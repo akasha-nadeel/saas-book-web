@@ -1,6 +1,6 @@
 /**
  * One plan, drawn as a card: a mark, the name, the figure, who it is for, what
- * you get, what a month of credits comes to, and a button.
+ * you get, and a button.
  *
  * **No `"use client"`, deliberately.** Nothing here holds state or listens for
  * anything — the period toggle, the checkout and the provider branching all
@@ -14,9 +14,8 @@
  *
  * **The card stopped being the comparison.** It used to carry all ten rows of
  * `ROWS` with a tick and a value badge against each, which is a table with
- * rounded corners — four of them side by side is forty lines, most of them
- * identical across the four columns, and the one line a buyer is choosing
- * between (the credit grant) was the eighth of ten. So the card now leads with
+ * rounded corners — most of the lines identical across the columns, and the
+ * one line a buyer is choosing between buried among them. So the card now leads with
  * a handful out of `plan-highlights.ts` and `PlanTable` underneath carries
  * every claim in full. Nothing was dropped; it moved to where it can be read.
  *
@@ -34,21 +33,8 @@
 
 import type { Highlight } from "@/lib/billing/plan-highlights";
 
-/**
- * Which of the three skins a card wears.
- *
- * **`pass` is a different *kind* of thing, not a louder plan**, and that is the
- * whole reason it gets a hue of its own rather than a bigger badge. Four of
- * these cards are subscriptions and one is a single charge; a reader who takes
- * the pass for a fifth plan has been misled by the layout. Violet says "not one
- * of these" before a word is read.
- *
- * It takes `badge-pro-*`, which is already in the palette and already stated in
- * all three theme blocks. **No new token was added for this** — the app's
- * colour exceptions are a closed list, and a sixth ground invented for one card
- * is exactly what that list exists to prevent.
- */
-export type CardTone = "plain" | "featured" | "pass";
+/** Which of the two skins a card wears. */
+export type CardTone = "plain" | "featured";
 
 export function PlanCard({
   tone = "plain",
@@ -59,7 +45,6 @@ export function PlanCard({
   price,
   note,
   highlights,
-  replies,
   action,
 }: {
   tone?: CardTone;
@@ -73,17 +58,9 @@ export function PlanCard({
   /** Shown under the price — which cycle this figure is. */
   note?: string;
   highlights: Highlight[];
-  /**
-   * What a month of credits comes to, in replies.
-   *
-   * **The one figure a reader wants and the one a credit balance never gives.**
-   * Absent on a plan with no grant, where the box would be three zeroes.
-   */
-  replies?: { label: string; count: string }[];
   action: React.ReactNode;
 }) {
   const featured = tone === "featured";
-  const pass = tone === "pass";
 
   return (
     <section
@@ -94,12 +71,7 @@ export function PlanCard({
                         // loudest thing here, and a line around a block of
                         // colour only muddies its edge.
                         "bg-accent text-accent-ink"
-                      : pass
-                        ? // Tinted rather than filled, with its border in the
-                          // same hue: the pass reads as *aside from* the row
-                          // rather than as competing with the featured plan.
-                          "border border-badge-pro-line bg-badge-pro-bg text-fg"
-                        : "border border-line bg-panel text-fg"
+                      : "border border-line bg-panel text-fg"
                   }`}
     >
       {badge && (
@@ -114,9 +86,7 @@ export function PlanCard({
                       ring-2 ring-surface ${
                         featured
                           ? "bg-accent-ink text-accent"
-                          : pass
-                            ? "bg-badge-pro-ink text-badge-pro-bg"
-                            : "bg-accent text-accent-ink"
+                          : "bg-accent text-accent-ink"
                       }`}
         >
           {badge}
@@ -129,9 +99,7 @@ export function PlanCard({
         className={`mx-auto grid h-11 w-11 place-items-center rounded-full ${
           featured
             ? "bg-accent-ink/15 text-accent-ink"
-            : pass
-              ? "bg-badge-pro-ink/15 text-badge-pro-ink"
-              : "bg-accent/12 text-accent"
+            : "bg-accent/12 text-accent"
         }`}
       >
         {mark}
@@ -168,13 +136,7 @@ export function PlanCard({
                     px-3.5 py-3 font-sans text-sm leading-snug ${
                       featured
                         ? "bg-accent-ink/12 text-accent-ink"
-                        : pass
-                          ? // Solid violet with its own ink, which is the
-                            // tint's ground — the fill is light by day and
-                            // dark at night, so one literal would vanish in
-                            // one of the two.
-                            "bg-badge-pro-ink text-badge-pro-bg"
-                          : "bg-accent/10 text-fg"
+                        : "bg-accent/10 text-fg"
                     }`}
       >
         {bestFor}
@@ -216,51 +178,6 @@ export function PlanCard({
         </ul>
       </div>
 
-      {replies && (
-        /* What the month actually buys, boxed under the list. `flex-1 basis-auto`
-           rather than equal thirds: equal columns cut "1,000" off on Studio at
-           this size, and letting each figure take its own width keeps every
-           card on one line. */
-        <div
-          className={`mt-2 flex items-start justify-center gap-0.5 rounded-md
-                      border px-1 py-2.5 ${
-                        featured
-                          ? "border-accent-ink/25"
-                          : pass
-                            ? "border-badge-pro-line"
-                            : "border-line"
-                      }`}
-        >
-          {replies.map((model, index) => (
-            <div key={model.label} className="flex min-w-0 items-start">
-              {index > 0 && (
-                /* Sits on the figures' line rather than the box's middle, so
-                   the three counts read as one sentence across the box. */
-                <span
-                  className={`shrink-0 pt-1.5 font-sans text-[0.625rem] italic ${
-                    featured ? "text-accent-ink/70" : "text-muted"
-                  }`}
-                >
-                  or&nbsp;
-                </span>
-              )}
-              <div className="flex min-w-0 flex-col items-center gap-px px-1">
-                <b className="font-display text-[1.4375rem] leading-tight font-bold tracking-tight tabular-nums whitespace-nowrap">
-                  {model.count}
-                </b>
-                <i
-                  className={`font-sans text-[0.625rem] font-semibold tracking-[0.05em] uppercase not-italic ${
-                    featured ? "text-accent-ink/70" : "text-muted"
-                  }`}
-                >
-                  {model.label}
-                </i>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* `mt-auto` is what puts the four buttons on one line whatever the lists
           above them did. */}
       <div className="mt-auto pt-3">{action}</div>
@@ -270,24 +187,6 @@ export function PlanCard({
 
 /* The two card marks. Same alphabet as the rest of the app: a 20-grid at 1.5
    weight, taking `currentColor` so the chip decides the hue. */
-
-export function PenIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className ?? "h-[21px] w-[21px]"}
-    >
-      <path d="M13.5 3.5a1.77 1.77 0 0 1 2.5 2.5L7 15l-3.5 1L4.5 12.5Z" />
-      <path d="M12 5 15 8" />
-    </svg>
-  );
-}
 
 export function StackIcon({ className }: { className?: string }) {
   return (
@@ -323,45 +222,6 @@ export function NibIcon({ className }: { className?: string }) {
       <path d="M10 2.5 15.5 8v6.5A1.5 1.5 0 0 1 14 16H6a1.5 1.5 0 0 1-1.5-1.5V8Z" />
       <path d="M10 9.5v4" />
       <circle cx="10" cy="7.5" r="1.1" />
-    </svg>
-  );
-}
-
-/** The pass's mark. A key, because it opens something rather than being it. */
-export function KeyIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className ?? "h-[21px] w-[21px]"}
-    >
-      <circle cx="7" cy="13" r="3.5" />
-      <path d="m9.6 10.6 6.4-6.4" />
-      <path d="m13.5 6.7 1.8 1.8" />
-    </svg>
-  );
-}
-
-export function ShelfIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className ?? "h-[21px] w-[21px]"}
-    >
-      <rect x="2.5" y="3" width="15" height="5" rx="1" />
-      <rect x="2.5" y="12" width="15" height="5" rx="1" />
-      <path d="M5.5 8v4M14.5 8v4" />
     </svg>
   );
 }

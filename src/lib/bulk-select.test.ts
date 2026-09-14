@@ -146,8 +146,10 @@ describe("restoreCapacity", () => {
   });
 
   it("counts the free allowance down as the shelf fills", () => {
-    const shelf = shelfOf([book("a"), book("b")]);
-    expect(restoreCapacity(shelf, true)).toBe(LAUNCH_LIMITS.freeBooks - 2);
+    expect(restoreCapacity(shelfOf([]), true)).toBe(LAUNCH_LIMITS.freeBooks);
+    expect(restoreCapacity(shelfOf([book("a")]), true)).toBe(
+      LAUNCH_LIMITS.freeBooks - 1,
+    );
   });
 
   /**
@@ -157,13 +159,17 @@ describe("restoreCapacity", () => {
    * one back out.
    */
   it("counts the archive against the plan and the trash not at all", () => {
-    const shelf = shelfOf([
-      book("a"),
-      book("b", { archivedAt: 1 }),
+    /* Two separate shelves rather than one mixed one: the free plan holds a
+       single book, so a shelf carrying both would read zero either way and
+       prove nothing about which of them was counted. */
+    const archived = shelfOf([book("b", { archivedAt: 1 })]);
+    expect(restoreCapacity(archived, true)).toBe(LAUNCH_LIMITS.freeBooks - 1);
+
+    const trashed = shelfOf([
       book("c", { trashedAt: 1 }),
       book("d", { trashedAt: 1 }),
     ]);
-    expect(restoreCapacity(shelf, true)).toBe(LAUNCH_LIMITS.freeBooks - 2);
+    expect(restoreCapacity(trashed, true)).toBe(LAUNCH_LIMITS.freeBooks);
   });
 
   it("never goes below zero on an over-full shelf", () => {
@@ -188,7 +194,7 @@ describe("planRestore", () => {
     expect(planRestore(picked, shelfOf([]), false).fits).toBe(true);
   });
 
-  /* All or nothing: the writer chose five books, not "whichever two fit". */
+  /* All or nothing: the writer chose three books, not "whichever one fits". */
   it("refuses the whole batch when it does not fit", () => {
     const shelf = shelfOf(
       Array.from({ length: LAUNCH_LIMITS.freeBooks - 1 }, (_, i) =>
@@ -207,11 +213,11 @@ describe("planRestore", () => {
 
   it("allows a batch that exactly fills the last slots", () => {
     const shelf = shelfOf(
-      Array.from({ length: LAUNCH_LIMITS.freeBooks - 2 }, (_, i) =>
+      Array.from({ length: LAUNCH_LIMITS.freeBooks - 1 }, (_, i) =>
         book(`b${i}`),
       ),
     );
-    const picked = [book("x", { trashedAt: 1 }), book("y", { trashedAt: 1 })];
+    const picked = [book("x", { trashedAt: 1 })];
     expect(planRestore(picked, shelf, true).fits).toBe(true);
   });
 });

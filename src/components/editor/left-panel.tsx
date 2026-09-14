@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
-import { ChatPanel } from "@/components/chat/chat-panel";
 import { ChapterSidebar } from "@/components/sidebar/chapter-sidebar";
 import { BookmarksPanel } from "@/components/editor/bookmarks-panel";
 import { HistoryPanel } from "@/components/editor/history-panel";
@@ -96,8 +95,6 @@ export function LeftPanel({
   chapterId,
   chapterTitle,
   editor,
-  getChapterText,
-  canWrite,
   onClose,
 }: {
   /**
@@ -111,7 +108,7 @@ export function LeftPanel({
    *
    * Nothing mounts before the first open: `rendered` starts false and the whole
    * component returns null, so a writer who never opens a panel never pays for
-   * the bible, the assistant or the history reading storage.
+   * the bible or the history reading storage.
    */
   open: boolean;
   tab: PanelTab;
@@ -119,16 +116,6 @@ export function LeftPanel({
   chapterId: string;
   chapterTitle: string;
   editor?: Editor | null;
-  getChapterText: () => string;
-  /**
-   * Whether this writer may change this book.
-   *
-   * Passed down rather than read here: `chapter-editor.tsx` already has it from
-   * `canWriteBook`, and two readings of one question are two answers waiting to
-   * disagree. The assistant is the only panel that needs it — it is the only
-   * one that can put words in the manuscript.
-   */
-  canWrite: boolean;
   /** Dismiss the panel. Required: the header's control and Escape both need it. */
   onClose: () => void;
 }) {
@@ -533,15 +520,6 @@ export function LeftPanel({
             <HistoryPanel key={chapterId} bookId={bookId} chapterId={chapterId} />
           )}
           {tab === "trash" && <TrashPanel bookId={bookId} />}
-          {tab === "assistant" && (
-            <ChatPanel
-              chapterId={chapterId}
-              chapterTitle={chapterTitle}
-              getChapterText={getChapterText}
-              editor={editor}
-              canWrite={canWrite}
-            />
-          )}
         </div>
       </aside>
     </>

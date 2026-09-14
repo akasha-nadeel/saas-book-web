@@ -200,78 +200,6 @@ function MarkdownPreview({ book }: PreviewProps) {
   );
 }
 
-/**
- * A player, a waveform, and the chapters it was cut into.
- *
- * **Nothing renders this at the moment, and it stays.** The audiobook export
- * came off the format step on 2026-08-14 to be put back later; the machinery
- * behind it is whole and tested, and this is the picture that card carried.
- * Same standing as `templates-dialog.tsx` and `ambience.ts` — kept, callerless,
- * not to be tidied away. It is still in `PREVIEWS` and `BADGES` below, which
- * costs nothing and is what makes the return one line of data.
- */
-function AudiobookPreview({ book }: PreviewProps) {
-  // Fixed rather than random: a preview that redraws differently on every
-  // render reads as a loading state.
-  const bars = [
-    30, 55, 40, 80, 65, 95, 50, 70, 35, 60, 85, 45, 75, 55, 90, 40, 65, 30, 50,
-    70, 45, 80, 35, 60, 55, 38, 72, 48,
-  ];
-  return (
-    <span
-      className={`flex h-full w-full ${MEASURE} flex-col px-6 pt-4 text-sheet-ink`}
-    >
-      <span className="flex items-center gap-2">
-        <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-sheet-ink">
-          <span
-            className="block h-0 w-0"
-            style={{
-              borderTop: "3px solid transparent",
-              borderBottom: "3px solid transparent",
-              borderLeft: "5px solid var(--color-sheet)",
-              marginLeft: "1px",
-            }}
-          />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate font-sans text-[7px] font-semibold text-sheet-ink/80">
-            {book.chapter}
-          </span>
-          <span className="block truncate font-sans text-[6px] text-sheet-ink/50">
-            {book.title}
-          </span>
-        </span>
-        <span className="shrink-0 font-mono text-[6.5px] text-sheet-ink/50">
-          04:12 / 12:38
-        </span>
-      </span>
-
-      <span className="mt-3 flex h-7 items-center gap-[3px]">
-        {bars.map((h, i) => (
-          <span
-            key={i}
-            className={`block w-[3px] rounded-full ${
-              i < 10 ? "bg-sheet-ink/70" : "bg-sheet-ink/20"
-            }`}
-            style={{ height: `${h}%` }}
-          />
-        ))}
-      </span>
-
-      <span className="mt-2.5 block font-mono text-[6.5px] leading-[1.9] text-sheet-ink/50">
-        <span className="flex justify-between">
-          <span className="truncate">01 &nbsp;{book.chapter}</span>
-          <span className="shrink-0 pl-2">12:38</span>
-        </span>
-        <span className="flex justify-between">
-          <span className="truncate">02 &nbsp;Chapter Two</span>
-          <span className="shrink-0 pl-2">09:41</span>
-        </span>
-      </span>
-    </span>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // The mark beside each format's name
 // ---------------------------------------------------------------------------
@@ -332,11 +260,6 @@ const BADGES: Record<
     label: "Markdown",
     path: "M22.27 19.385H1.73A1.73 1.73 0 010 17.655V6.345a1.73 1.73 0 011.73-1.73h20.54A1.73 1.73 0 0124 6.345v11.308a1.73 1.73 0 01-1.73 1.731zM5.769 15.923v-4.5l2.308 2.885 2.307-2.885v4.5h2.308V8.078h-2.308l-2.307 2.885-2.308-2.885H3.46v7.847zM21.232 12h-2.309V8.077h-2.307V12h-2.308l3.461 4.039z",
   },
-  audiobook: {
-    viewBox: "0 0 384 512",
-    label: "Audio file",
-    path: "M0 64C0 28.7 28.7 0 64 0L213.5 0c17 0 33.3 6.7 45.3 18.7L365.3 125.3c12 12 18.7 28.3 18.7 45.3L384 448c0 35.3-28.7 64-64 64L64 512c-35.3 0-64-28.7-64-64L0 64zm208-5.5l0 93.5c0 13.3 10.7 24 24 24L325.5 176 208 58.5zm53.8 185.2c-9.1-6.3-21.5-4.1-27.8 5s-4.1 21.5 5 27.8c23.9 16.7 39.4 44.3 39.4 75.5s-15.6 58.9-39.4 75.5c-9.1 6.3-11.3 18.8-5 27.8s18.8 11.3 27.8 5c34.1-23.8 56.6-63.5 56.6-108.3S296 267.5 261.8 243.7zM80 312c-8.8 0-16 7.2-16 16l0 48c0 8.8 7.2 16 16 16l24 0 27.2 34c3 3.8 7.6 6 12.5 6l.3 0c8.8 0 16-7.2 16-16l0-128c0-8.8-7.2-16-16-16l-.3 0c-4.9 0-9.5 2.2-12.5 6l-27.2 34-24 0zm128 72.2c0 10.7 10.5 18.2 18.9 11.6 12.9-10.3 21.1-26.1 21.1-43.8s-8.2-33.5-21.1-43.8c-8.4-6.7-18.9 .9-18.9 11.6l0 64.5z",
-  },
 };
 
 /**
@@ -373,7 +296,6 @@ const PREVIEWS = {
   epub: EpubPreview,
   docx: WordPreview,
   markdown: MarkdownPreview,
-  audiobook: AudiobookPreview,
 } as const;
 
 export type PreviewKey = keyof typeof PREVIEWS;

@@ -9,7 +9,6 @@ import { ToolHeader } from "@/components/tool-header";
    on the export. */
 import { AMAZON_MARK } from "@/components/landing/works-with";
 import { keywordReport, SLOTS, SLOT_MAX, type Issue } from "@/lib/keywords";
-import { KeywordWorkshop } from "@/components/categories/keyword-workshop";
 /* Several pages of prose that most visits never open, so it is a chunk of its
    own — the same reasoning the roadmap loads its tool panels under. */
 const KeywordGuide = dynamic(
@@ -24,16 +23,13 @@ import { useToolSave } from "@/lib/use-tool-save";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
- * The height of the keyword row's two cards.
+ * The height of the keyword card.
  *
- * **The blurb screen's own numbers, taken deliberately.** That screen is the
- * same idea — a thing you write in beside a thing you talk to — and it settled
- * these two figures already: a page gets `36rem`, and the roadmap's panel gets
- * `22rem` because the sheet there is short and a card taller than its window
- * cannot be scrolled to the bottom of. Stated once here so both children of
- * the grid take it and end on the same line; if the blurb screen ever moves,
- * move this with it, because two tool screens differing by four rem look like
- * two products.
+ * **The blurb screen's own numbers, taken deliberately**: a page gets `36rem`,
+ * and the roadmap's panel gets `22rem` because the sheet there is short and a
+ * card taller than its window cannot be scrolled to the bottom of. If the blurb
+ * screen ever moves, move this with it, because two tool screens differing by
+ * four rem look like two products.
  */
 const COMPOSER_HEIGHT_PAGE = "h-[36rem]";
 const COMPOSER_HEIGHT_PANEL = "h-[22rem]";
@@ -131,7 +127,7 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
      already knew, and it forced a `seeded` flag to be read during render. */
   /* **Read-only while "On this book" is out.** Nothing on the screen edits the
      categories at the moment, so this is the book's own list — which the
-     keyword checker and the workshop both still need, since a shop indexes a
+     keyword checker still needs, since a shop indexes a
      book under its categories already and a keyword repeating one is a box
      spent on nothing. The draft keeps the field rather than dropping it: the
      section is being rebuilt, and the save bar this screen already owns is
@@ -190,64 +186,9 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
     });
   }
 
-  /* ---- Candidates from the workshop -----------------------------------
-   *
-   * **The model writes candidates; the writer keeps or discards them.** Both
-   * doors in `KeywordWorkshop` — the one press and the conversation — come
-   * back here, so there is one place that touches the boxes and three rules
-   * hold all of it.
-   *
-   * *Empty slots only.* Words a writer typed are never overwritten. A model
-   * quietly replacing somebody's work and presenting the result as theirs is
-   * the invisible hand this app refuses everywhere — the comps query goes back
-   * into the search box editable for the same reason.
-   *
-   * *It lands in the draft, not in the store.* Candidates go through `edit()`
-   * like any typed character, so the save bar appears and nothing reaches the
-   * book until the writer presses it. Undo is then honest rather than
-   * cosmetic: it puts back exactly what was there.
-   *
-   * *The allowances are spent where the replies land*, which is inside the
-   * workshop — a gateway error must not cost an allowance a writer never got
-   * the benefit of, and this function is only ever reached once something
-   * arrived.
-   */
-  /** The seven as they were before the last fill, or null when there is none. */
-  const [beforeSuggest, setBeforeSuggest] = useState<string[] | null>(null);
-
   /* The guide sheet. Loaded on demand below rather than imported at the top:
      it is several pages of prose that most visits never open. */
   const [guideOpen, setGuideOpen] = useState(false);
-
-  /* `description` is the blurb — `publishing.ts` names the field for the shops'
-     own form rather than for what writers call it. */
-  const blurb = book?.publishing?.description ?? "";
-
-  function applyCandidates(found: string[]) {
-    if (found.length === 0) return;
-
-    setBeforeSuggest([...keywords]);
-    edit({
-      keywords: (current) => {
-        const next = [...current];
-        let take = 0;
-        for (let i = 0; i < SLOTS && take < found.length; i += 1) {
-          if (!(next[i] ?? "").trim()) {
-            next[i] = found[take];
-            take += 1;
-          }
-        }
-        return next;
-      },
-    });
-  }
-
-  function undoSuggest() {
-    if (!beforeSuggest) return;
-    const previous = beforeSuggest;
-    edit({ keywords: () => [...previous] });
-    setBeforeSuggest(null);
-  }
 
   // The app's splash is for the app. In the roadmap's panel it would take
   // over half the window with a logo, so an embedded tool waits silently —
@@ -349,25 +290,9 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
             </span>
           </div>
 
-          {/* **The boxes and the offer are two boxes, side by side.** The
-              suggestion control sat inside this panel, above the fields, on
-              the reasoning that it is what somebody looking at seven empty
-              inputs needs. It is — but stacked it pushed the seven down the
-              page and read as a step to take before typing, when the whole
-              design is that a writer fills these in themselves and the model
-              only fills what is left empty. Beside them it is an offer
-              standing next to the work rather than in front of it, and the
-              fields start at the top of the section where they belong.
-
-              **The same measurements as the blurb screen, and that is the
-              point.** Both screens are a thing you write beside a thing you
-              talk to, so they take one grid — `@3xl` off the *container* and a
-              24rem rail, not `lg:` off the window, because in the roadmap's
-              panel the window is wide while this column is not — and one
-              height, stated on both children so the two cards end on the same
-              line. Two tool screens that differ by four rem in the sidebar and
-              a hand's width in the card look like two products. */}
-          <div className="mt-3 grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_24rem]">
+          {/* The seven boxes at the blurb screen's height, so the two tool
+              screens take one measure. */}
+          <div className="mt-3">
             <div
               className={`flex ${COMPOSER_HEIGHT} flex-col overflow-hidden rounded-xl
                           border border-line bg-panel p-4`}
@@ -506,46 +431,9 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
               </div>
             </div>
 
-            {/* ---- The workshop --------------------------------------------
-
-                One card, two doors: the press for somebody who wants seven
-                candidates and nothing else, and the conversation for the two
-                questions a button cannot answer — *what are these boxes* and
-                *which seven should this book spend them on*.
-
-                **A stated height, not `flex-1`, and the same one the card
-                beside it takes.** A grid row is `auto` and grows to its
-                tallest item, so a chat left to size itself would stretch the
-                row with every turn and never scroll — and the two cards would
-                end on different lines, which is the thing that made this
-                screen and the blurb screen look like two products.
-                `COMPOSER_HEIGHT` is the one place that number lives. */}
-            <div className={`flex ${COMPOSER_HEIGHT} flex-col`}>
-              <KeywordWorkshop
-                bookId={book.id}
-                blurb={blurb}
-                genre={book.genre}
-                categories={chosen}
-                keywords={keywords}
-                title={book.title}
-                subtitle={book.subtitle}
-                author={book.author}
-                series={book.publishing?.series}
-                onCandidates={applyCandidates}
-                onUndo={undoSuggest}
-                canUndo={beforeSuggest !== null}
-                onOpenGuide={() => setGuideOpen(true)}
-              />
-            </div>
           </div>
         </section>
       </div>
-
-      {/* Both limit dialogs live inside the workshop now, with the presses
-          that are refused — opened by a press and never by an effect, since an
-          effect watching `blocked` would fire on arrival for somebody who ran
-          out last week, which is a paywall shown to a writer who pressed
-          nothing. */}
 
       {guideOpen && <KeywordGuide onClose={() => setGuideOpen(false)} />}
     </div>

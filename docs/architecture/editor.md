@@ -314,7 +314,7 @@ where both defaulted to the literal string.
 
 **The editor shell is a rail, a tool panel, and the book panel.**
 `workspace-rail.tsx` selects which tool panel (`PanelTab` in `left-panel.tsx`:
-chapters, search, notes, ideas, bible, bookmarks, assistant, history, trash) is
+chapters, search, notes, ideas, bible, bookmarks, history, trash) is
 open, and clicking the active tab closes it — one control, never two.
 
 **The left chrome is one slot, `--sidebar-width` wide, and the page stands
@@ -385,15 +385,15 @@ that failed to load.
 passes `open` rather than writing `{open && …}`: a panel removed from the tree
 cannot animate its exit, so it stays mounted for `EXIT_MS` (in step with
 `.oc-drawer-out`) and then takes itself down; nothing mounts at all before the
-first open, so a writer who never opens a panel never pays for the bible, the
-assistant or the history reading storage. The travel is a whole drawer's width
+first open, so a writer who never opens a panel never pays for the bible or
+the history reading storage. The travel is a whole drawer's width
 from behind the rail — which is why the left rail is `z-[45]`, above the panel's
 40 and under the app's dialogs — rather than a nudge, because a nudge reads as a
 layer that was always there. In decelerating, out accelerating and quicker.
 
 **The rail is grouped, and the groups are the argument** (`GROUPS` / `FOOTER` in
 `workspace-rail.tsx`): finding a place in the book (search, bookmarks), then
-what is kept beside the book (notes, ideas, bible, assistant), then the two
+what is kept beside the book (notes, ideas, bible), then the two
 safety nets — versions and the trash — pinned to the foot, where Material's own
 rail guidance puts this class of item and for the reason that matters here: the
 trash is the one button in the column nobody wants to press by accident, so it

@@ -17,22 +17,9 @@ import {
   buildQuery,
   type CompTitle,
 } from "@/lib/comps/comps";
-import { looksPlain } from "@/lib/comps/query";
 import { subjectParts } from "@/lib/comps/subjects";
-import {
-  openingFrom,
-  proseFrom,
-  restOf,
-  type RankedComp,
-} from "@/lib/comps/rank";
 import { plural } from "@/lib/plural";
-import { toBlocks } from "@/lib/export/blocks";
-import {
-  chapterMatterOf,
-  findBook,
-  getBody,
-  orderedChapters,
-} from "@/lib/library-store";
+import { findBook } from "@/lib/library-store";
 import {
   LeftPill,
   LimitBanner,
@@ -47,7 +34,6 @@ import {
   resultsGridClass,
   type ShelfLayout,
 } from "@/lib/shelf-layout";
-import { COMPS_RANKING_LIVE } from "@/lib/launch";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
@@ -73,19 +59,9 @@ import { toolShell, type ToolPageProps } from "@/lib/tool-page";
  * cover. Ordered the other way round, the numbers arrive after the books they
  * were counted from, which is when they mean anything.
  *
- * **The search does not judge, and the ranking is a separate press.** What the
- * two services return is what they return, in their order. Working out which
- * five of those twenty are genuinely comparable is a fuzzy judgement and the
- * one place a model earns its cost — so it is a control on the results bar
- * rather than part of the search, and everything else works with the model
- * switched off and the bill at zero.
- *
- * **That press is where this screen sends prose**, and it is the only thing in
- * the tool that does. The opening of the manuscript answers what a keyword
- * search cannot — does this *sound* like that book — so the line under the
- * button names exactly what leaves before it is pressed, in the shape the
- * feedback dialog uses. Nothing is sent by loading the page except the query
- * in the box.
+ * **The search does not judge.** What the two services return is what they
+ * return, in their order. Nothing is sent by loading the page except the query
+ * in the box, and no prose ever leaves: there is no model behind this screen.
  */
 export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
   const hydrated = useHydrated();
@@ -136,35 +112,6 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
   );
   const [error, setError] = useState<string | null>(null);
 
-  const [picks, setPicks] = useState<RankedComp[] | null>(null);
-  const [pattern, setPattern] = useState<string | null>(null);
-  const [ranking, setRanking] = useState(false);
-  const [rankError, setRankError] = useState<string | null>(null);
-
-  /**
-   * The opening of the book, for the ranking to judge voice against.
-   *
-   * The first body chapter that has any prose in it, rather than the first
-   * chapter: a book whose chapter one is an empty stub would otherwise send
-   * nothing and be told there was nothing to judge, while the prose sat in
-   * chapter two.
-   */
-  const opening = useMemo(() => {
-    if (!book) return "";
-    for (const chapter of orderedChapters(book)) {
-      if (chapterMatterOf(chapter) !== "body") continue;
-      const raw = getBody(chapter.id);
-      if (!raw) continue;
-      try {
-        const text = openingFrom(proseFrom(toBlocks(JSON.parse(raw))));
-        if (text) return text;
-      } catch {
-        // A corrupt body contributes nothing, as it does to search.
-      }
-    }
-    return "";
-  }, [book]);
-
   /**
    * The query the result on screen belongs to.
    *
@@ -176,100 +123,32 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
   const [searched, setSearched] = useState("");
 
   /**
-   * Search, translating the writer's words into a catalogue query first.
+   * Search the two catalogues for what is in the box.
    *
-   * **The translation is the fix for the wrong-books problem**, and it has to
-   * happen here rather than in the ranking: `Rank these` reorders what was
-   * fetched, so a fetch that brought back a comedian's memoir and a devotional
-   * about dessert stays wrong however well it is sorted.
-   *
-   * Three things keep it honest. It runs **only on plain words** — a shelf chip
-   * or a hand-written `subject:"…"` is already a query, and rewriting it would
-   * spend a model call to change nothing. It **puts the query it used in the
-   * box**, so what was searched is on screen and can be edited or undone. And
-   * **every failure falls through to the raw words**: no plan, no key, a bad
-   * parse or a dead model all end in the search that would have run anyway,
-   * because a free keyless search is the thing this screen may never lose.
+   * Nothing is rewritten: the words in the box are the search, and they stay
+   * on screen to be edited and run again.
    */
-  const search = useCallback(async (q: string, genre?: string) => {
+  const search = useCallback(async (q: string) => {
     if (q.trim().length < 2) return;
     setState("loading");
     setError(null);
-    // A ranking belongs to the list it was made from. Leaving it up over a new
-    // search would attribute five reasons to twenty different books.
-    setPicks(null);
-    setPattern(null);
-    setRankError(null);
-
-    let asked = q;
-    /* **The translation is skipped outright while the model routes are gated**,
-       rather than left to fail into the catch below. The catch is still the
-       right behaviour and stays — a translation that errors must never cost a
-       writer their search — but firing a request we already know answers 404,
-       on every search, is a round trip spent to reach a `catch` block. The flag
-       is the one place that knows; see `COMPS_RANKING_LIVE`. */
-    if (COMPS_RANKING_LIVE && looksPlain(q)) {
-      try {
-        const response = await fetch("/api/comps/query", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ words: q, genre }),
-        });
-        if (response.ok) {
-          const built = (await response.json())?.query;
-          if (typeof built === "string" && built.trim()) {
-            asked = built.trim();
-            setQuery(asked);
-          }
-        }
-      } catch {
-        // The words themselves are a working search. Never block on this.
-      }
-    }
 
     try {
-      let response = await fetch(`/api/comps?q=${encodeURIComponent(asked)}`);
-      let data = await response.json();
+      const response = await fetch(`/api/comps?q=${encodeURIComponent(q)}`);
+      const data = await response.json();
       if (!response.ok) {
         setError(data?.error ?? "That search did not work.");
         setState("error");
         return;
       }
 
-      /*
-       * **A translation that finds nothing loses to the words it replaced.**
-       *
-       * Measured, and it is not a rare edge: "cozy village mystery with a nosy
-       * librarian" came back as `subject:"Fantasy" subject:"Cozy mystery"
-       * librarian village` — four terms, which the catalogue ANDs, and
-       * therefore **0 books**. The same words sent raw found 6, and the single
-       * term `subject:"Cozy mystery"` found 20. The clever step had made the
-       * screen worse than not having it, which is the one thing a clever step
-       * may never do.
-       *
-       * The prompt was tightened to stop stacking terms, but a prompt is a
-       * request rather than a guarantee, so this is the guarantee: if the
-       * rewritten query finds nothing, the writer's own words run instead and
-       * the box goes back to showing what was actually searched.
-       */
-      if ((data.books ?? []).length === 0 && asked !== q) {
-        const plain = await fetch(`/api/comps?q=${encodeURIComponent(q)}`);
-        const fallback = await plain.json();
-        if (plain.ok && (fallback.books ?? []).length > 0) {
-          asked = q;
-          setQuery(q);
-          response = plain;
-          data = fallback;
-        }
-      }
       setBooks(data.books ?? []);
       setSources(data.sources ?? null);
       setGoogleKeyed(data.googleKeyed !== false);
       setWhy(data.why ?? null);
-      // What was actually asked, which is the translated query when there was
-      // one. The empty state explains a result, so it has to name the search
-      // that produced it rather than the words that were typed.
-      setSearched(asked);
+      // What was actually asked. The empty state explains a result, so it has
+      // to name the search that produced it rather than the words in the box.
+      setSearched(q);
       setState("done");
     } catch {
       setError("Could not reach the search. Check your connection.");
@@ -321,11 +200,11 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
   const gate = useLimitGate({ action: "comps" });
   const comps = gate.allowance;
   const ask = useCallback(
-    (q: string, genre?: string) => {
+    (q: string) => {
       // Refused rather than disabled: the eleventh press is what puts the
       // banner and the dialog on screen. See `useLimitGate`.
       if (!gate.spend()) return;
-      void search(q, genre);
+      void search(q);
     },
     [gate, search],
   );
@@ -353,49 +232,8 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
       blurb: book.publishing?.description,
     });
     setQuery(seed);
-    void search(seed, book.genre);
+    void search(seed);
   }, [book, search]);
-
-  /**
-   * Ask the model which of these are actually alike.
-   *
-   * The reply comes back as keys and reasons rather than whole records — the
-   * browser already has the books, and echoing twenty of them back would be
-   * paying to move data that never left.
-   */
-  const rank = useCallback(async () => {
-    setRanking(true);
-    setRankError(null);
-    try {
-      const response = await fetch("/api/comps/rank", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          blurb: book?.publishing?.description ?? "",
-          opening,
-          books,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setRankError(data?.error ?? "The ranking did not work.");
-        return;
-      }
-      const byKey = new Map(books.map((b) => [b.key, b]));
-      const chosen: RankedComp[] = (data.picks ?? []).flatMap(
-        (p: { key?: string; reason?: string }) => {
-          const found = p.key ? byKey.get(p.key) : undefined;
-          return found && p.reason ? [{ book: found, reason: p.reason }] : [];
-        },
-      );
-      setPicks(chosen);
-      setPattern(typeof data.pattern === "string" ? data.pattern : null);
-    } catch {
-      setRankError("Could not reach the ranking. Check your connection.");
-    } finally {
-      setRanking(false);
-    }
-  }, [book, books, opening]);
 
   // The app's splash is for the app. In the roadmap's panel it would take
   // over half the window with a logo, so an embedded tool waits silently —
@@ -527,13 +365,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
             Agents and shops ask for books like yours &mdash; find them.
           </label>
 
-          {/* **Says what to type, not what the machine does with it.** The
-              translation step is deliberately unadvertised: it needs a plan
-              and a model key, so a line promising that your words become a
-              proper search would be false for anyone without either — and this
-              screen's free half is the part that may never come with an
-              asterisk. The query it lands on is visible in the box afterwards,
-              which is a demonstration rather than a claim. */}
+          {/* **Says what to type, not what the machine does with it.** */}
           <p className="mt-1.5 mb-3 max-w-prose text-sm leading-relaxed text-muted">
             Plain words are fine — the kind of story, who it is for, where it is
             set. Not the title, though: comps are books <em>like</em> yours.
@@ -546,7 +378,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
               touched.current = true;
               setQuery(next);
             }}
-            onSearch={(q) => ask(q, book.genre)}
+            onSearch={(q) => ask(q)}
             busy={state === "loading"}
           />
 
@@ -621,8 +453,8 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
             {/* ---- The books ------------------------------------------------
 
                 First, and that is the whole of this section's design. These panels
-                used to run figures, then a length reading, then the ranking card
-                before a single cover appeared — about a screen and a half of
+                used to run figures and a length reading before a single cover
+                appeared — about a screen and a half of
                 analysis above the thing being analysed, so the answer to "what
                 does my book sit beside" was below the fold on every screen size.
                 Every shop that sells books puts the shelf directly under the
@@ -635,33 +467,6 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
               <p className="max-w-prose text-muted">
                 {emptyReason(searched, book.title, sources, googleKeyed, why)}
               </p>
-            )}
-
-            {/* ---- The ranking card, and why it may not be here -------------
-
-                `ResultsBar` is the whole model half of this screen: "Rank
-                these", its disabled states, and the paragraph naming the prose
-                that press would send. `/api/comps/rank` is still gated, so with
-                the card drawn the only thing that button could do is fail —
-                which is the dead UI the house rules refuse. One flag hides the
-                card; nothing below it is touched, and `ResultsBar`, `rank()`,
-                `picks` and `pattern` are all still here, finished and tested,
-                for the day `COMPS_RANKING_LIVE` goes true.
-
-                What is left is the search, which is the free half and the
-                larger one: the shelf of covers, the median length, the subject
-                counts and the two catalogues' own account of themselves. */}
-            {COMPS_RANKING_LIVE && books.length > 0 && (
-              <ResultsBar
-                picks={picks}
-                pattern={pattern}
-                ranking={ranking}
-                error={rankError}
-                count={books.length}
-                hasBlurb={Boolean(book.publishing?.description?.trim())}
-                hasOpening={Boolean(opening)}
-                onRank={rank}
-              />
             )}
 
             {/* Said plainly rather than left as a short list. A writer who sees ten
@@ -705,27 +510,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
               </div>
             )}
 
-            {picks && picks.length > 0 && (
-              <CompGrid
-                comps={picks.map((p) => p.book)}
-                reasons={picks}
-                layout={layout}
-              />
-            )}
-
-            {books.length > 0 && (
-              <>
-                {picks && picks.length > 0 && (
-                  <h2 className="mt-10 text-sm font-bold text-fg">
-                    The rest of what came back
-                  </h2>
-                )}
-                <CompGrid
-                  comps={picks ? restOf(books, picks) : books}
-                  layout={layout}
-                />
-              </>
-            )}
+            {books.length > 0 && <CompGrid comps={books} layout={layout} />}
           </div>
         </section>
         {/* ---- What the shelf added up to, and why it is gone -------------
@@ -747,8 +532,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
         ---------------------------------------------------------------- */}
 
         {/* Cut from four sentences to one. Three of them were restating what
-            the cards above already say at the moment it matters — the ranking
-            card lists what it sends, right where it is sent. What cannot go is
+            the cards above already say at the moment it matters. What cannot go is
             the source: these are contributed catalogues, and a reader deciding
             how much to trust a record needs to know whose record it is. */}
         <div className="mt-10 border-t border-line pt-6">
@@ -1100,119 +884,6 @@ function emptyReason(
 }
 
 /**
- * The bar over the shelf: how many books, and the one action that costs money.
- *
- * **This was a card, and the card was the problem.** It explained comps at
- * length, listed what ranking sends, and did all of that *above* the covers —
- * so the answer to "what does my book sit beside" started below the fold. A
- * results bar is what every shop selling books puts here instead: a count on
- * one side, the control that reorders the list on the other, one line tall.
- *
- * **The disclosure survived the shrinking**, because it is the one part that
- * could not go. Ranking sends prose, and a writer is owed that in plain words
- * at the moment it applies rather than in a policy page — so the line under
- * the button names exactly what leaves, and it sits there before the press and
- * goes after it. Add a field to what is sent and add it to that line.
- *
- * **Failure is text where the count is, never a missing button.** No key, no
- * account, no plan and a bad answer all read as a sentence — a control that
- * quietly does nothing is what the house rules call dead UI, and the shelf
- * below it still works, which is what the writer most needs to know.
- */
-function ResultsBar({
-  picks,
-  pattern,
-  ranking,
-  error,
-  count,
-  hasBlurb,
-  hasOpening,
-  onRank,
-}: {
-  picks: RankedComp[] | null;
-  pattern: string | null;
-  ranking: boolean;
-  error: string | null;
-  count: number;
-  hasBlurb: boolean;
-  hasOpening: boolean;
-  onRank: () => void;
-}) {
-  const nothingToJudge = !hasBlurb && !hasOpening;
-
-  return (
-    // No top margin: the section this sits in provides its own.
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
-        <p className="text-sm text-muted">
-          {picks === null ? (
-            <>
-              <span className="font-bold text-fg">{count}</span>{" "}
-              {count === 1 ? "book" : "books"}, in the catalogues&rsquo; own
-              order
-            </>
-          ) : picks.length === 0 ? (
-            <>None of these {count} came back as close</>
-          ) : (
-            <>
-              <span className="font-bold text-fg">{picks.length}</span> of{" "}
-              {count} judged closest, best first
-            </>
-          )}
-        </p>
-
-        {picks === null && (
-          <button
-            type="button"
-            onClick={onRank}
-            disabled={ranking || nothingToJudge}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink
-                       disabled:opacity-50"
-          >
-            {ranking ? "Reading\u2026" : "Rank these"}
-          </button>
-        )}
-      </div>
-
-      {picks === null && (
-        <p className="mt-2 text-xs text-muted">
-          {nothingToJudge ? (
-            <>
-              Ranking needs something of yours to judge against &mdash; write a
-              blurb in the export screen&rsquo;s listing details, or some prose
-              in your first chapter.
-            </>
-          ) : (
-            <>
-              Ranking sends{" "}
-              {[
-                hasBlurb && "your blurb",
-                hasOpening && "the opening of your first chapter",
-              ]
-                .filter(Boolean)
-                .join(" and ")}{" "}
-              to a model, only when you press it. Nothing is kept, and no score
-              comes back &mdash; an order and a reason each.
-            </>
-          )}
-        </p>
-      )}
-
-      {picks !== null && picks.length === 0 && (
-        <p className="mt-2 text-xs text-muted">
-          That is an answer rather than a failure. Try a search that describes
-          the story rather than naming the genre.
-        </p>
-      )}
-
-      {pattern && <p className="mt-3 text-sm text-fg">{pattern}</p>}
-
-      {error && <p className="mt-2 text-sm text-fg">{error}</p>}
-    </div>
-  );
-}
-
-/**
  * The shelf itself &mdash; covers in a grid, the way a bookshop shows books.
  *
  * A stacked list of rows was the wrong shape for this. Comps are judged by eye
@@ -1228,22 +899,17 @@ function ResultsBar({
  */
 function CompGrid({
   comps,
-  reasons,
   layout,
 }: {
   comps: CompTitle[];
-  reasons?: RankedComp[];
   layout: ShelfLayout;
 }) {
-  const reasonFor = new Map((reasons ?? []).map((r) => [r.book.key, r.reason]));
-
   return (
     <ul className={`mt-4 ${resultsGridClass(layout)}`}>
       {comps.map((comp) => (
         <CompCard
           key={comp.key}
           comp={comp}
-          reason={reasonFor.get(comp.key)}
           layout={layout}
         />
       ))}
@@ -1264,11 +930,9 @@ function CompGrid({
  */
 function CompCard({
   comp,
-  reason,
   layout,
 }: {
   comp: CompTitle;
-  reason?: string;
   layout: ShelfLayout;
 }) {
   /**
@@ -1320,7 +984,7 @@ function CompCard({
      * **A branch, not a second component.** Both show the same five things —
      * jacket, shelf, title, author, year and length — and two components would
      * be two places to add the sixth. What differs is the arrangement; the
-     * link, the drawn missing cover and the ranked reason are shared.
+     * link and the drawn missing cover are shared.
      *
      * The small print runs on one line rather than stacking, because a column
      * of three-line entries is a one-column grid. This mode exists to put more
@@ -1361,12 +1025,6 @@ function CompCard({
         </a>
       ) : (
         <div>{inner}</div>
-      )}
-
-      {reason && (
-        <p className="mt-1.5 border-l-2 border-accent/40 pl-2 text-xs leading-relaxed text-fg">
-          {reason}
-        </p>
       )}
     </li>
   );

@@ -19,7 +19,6 @@ export type PanelTab =
   | "ideas"
   | "bible"
   | "bookmarks"
-  | "assistant"
   | "page"
   | "history"
   | "trash";
@@ -32,7 +31,6 @@ export const PANEL_TITLES: Record<PanelTab, string> = {
   ideas: "Ideas",
   bible: "Story bible",
   bookmarks: "Bookmarks",
-  assistant: "Assistant",
   /**
    * The settings that decide how the manuscript looks, and what can be put on
    * it — the book's type, the colour of the paper, a picture, a link.
@@ -61,7 +59,7 @@ export const PANEL_TITLES: Record<PanelTab, string> = {
 };
 
 /**
- * The same ten, in the words that fit under an icon.
+ * The same tabs, in the words that fit under an icon.
  *
  * **A rail label and a panel heading are different jobs.** The heading has the
  * whole width of the panel and has to say precisely what you are looking at —
@@ -85,7 +83,6 @@ export const PANEL_RAIL_NAMES: Record<PanelTab, string> = {
   ideas: "Ideas",
   bible: "Bible",
   bookmarks: "Marks",
-  assistant: "Assistant",
   page: "Tools",
   history: "Versions",
   trash: "Trash",

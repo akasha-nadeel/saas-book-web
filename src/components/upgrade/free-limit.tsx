@@ -14,13 +14,11 @@ import {
   resetsDaily,
   SEATS_PER_BOOK,
   spentLine,
-  totalAllowance,
   type Allowance,
   type BookLimit,
   type DailyLimit,
   type ItemLimit,
   type Limited,
-  type TotalLimit,
 } from "@/lib/free-limits";
 import { markToolBook, spendDailyUse } from "@/lib/library-store";
 import { usePrefs } from "@/lib/use-library";
@@ -57,27 +55,10 @@ import { usePlan } from "@/lib/use-plan";
  * quietly — the version before this took a `bookId` and four screens were
  * passing the literal `"imports"`.
  */
-/**
- * The lifetime-counted actions, as a set `spend` can test.
- *
- * A set rather than a string comparison because there is one of these today
- * and adding a second must not require anybody to notice this line: a new
- * member of `TotalLimit` that was left out here would silently be spent as a
- * *daily* count, which is the wrong counter and the wrong sentence.
- */
-const TOTAL = new Set<Limited>(["keywordsAi", "blurbChat"]);
-
 export type LimitAsk =
   | { action: DailyLimit }
   | { action: BookLimit; bookId: string }
-  | { action: ItemLimit; items: number }
-  /**
-   * A lifetime total. `used` is read from prefs by the caller rather than
-   * looked up here, which keeps this hook's dependency on the store to the one
-   * `usePrefs` call it already makes — and lets a screen show the count
-   * without asking twice.
-   */
-  | { action: TotalLimit; used: number };
+  | { action: ItemLimit; items: number };
 
 /**
  * The plan and whichever counter this limit keeps, in a single answer.
@@ -103,8 +84,6 @@ export function useAllowance(ask: LimitAsk): Allowance {
   }
 
   if ("items" in ask) return itemAllowance(ask.action, ask.items, pro);
-
-  if ("used" in ask) return totalAllowance(ask.action, ask.used, pro);
 
   return dailyAllowance(ask.action, prefs.usedToday, pro);
 }
@@ -182,17 +161,9 @@ export function useLimitGate(ask: LimitAsk): {
     // screen may call this on every action without working out whether this
     // press is the first. An item limit records nothing at all — the caller's
     // own append *is* the item, and counting it here as well would double it.
-    //
-    // **A total records nothing here either, and for a different reason.** It
-    // is the only limit in front of a request that can fail: a gateway 502 or
-    // a model timeout would cost a writer one of five allowances they never
-    // received the benefit of, and five is few enough that one is worth
-    // caring about. So the screen calls `spendTotalUse` when the reply
-    // actually lands. The cost of that choice is a writer who presses twice
-    // very quickly getting two calls for one allowance, which is a second of
-    // exposure against a permanent unfairness.
+
     if (bookId !== null) markToolBook(action as BookLimit, bookId);
-    else if (action !== "arcReaders" && !TOTAL.has(action)) {
+    else if (action !== "arcReaders") {
       spendDailyUse(action as DailyLimit);
     }
 
@@ -450,16 +421,20 @@ export function LimitNote({
 /**
  * What Pro lifts, in the order somebody standing at this wall cares about.
  *
- * Four lines and no more. A pricing table pasted into a dialog is a decision
- * nobody makes at the moment they were interrupted — what is wanted here is
- * enough to answer "is this worth eleven dollars to me", and the page that
- * answers the rest is one press away.
+ * **Only what Pro actually sells** (2026-09-14): unlimited title checks and
+ * unlimited books. This list used to name the blurb, the prose report, money
+ * tracking and the assistant — tools the launch gate hides and a model that no
+ * longer exists — on the one dialog a live screen (the title check) opens. A
+ * limit dialog promising things the product cannot open is a claim the code
+ * cannot back.
+ *
+ * Four lines at most. What is wanted here is enough to answer "is this
+ * worth it to me", and the page that answers the rest is one press away.
  */
 const WHAT_PRO_ADDS = [
-  "Comp searches, cover searches and title checks with no daily limit",
-  "The blurb, prose report and money tracking on every book",
-  "Advance reader lists with no ceiling",
-  "The assistant, ranked comps and the audio routes",
+  "Title checks with no daily limit",
+  "As many books as you write",
+  "Everything on Free stays — every export format, sync, the consistency check",
 ];
 
 /**
@@ -472,18 +447,13 @@ const WHAT_PRO_ADDS = [
  * which is why it is filtered rather than prepended blindly.
  */
 const REACHED_LINE: Record<Limited, string> = {
-  comps: "Comp searches, cover searches and title checks with no daily limit",
-  covers: "Comp searches, cover searches and title checks with no daily limit",
-  titleCheck: "Comp searches, cover searches and title checks with no daily limit",
+  comps: "Comp and cover searches with no daily limit",
+  covers: "Comp and cover searches with no daily limit",
+  titleCheck: "Title checks with no daily limit",
   blurb: "The blurb, prose report and money tracking on every book",
   prose: "The blurb, prose report and money tracking on every book",
   track: "The blurb, prose report and money tracking on every book",
   arcReaders: "Advance reader lists with no ceiling",
-  // The one line here that is *not* also in `WHAT_PRO_ADDS`, so it is genuinely
-  // prepended rather than reordered — which is what that filter is for.
-  keywordsAi: "Keyword suggestions whenever you want them",
-  blurbChat: "Work on the blurb with a reader as often as you like",
-  keywordChat: "Talk your keywords through as often as you like",
   collaborators: `Up to ${SEATS_PER_BOOK.pro} people on a book instead of ${SEATS_PER_BOOK.free}`,
 };
 
@@ -706,8 +676,8 @@ export function LimitDialog({
             {/* Read from the price table, never restated — the same rule the
               pricing page follows, so the two cannot disagree. */}
             <p className="mt-4 font-sans text-sm text-muted">
-              From {displayPrice(priceOf("draft", "monthly"))} a month, or{" "}
-              {displayPrice(priceOf("draft", "annual"))} a year.
+              {displayPrice(priceOf("pro", "monthly"))} a month, or{" "}
+              {displayPrice(priceOf("pro", "annual"))} a year.
             </p>
 
             {/* Full width, as the reference has it: at the foot of a column of

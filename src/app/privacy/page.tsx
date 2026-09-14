@@ -38,13 +38,13 @@ export default function PrivacyPage() {
       <Section title="The short version">
         <p>
           OpenChapter stores your books so you can return later and keep
-          writing. We do not sell your data, run advertising trackers, or use
-          your writing to train models.
+          writing. There is no AI in OpenChapter: your writing is never sent to
+          a language model, and we do not sell your data, run advertising
+          trackers, or use your writing to train anything.
         </p>
         <Note>
-          The writing assistant sees the chapter text you send with your
-          question. PDF export sends the full book to our server for layout.
-          Word and EPUB export are built in the browser.
+          PDF export sends the full book to our server for layout. Word and
+          EPUB export are built in the browser.
         </Note>
       </Section>
 
@@ -81,8 +81,9 @@ export default function PrivacyPage() {
               period end. We do not receive or store card numbers.
             </>,
             <>
-              <Term>Usage counters</Term> — how many assistant replies you have
-              used, daily and monthly, so each plan&rsquo;s allowance can be enforced.
+              <Term>Usage counters</Term> — how many title checks you have run
+              today, synced with your other settings so the free plan&rsquo;s
+              daily allowance is the same on every device.
             </>,
             <>
               <Term>Feedback you send</Term> — the message, topic and account it
@@ -96,13 +97,10 @@ export default function PrivacyPage() {
         <List
           items={[
             <>
-              <Term>The writing assistant</Term> — when you ask the assistant a
-              question, the open chapter and your chat message are sent to the
-              configured language-model provider so it can answer. If you have
-              turned on letting it write into the chapter and you have a passage
-              selected, that passage is sent too, so a replacement it offers
-              fits the words it is replacing. Nothing is used for model training
-              by us.
+              <Term>The title check</Term> — the title you type is sent to our
+              server, which searches Google Books and Open Library for it and
+              returns what they hold. Only the words you typed are sent; none
+              of your manuscript goes with them.
             </>,
             <>
               <Term>Dictation</Term> — the microphone buttons use your
@@ -128,9 +126,9 @@ export default function PrivacyPage() {
               OpenChapter.
             </>,
             <>
-              <Term>Pressing a paid plan</Term> — the paid plans are not on sale
-              yet, so pressing one records which plan and which billing cycle
-              you pressed, and where you pressed it. That is how we decide what
+              <Term>Pressing a paid plan</Term> — Pro is not on sale yet, so
+              pressing it records the plan and billing cycle you pressed, and
+              where you pressed it. That is how we decide what
               to switch on first. If you are signed in, your account and email
               address are recorded with it; if you are not, nothing that
               identifies you is. No other detail is taken, and the record is not
@@ -139,9 +137,10 @@ export default function PrivacyPage() {
           ]}
         />
         <p>
-          The launch MVP does not publicly offer the older research, audio,
+          The launch MVP does not publicly offer the older research,
           collaboration or publishing-workflow tools. Their old API routes are
-          hidden for launch by default.
+          hidden for launch by default. None of them sends your writing to a
+          language model either — the routes that did were removed.
         </p>
       </Section>
 

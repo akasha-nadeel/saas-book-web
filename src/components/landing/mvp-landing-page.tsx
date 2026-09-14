@@ -20,10 +20,7 @@ import { FeatureBento } from "@/components/landing/feature-bento";
    `VersionsScreen` stay in `mvp-screens.tsx`: they are finished, tested and
    cannot go stale the way a bitmap can, which makes them the thing to come
    back to rather than to delete. */
-import {
-  AssistantScreen,
-  ImportScreen,
-} from "@/components/landing/mvp-screens";
+import { ImportScreen } from "@/components/landing/mvp-screens";
 import {
   LEAD_EM,
   HERO_TITLE,
@@ -48,13 +45,19 @@ import { signInWithGoogle } from "@/app/auth/actions";
  * beside it is the fuller sixteen-tool page — still built, still tested, and
  * mounted by nothing — and the difference between them is not a matter of
  * length. The proxy redirects fifteen of the sixteen tool screens home along
- * with `/read`, `/tools` and `/invite/*`, and every model route but the
- * assistant answers 404, so a sentence on this page naming comps, covers, the
- * roadmap or the reading view is a promise with nothing behind it. What is
- * reachable is the shelf, `/book/new`, `/book/import`, the editor, the export
- * wizard, the assistant, upgrade and billing, and the four legal pages. That
+ * with `/read`, `/tools` and `/invite/*`, so a sentence on this page naming
+ * comps, covers, the roadmap or the reading view is a promise with nothing
+ * behind it. What is reachable is the shelf, `/book/new`, `/book/import`, the
+ * editor, the export wizard, the title and consistency checks, upgrade and
+ * billing, and the four legal pages. That
  * list is what this page is allowed to be about; `src/lib/launch.ts` is the
  * statement of it.
+ *
+ * **There is no AI, and the page says so** (2026-09-14). The assistant and
+ * every model route were deleted, and "No AI" is a claim the code now backs:
+ * nothing in the app calls a language model. Voice typing is the browser's own
+ * speech feature, and the FAQ says where its audio goes so the claim stays
+ * true.
  *
  * **Everything countable is imported and counted** — the prices and the annual
  * saving from `billing/plans.ts`, the free and Pro limits from `launch.ts`, the
@@ -221,7 +224,7 @@ const FOOTER_COLUMNS: FooterColumn[] = [
       { href: "#inside", label: "The shelf" },
       { href: "#inside", label: "The editor" },
       { href: "#inside", label: "Importing" },
-      { href: "#inside", label: "The assistant" },
+      { href: "#faq", label: "No AI" },
     ],
   },
   {
@@ -483,14 +486,6 @@ const ROWS: Row[] = [
     figure: <ImportScreen chrome={{ url: "openchapter.app/book/import" }} />,
   },
   {
-    badge: "The assistant",
-    title: "Ask about the chapter you are on",
-    lead: "It reads the chapter and answers about it. On a paid plan it can offer a passage for the page — you see exactly what would change before it goes in, and one undo takes it back.",
-    figure: (
-      <AssistantScreen chrome={{ url: "openchapter.app/book/breathe-again/chapter/two" }} />
-    ),
-  },
-  {
     /* **The export was a band of its own and is a row now**, which is the
        whole of what changed: same eyebrow, same heading size, same sentence,
        same press, and the figure behind the same three lights as the four
@@ -523,6 +518,17 @@ const ROWS: Row[] = [
    -------------------------------------------------------------------------- */
 
 const FAQ: [question: string, answer: ReactNode][] = [
+  [
+    "Is there any AI in OpenChapter?",
+    <>
+      No. There is no writing assistant, nothing is generated, and no part of
+      your book is sent to a language model or used to train one. Every word
+      in it is yours. The one thing worth knowing: voice typing uses your
+      browser&rsquo;s own speech recognition, and in Chrome that sends the
+      audio to Google to be turned into text. Leave the microphone off and
+      nothing is sent.
+    </>,
+  ],
   [
     "Do I have to pay to get my book out?",
     <>
@@ -557,10 +563,10 @@ const FAQ: [question: string, answer: ReactNode][] = [
     <>
       Nothing is taken away and nothing is locked. Your books stay where they
       are, you keep writing in all of them, and every export format goes on
-      working. The assistant is what stops — it runs on credits and a free
-      account is granted none — and the shelf goes back to holding{" "}
-      {plural(LAUNCH_LIMITS.freeBooks, "book")}, with the rest kept safe and
-      read-only rather than deleted.
+      working. What changes is that you cannot start a new book while you
+      hold more than the free plan&rsquo;s{" "}
+      {plural(LAUNCH_LIMITS.freeBooks, "book")}, and title checks go back to a
+      daily allowance.
     </>,
   ],
   [
@@ -695,7 +701,8 @@ export function MvpLandingPage() {
               Write your whole manuscript in the browser.{" "}
               <strong className={LEAD_EM}>
                 Export to Word, EPUB or PDF any time.
-              </strong>
+              </strong>{" "}
+              No AI — every word is yours.
             </p>
 
             {/* Two pills side by side, filled and white — the reference's pair.

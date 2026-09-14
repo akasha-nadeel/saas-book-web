@@ -17,7 +17,6 @@ import LetterTIcon from "@/components/icons/letter-t-icon";
 import LibraryIcon from "@/components/icons/library-icon";
 import MagnifierIcon from "@/components/icons/magnifier-icon";
 import PaintIcon from "@/components/icons/paint-icon";
-import SparklesIcon from "@/components/icons/sparkles-icon";
 import TrashIcon from "@/components/icons/trash-icon";
 import UploadIcon from "@/components/icons/upload-icon";
 import UsersGroupIcon from "@/components/icons/users-group-icon";
@@ -54,7 +53,6 @@ export type MarkName =
   | "search"
   | "consistency"
   | "notes"
-  | "assistant"
   | "history"
   | "trash"
   | "bookmarks"
@@ -93,7 +91,6 @@ const ICONS: Partial<Record<MarkName, IconComponent>> = {
   search: MagnifierIcon,
   consistency: DoubleCheckIcon,
   notes: FileDescriptionIcon,
-  assistant: SparklesIcon,
   history: HistoryCircleIcon,
   trash: TrashIcon,
   bookmarks: BookmarkIcon,

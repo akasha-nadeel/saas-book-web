@@ -1,14 +1,11 @@
-/* No import of `tiers.ts` any more: this file reads a balance rather than a
-   plan, and the one thing it used it for — `chatAllowed` — is now the pricing
-   screens' question rather than the gate's. */
-
 /**
  * Launch-MVP product decisions that must stay consistent across marketing,
  * pricing, entitlement checks, and upgrade prompts.
  */
 
 export const LAUNCH_LIMITS = {
-  freeBooks: 5,
+  /** Mirrors `TIER_LIMITS.free.books` and the book-limit trigger. */
+  freeBooks: 1,
   /**
    * **Every format, on both plans, and the two arrays being identical is the
    * point rather than an oversight.**
@@ -19,29 +16,13 @@ export const LAUNCH_LIMITS = {
    * charge for: a writer has to be able to take the book and go, and a tool
    * that holds the finished file back is the one thing this trade's writers
    * have been burned by often enough to look for first. Pro is unlimited books
-   * and the assistant's allowance; it is not the door.
+   * and unlimited title checks; it is not the door.
    *
    * The pair stays as a pair so the decision has somewhere to live and so
    * narrowing it again is still one edit — `exportAllowed` reads both.
    */
   freeExports: ["docx", "epub", "pdf"],
   proExports: ["docx", "epub", "pdf"],
-  /**
-   * **Whether the assistant may put a passage into the chapter.**
-   *
-   * The third thing Pro buys, after unlimited books and the larger reply
-   * allowance — and the first that is a capability rather than a number, which
-   * is why it is stated here rather than left to the switch in the panel.
-   *
-   * **What is sold is the model writing applicable prose, not the pressing of a
-   * button.** The manuscript is on the writer's own machine and the app says
-   * so everywhere else; no browser gate could keep somebody out of their own
-   * document, and none is claimed to. What the server actually decides is
-   * whether `/api/chat` answers in write mode at all — see `requirePro` in the
-   * route. That is a real gate on the thing that costs, which is the house rule
-   * for anything sold: no Pro row whose value depends on a browser gate being
-   * unbreakable.
-   */
 } as const;
 
 export type LaunchExportFormat = (typeof LAUNCH_LIMITS.proExports)[number];
@@ -76,37 +57,6 @@ export function onFreePlan(plan: {
 }
 
 /**
- * Whether the writing assistant is shut to this reader.
- *
- * **It asks about the balance, not about the plan**, and that is the whole of
- * what changed when credits arrived. A Free account holding bought credits may
- * use the assistant; a Writer who has spent their month may not, until the 1st.
- * Neither of those is a fact about the tier, and a gate written against
- * `chatAllowed` alone gets both of them wrong in opposite directions.
- *
- * `credits` is the total a writer can spend right now — the month's grant plus
- * anything bought. **`null` means nothing is metered here** (no gateway
- * configured, the self-hosted case) and must open, not close.
- *
- * The same loading rule as `onFreePlan`, for the same reason: `credits`
- * undefined is the state before the server has answered, and not knowing yet
- * is not a reason to refuse.
- *
- * `chatAllowed(tier)` still has a job — it is what the *pricing* screens ask,
- * because "this plan grants credits" is a different question from "this reader
- * has some". It is not the gate.
- */
-export function aiChatClosed(plan: {
-  loading: boolean;
-  billing: boolean;
-  credits?: number | null;
-}): boolean {
-  if (plan.loading || !plan.billing) return false;
-  if (plan.credits === null || plan.credits === undefined) return false;
-  return plan.credits <= 0;
-}
-
-/**
  * Whether a book's inside is shut to this reader.
  *
  * **The trash is the free plan's one closed door, and it is a browser gate
@@ -128,61 +78,32 @@ export function trashedBookClosed(
 }
 
 /**
- * **Whether the model steps around the comps search are reachable.**
- *
- * The catalogue search itself is live: `/api/comps` is free, keyless and
- * answers again as of 2026-09-02. The two routes that put a model over it are
- * not — `/api/comps/query`, which turns a plain sentence into a catalogue
- * query, and `/api/comps/rank`, which reads the manuscript's opening and says
- * which of the results are actually like it. Both still answer 404 through
- * `launchFeatureEnabled()`.
- *
- * **This is here rather than in `launch-server.ts` because a component has to
- * read it.** That module touches `process.env` and cannot be imported by a
- * client screen; this one reads no environment at all, which is exactly what
- * makes it safe to import anywhere. Same reasoning as
- * `HIDDEN_BOOK_TOOL_PATHS` below.
- *
- * **What it buys is the house rule about dead UI.** `comps-page.tsx` draws a
- * "Rank these" button and a paragraph listing the prose that press would send.
- * With the route gated that button cannot do anything but fail, and a control
- * that always errors is worse than one that is not there. The query
- * translation needs no such care — its failure is already swallowed on
- * purpose — so the flag only saves it a guaranteed 404 on every search.
- *
- * Flip it to `true` the day those two routes are un-gated. Nothing else needs
- * editing: `ResultsBar`, `rank()` and the whole ranking path are untouched in
- * the page, kept whole for exactly that.
- */
-export const COMPS_RANKING_LIVE: boolean = false;
-
-/**
  * Whether the paid plans can actually be bought.
  *
  * **False since 2026-09-07, and off on purpose rather than by accident.**
- * Paddle is configured correctly — live keys, production environment, six
- * price ids — but no stranger has ever completed a checkout against those
- * prices, and the one card available to test with is being declined by its
- * bank. A pricing page that takes money down a path nobody has walked is worse
- * than one that says it is not open yet, so every paid button opens the
- * "Available Soon" dialog and the press is recorded instead.
+ * No stranger has ever completed a checkout against the live prices, and the
+ * one card available to test with was declined by its bank. A pricing page
+ * that takes money down a path nobody has walked is worse than one that says
+ * it is not open yet, so every paid button opens the "Available Soon" dialog
+ * and the press is recorded instead. (The prices themselves changed on
+ * 2026-09-14, when the three paid plans became Pro; the two new Paddle price
+ * ids have to exist before this can flip.)
  *
  * **Do not do this by unsetting the Paddle environment variables**, which is
- * the shortcut it looks like. `billingConfigured()` answering false makes
- * `requireTier()` hand every signed-in writer `studio` and `requirePro()` gate
- * nothing — the site would stop selling *and* give the paid product away. That
- * is not a hypothetical: it is the state this deployment sat in from
- * 2026-08-23 to 2026-09-07, when six renamed price variables went unset and
- * nothing noticed, because "no gateway configured" is a legitimate state that
- * opens everything rather than breaking anything. The gate belongs over the
- * buttons, with the billing configuration left intact underneath.
+ * the shortcut it looks like. `billingConfigured()` answering false means no
+ * plans and nothing held back — the site would stop selling *and* give the
+ * paid product away. That is not a hypothetical: it is the state this
+ * deployment sat in from 2026-08-23 to 2026-09-07, when six renamed price
+ * variables went unset and nothing noticed, because "no gateway configured" is
+ * a legitimate state that opens everything rather than breaking anything. The
+ * gate belongs over the buttons, with the billing configuration left intact
+ * underneath.
  *
  * Flipping it back is this one edit and a deploy — after a real checkout has
  * been proven end to end with a card that works.
  *
- * Plain const rather than an environment read, matching `COMPS_RANKING_LIVE`
- * above: `launch.ts` imports nothing and is read by client and server alike,
- * so one boolean serves every call site.
+ * Plain const rather than an environment read: `launch.ts` imports nothing and
+ * is read by client and server alike, so one boolean serves every call site.
  */
 export const PLANS_ON_SALE: boolean = false;
 
@@ -197,8 +118,7 @@ export const PLANS_ON_SALE: boolean = false;
  *
  * **`/api/comps` stays open**, because it is the route the title check runs on.
  * Gating a screen and gating the data behind it are separate decisions, and
- * this is the case that shows why they have to be. `COMPS_RANKING_LIVE` above
- * covers the model routes over that data, which stay shut.
+ * this is the case that shows why they have to be.
  */
 const HIDDEN_BOOK_TOOL_PATHS = new Set([
   "arc",
@@ -241,5 +161,5 @@ export const LAUNCH_POST_BACKLOG = [
   "Advance copies",
   "Collaboration and invitations",
   "Story bible, ideas, and bookmarks panels",
-  "Markdown and audiobook export",
+  "Markdown export",
 ] as const;

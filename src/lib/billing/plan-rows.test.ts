@@ -17,7 +17,7 @@ import { TIER_ORDER } from "./tiers";
  * The mirror of the assertion in `launch.test.ts` — that one guards the gate,
  * this one guards the promise. A reader comparing four columns should be able
  * to see that the finished file is not what they are paying for, and the only
- * way to see it is four identical values in a row.
+ * way to see it is identical values in a row.
  */
 it("offers every export format on every plan", () => {
   const row = ROWS.find((r) => r.label === "Export");
@@ -29,16 +29,12 @@ it("offers every export format on every plan", () => {
 });
 
 /**
- * **No card may name a model, and this is what stops one creeping in.**
- *
- * On an Anthropic deployment Quick is Haiku and Careful is Sonnet; on a Google
- * one they are the same model. So any wording about a model's cleverness is a
- * claim the code cannot back on half the installations — and the house rule is
- * that a claim has to be true of what ships. What is true everywhere is the
- * allowance and the wait, which is what these rows describe.
+ * **No row may mention AI.** The app has none since 2026-09-14 and the pricing
+ * page says so; a row selling an assistant, credits or a model would be a claim
+ * the code cannot back.
  */
-it("describes the allowance rather than the model", () => {
-  const forbidden = /haiku|sonnet|gemini|claude|gpt|opus|smarter|cleverer/i;
+it("sells nothing the app no longer has", () => {
+  const forbidden = /ai|assistant|credit|model|haiku|sonnet|gemini|claude|gpt|opus/i;
 
   for (const row of ROWS) {
     expect(row.label).not.toMatch(forbidden);
@@ -65,33 +61,26 @@ it("gives every row an answer for every plan", () => {
 });
 
 /**
- * **The crossed rows fall together at the foot of the card.**
- *
- * Scattered crosses read as arbitrary; a block reads as a boundary — which is
- * what it is, since everything Free and Draft lack is the assistant. The
- * headings that used to announce that boundary are gone, so the ordering is now
- * the only thing drawing it.
+ * The first row is the first thing Pro buys, so it is said first rather than
+ * found.
  */
-it("keeps what a plan lacks in one block at the end", () => {
-  for (const tier of TIER_ORDER) {
-    const crossed = ROWS.map((row) => row.values[tier] === NOT_INCLUDED);
-    const first = crossed.indexOf(true);
-    if (first === -1) continue;
-
-    // Once the crosses start they do not stop.
-    expect(crossed.slice(first).every(Boolean)).toBe(true);
-    // And the last row is one of them.
-    expect(crossed[crossed.length - 1]).toBe(true);
-  }
+it("opens on the row that separates Free from Pro", () => {
+  expect(ROWS[0].label).toBe("Books");
+  expect(ROWS[0].values.free).not.toBe(ROWS[0].values.pro);
 });
 
 /**
- * The first row is the one place Free and Draft differ, which is the whole of
- * what the cheapest paid plan buys — so it is said first rather than found.
+ * **Pro is the whole of what is sold, and these are the two rows that say
+ * what it buys.** Everything else must read the same on both plans.
  */
-it("opens on the row that separates Free from the first paid plan", () => {
-  expect(ROWS[0].label).toBe("Books");
-  expect(ROWS[0].values.free).not.toBe(ROWS[0].values.draft);
+it("differs between the plans on books and title checks only", () => {
+  const differing = ROWS.filter((row) => row.values.free !== row.values.pro).map(
+    (row) => row.label,
+  );
+  expect(differing.sort()).toEqual(["Books", "Title check"]);
+  for (const row of ROWS) {
+    for (const tier of TIER_ORDER) expect(row.values[tier]).not.toBe(NOT_INCLUDED);
+  }
 });
 
 /**
@@ -99,7 +88,7 @@ it("opens on the row that separates Free from the first paid plan", () => {
  * break that.**
  *
  * The rows carried an explanation inline in brackets until the cards went to
- * four columns, where every one of them wrapped — and a wrapped label took the
+ * four columns (there are two now), where every one of them wrapped — and a wrapped label took the
  * tick off its own line and pushed the badge over the card's edge. The
  * explanations are gone and the labels are short, and this is what keeps them
  * short: there is no width to test against here, so the proxy is the character

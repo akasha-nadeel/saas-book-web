@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { LegalPage, List, Note, Section, Term } from "@/components/legal/legal-shell";
 import { displayPrice, priceOf } from "@/lib/billing/plans";
+import { TIER_NAMES } from "@/lib/billing/tiers";
 import { CONTACT_EMAIL, REFUND_DAYS, REPLY_DAYS, TRADING_NAME } from "@/lib/legal";
 
 /**
@@ -64,9 +65,9 @@ export default function RefundsPage() {
           it in full. You do not have to give a reason.
         </p>
         <p>
-          That applies to every paid plan and both cycles, from{" "}
-          {displayPrice(priceOf("draft", "monthly"))} monthly up to{" "}
-          {displayPrice(priceOf("studio", "annual"))} annual.
+          That applies to {TIER_NAMES.pro} on both cycles —{" "}
+          {displayPrice(priceOf("pro", "monthly"))} monthly or{" "}
+          {displayPrice(priceOf("pro", "annual"))} annual.
         </p>
       </Section>
 

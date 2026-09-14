@@ -1,7 +1,7 @@
+import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 import {
   LAUNCH_LIMITS,
-  aiChatClosed,
   exportAllowed,
   onFreePlan,
   trashedBookClosed,
@@ -79,50 +79,21 @@ it("holds nothing back where no gateway is configured", () => {
 });
 
 /**
- * **The balance is the gate, not the plan, and this is what says so.**
- *
- * It asked about the tier until 2026-09-04 — the right question while the
- * assistant was what Writer and Studio bought. Credits make it the wrong one in
- * both directions at once: a Free account holding bought credits is entitled to
- * spend them, and a Writer who has spent the month is not entitled to more. A
- * gate written against the tier gets one of those wrong whichever way it is
- * written, and `chat-panel.tsx` is the one call site — nothing else in the tree
- * would notice it going back.
+ * **The free book count is stated three times and they must agree**:
+ * `LAUNCH_LIMITS.freeBooks`, `TIER_LIMITS.free.books`, and the trigger in
+ * `20260914000000_ai_free_pro_plan.sql`, which is the one that actually
+ * refuses. SQL cannot import TypeScript, so the test reads the migration — the
+ * browser offering a book Postgres then refuses is the drift this catches.
  */
-it("shuts the assistant only when there is nothing left to spend", () => {
-  const known = { loading: false, billing: true };
-  expect(aiChatClosed({ ...known, credits: 0 })).toBe(true);
-  expect(aiChatClosed({ ...known, credits: 10 })).toBe(false);
-});
+it("holds one book on the free plan, in TypeScript and in SQL", async () => {
+  const { TIER_LIMITS } = await import("@/lib/billing/tiers");
+  expect(LAUNCH_LIMITS.freeBooks).toBe(1);
+  expect(TIER_LIMITS.free.books).toBe(LAUNCH_LIMITS.freeBooks);
 
-/**
- * **A free account holding credits may spend them**, which is the case the tier
- * test could not express: there is no tier here at all, only a balance.
- */
-it("opens on a balance regardless of where it came from", () => {
-  expect(aiChatClosed({ loading: false, billing: true, credits: 400 })).toBe(
-    false,
+  const sql = readFileSync(
+    "supabase/migrations/20260914000000_ai_free_pro_plan.sql",
+    "utf8",
   );
-});
-
-/** The same loading-window rule as `onFreePlan`, and for the same reason. */
-it("refuses no assistant while the balance is still unknown", () => {
-  expect(aiChatClosed({ loading: true, billing: true })).toBe(false);
-  expect(aiChatClosed({ loading: true, billing: true, credits: 0 })).toBe(false);
-  expect(aiChatClosed({ loading: false, billing: true })).toBe(false);
-  expect(aiChatClosed({ loading: false, billing: true, credits: undefined })).toBe(
-    false,
-  );
-});
-
-/**
- * Configure no gateway and there are no plans, so nothing is held back — and
- * `null` says the same thing a second way, for the self-hosted copy running on
- * its owner's own API key. Neither may read as an empty balance.
- */
-it("leaves the assistant open where nothing is metered", () => {
-  expect(aiChatClosed({ loading: false, billing: false, credits: 0 })).toBe(false);
-  expect(aiChatClosed({ loading: false, billing: true, credits: null })).toBe(
-    false,
-  );
+  const limit = sql.match(/if v_count >= (\d+) then/);
+  expect(limit?.[1]).toBe(String(LAUNCH_LIMITS.freeBooks));
 });

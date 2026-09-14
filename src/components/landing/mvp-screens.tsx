@@ -8,8 +8,8 @@ import { LAUNCH_LIMITS } from "@/lib/launch";
 import { plural } from "@/lib/plural";
 
 /**
- * The launch MVP's five drawn screens — the shelf, the editor, the versions a
- * chapter keeps, the import and the assistant.
+ * The launch MVP's drawn screens — the shelf, the editor, the versions a
+ * chapter keeps, and the import.
  *
  * **Drawn in markup rather than photographed**, which is this site's standing
  * rule and the reason it can claim to be checkable: a screenshot is an asset
@@ -264,7 +264,7 @@ export function ShelfScreen({ chrome }: ScreenProps = {}) {
 /**
  * The panels the rail opens, in the rail's own order.
  *
- * **Six of the nine, and the three left out are left out on purpose.** Ideas,
+ * **Five of the eight, and the three left out are left out on purpose.** Ideas,
  * Story bible and Bookmarks are named in `LAUNCH_POST_BACKLOG` as things the
  * launch MVP is meant to bring back later, so this page does not sell them.
  * The names are `PANEL_TITLES` in `left-panel.tsx`, quoted rather than
@@ -276,7 +276,6 @@ const PANELS = [
   "Notes",
   "Versions",
   "Deleted chapters",
-  "Assistant",
 ] as const;
 
 /** What each chapter in the drawn list has been written to, in words. */
@@ -581,118 +580,6 @@ export function ImportScreen({ chrome }: ScreenProps = {}) {
           </p>
         </div>
       </div>
-    </AppWindow>
-  );
-}
-
-/* --------------------------------------------------------------------------
-   The assistant
-   -------------------------------------------------------------------------- */
-
-/**
- * The three openers the panel offers, quoted from `chat-panel.tsx`'s own
- * `SUGGESTIONS` — it is `"use client"` and does not export them.
- */
-const SUGGESTIONS = [
-  "What isn't working in this chapter?",
-  "Tighten the opening paragraph.",
-  "What should happen next?",
-] as const;
-
-/**
- * The assistant panel, mid-answer.
- *
- * **Both of the panel's own disclosures are drawn**, and that is the point of
- * putting this screen on a marketing page: the chapter text is sent with the
- * question, and the conversation is kept in this browser rather than on the
- * account. `chat-panel.tsx` prints both above the first message, and a picture
- * that showed the reply without them would be selling the feature without its
- * terms.
- */
-export function AssistantScreen({ chrome }: ScreenProps = {}) {
-  return (
-    <AppWindow
-      chrome={chrome}
-      label="The assistant panel beside the chapter: a note saying the chapter text is sent with your question and that the conversation stays in this browser, three suggested openers, and a reply underneath them."
-      screenStyle={{ aspectRatio: `${W} / 600` }}
-      screenClassName="@container flex overflow-hidden bg-lp-raised leading-[1.35]"
-    >
-      {/* The chapter it is answering about, still there. The panel floats over
-          the manuscript rather than replacing it — `LeftPanel`'s own rule —
-          which is what keeps the prose readable beside the answer. Hidden on a
-          narrow card, where a two-column window would be two slivers. */}
-      <div className="hidden min-w-0 flex-1 flex-col overflow-hidden px-[5.2cqw] pt-[3.9cqw] @[30rem]:flex">
-        <div className="flex-1 rounded-t-[0.52cqw] bg-lp-paper px-[5.2cqw] pt-[3.9cqw] opacity-70 shadow-[0_1px_4px_rgba(15,15,16,0.06)]">
-          <p className="text-center font-serif text-[2.08cqw] text-lp-ink">
-            {BOOK.chapter}
-          </p>
-          <div className="mt-[2.6cqw] space-y-[1.37cqw]">
-            {[98, 92, 100, 66].map((w, i) => (
-              <Line key={i} w={w} />
-            ))}
-            <span className="block h-[1.17cqw]" />
-            {[95, 88, 100, 91, 99, 73, 96, 100, 84].map((w, i) => (
-              <Line key={`b${i}`} w={w} />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <aside className="flex w-full shrink-0 flex-col border-l border-lp-edge bg-lp-ground @[30rem]:w-[54.6cqw]">
-        <div className="flex shrink-0 items-center border-b border-lp-edge px-[2.6cqw] py-[1.82cqw]">
-          <p className="text-[1.62cqw] font-semibold text-lp-ink">Assistant</p>
-          <span className="ml-auto text-[1.37cqw] text-lp-faint">Close</span>
-        </div>
-
-        <div className="min-h-0 flex-1 px-[2.6cqw] py-[2.34cqw]">
-          <p className="text-[1.43cqw] text-lp-body">
-            Ask about “Chapter Two”. The chapter text is sent with your
-            question.
-          </p>
-          <p className="mt-[0.78cqw] text-[1.3cqw] text-lp-faint">
-            The conversation stays in this browser. It is not saved to your
-            account.
-          </p>
-
-          <div className="mt-[2.08cqw] flex flex-col gap-[0.91cqw]">
-            {SUGGESTIONS.map((s, i) => (
-              <span
-                key={s}
-                className={`rounded-[0.78cqw] border px-[1.56cqw] py-[1.1cqw] text-[1.43cqw] ${
-                  i === 0
-                    ? "border-lp-accent/50 text-lp-accent-text"
-                    : "border-lp-edge text-lp-body"
-                }`}
-              >
-                {s}
-              </span>
-            ))}
-          </div>
-
-          {/* One answer, drawn as bars for the reason `Line` gives: a made-up
-              reply printed as words would be this page inventing the very
-              thing it is selling. */}
-          <div className="mt-[2.34cqw] rounded-[1.04cqw] bg-lp-well px-[1.82cqw] py-[1.56cqw]">
-            <p className="text-[1.3cqw] font-semibold tracking-[0.14em] text-lp-faint uppercase">
-              Reply
-            </p>
-            <div className="mt-[1.3cqw] space-y-[1.23cqw]">
-              {[96, 100, 82, 94, 58].map((w, i) => (
-                <Line key={i} w={w} />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-[1.3cqw] border-t border-lp-edge px-[2.6cqw] py-[1.82cqw]">
-          <span className="flex-1 rounded-[0.91cqw] border border-lp-edge px-[1.56cqw] py-[1.17cqw] text-[1.43cqw] text-lp-faint">
-            Ask about this chapter…
-          </span>
-          <span className="rounded-[0.91cqw] bg-lp-accent px-[1.82cqw] py-[1.17cqw] text-[1.43cqw] font-semibold text-lp-accent-ink">
-            Ask
-          </span>
-        </div>
-      </aside>
     </AppWindow>
   );
 }

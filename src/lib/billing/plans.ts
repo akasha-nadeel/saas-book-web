@@ -35,9 +35,9 @@ export type { PaidTier, PlanTier } from "./tiers";
  * **One member, and that is the decision rather than an oversight.** There used
  * to be an LKR table beside the USD one, priced for its own market rather than
  * converted, selected by `NEXT_PUBLIC_PAYHERE_CURRENCY`. It came out when the
- * plans went to four: three tiers times two cycles times two currencies is
- * twelve figures to keep true, and eleven of them were never rendered — this
- * deployment charges in USD, and only PayHere could have shown the others.
+ * plans went to four: every extra currency multiplies the figures to keep true,
+ * and most of them were never rendered — this deployment charges in USD, and
+ * only PayHere could have shown the others.
  *
  * The type survives the table because PayHere's payload carries the string and
  * ought to be typed. Putting a second currency back means restoring the record
@@ -52,41 +52,31 @@ export const CURRENCY: Currency = "USD";
  * What each plan costs. `total` is what the gateway charges on a cycle;
  * `perMonth` is what a card shows for comparison.
  *
- * Every annual price is 25% below paying monthly for twelve months. That the
- * three agree is what lets the period toggle print one badge over three
- * columns — and because it is a coincidence of the numbers rather than a rule,
- * `uniformAnnualSaving()` below checks it rather than assuming it.
- *
  * **`perMonth` is divided, never typed.** A hand-written figure drifts from the
  * charge the first time a total moves, and the drift is invisible: both numbers
  * look plausible. `plans.test.ts` pins this.
  */
 const PRICES: Record<PaidTier, Record<Period, { total: number; perMonth: number }>> = {
   /**
-   * **Draft is priced backwards from a floor, not forwards from a cost**, and
-   * the arithmetic is written down so it is not re-litigated. The rule is at
-   * least $5.00 kept on every sale *after* Paddle's 5% + 50¢ and after all
-   * 2,000 credits have been spent. That floor sits at $7.47 —
-   * ($5.50 + $1.60) ÷ 0.95 — and the price is set above it at $7.98, which
-   * keeps $5.48. Move the grant and this moves with it.
+   * **Pro is priced backwards from a floor and sideways from the trade**, and
+   * the arithmetic is written down so it is not re-litigated (2026-09-14).
+   *
+   * The floor is at least $5.00 kept on every monthly sale after Paddle's
+   * 5% + 50¢. With no model bill behind the plan any more that sits at $5.79 —
+   * $5.50 ÷ 0.95 — and $5.99 keeps $5.19.
+   *
+   * The ceiling is what the AI-free writing apps charge for more than this
+   * plan gives: WriteO $9.49 a month, Novlr's Starter $8 billed yearly, Plottr
+   * $9.99. Pro buys two things — unlimited books and unlimited title checks —
+   * so it sits under all of them. The design note is
+   * `docs/plans/2026-09-14-ai-free-pro-plan-design.md`.
+   *
+   * The year is $49.99, which rounds to 30% off twelve monthly payments: the top
+   * of the band `plans.test.ts` allows.
    */
-  draft: {
-    monthly: { total: 7.98, perMonth: 7.98 },
-    annual: { total: 71.82, perMonth: 71.82 / 12 },
-  },
-  writer: {
-    monthly: { total: 14.98, perMonth: 14.98 },
-    annual: { total: 134.99, perMonth: 134.99 / 12 },
-  },
-  /**
-   * Twice Writer's credits at roughly twice the price. By the credit the ladder
-   * runs 0.40¢ on Draft and 0.30¢ on both Writer and Studio — the volume
-   * discount is spent between Draft and Writer, and Studio is simply more of
-   * the same rather than a third rate.
-   */
-  studio: {
-    monthly: { total: 29.98, perMonth: 29.98 },
-    annual: { total: 269.82, perMonth: 269.82 / 12 },
+  pro: {
+    monthly: { total: 5.99, perMonth: 5.99 },
+    annual: { total: 49.99, perMonth: 49.99 / 12 },
   },
 };
 
@@ -123,15 +113,16 @@ export function annualSavingPercent(tier: PaidTier): number {
 }
 
 /**
- * The saving all three paid plans share, or null when they do not share one.
+ * The saving every paid plan shares, or null when they do not share one.
  *
- * **The period toggle prints one badge above three columns**, and a single
- * percentage over three different savings is the same stale claim
+ * **The period toggle prints one badge above the paid columns**, and a single
+ * percentage over different savings is the same stale claim
  * `annualSavingPercent` was written to prevent, one level up. So the badge asks
  * this first and renders nothing when the answer is null, rather than picking a
- * tier's figure and hoping.
+ * tier's figure and hoping. With Pro the only paid plan it is Pro's saving,
+ * and it stays a function so a second plan cannot quietly make the badge lie.
  *
- * Today all three round to 25%.
+ * Today it rounds to 30%.
  */
 export function uniformAnnualSaving(): number | null {
   const [first, ...rest] = PAID_TIERS.map(annualSavingPercent);

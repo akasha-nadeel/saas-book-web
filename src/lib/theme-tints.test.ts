@@ -7,7 +7,7 @@ import { TINTS } from "./library-store";
  * The six named themes, held to the floors their block claims to clear.
  *
  * **This reads `globals.css` rather than a second copy of the values**, which
- * is the shape `credits.test.ts` already uses against the SQL migration: one
+ * is the shape `launch.test.ts` uses against the SQL migration: one
  * source, and a test that holds it to its promises. A palette can be chosen by
  * eye and look convincing while one of its pairs sits at 3:1 — legible in a
  * screenshot at the size a designer looks at it, and tiring at 11px for a

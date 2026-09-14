@@ -8,14 +8,8 @@ import { plural } from "@/lib/plural";
 /**
  * Where a manuscript is coming from. Blank books never reach this step.
  *
- * **No `audio`.** A recording is the third thing the shelf's menu names, and it
- * is named there with a "Soon" badge that opens an explanation instead of this
- * screen — the transcriber and the chaptering after it are both written, but
- * the route in is not finished, and `/book/import` has said so in those words
- * for a while. A tab here would be a second way in to the thing being held
- * back, which is how a feature ends up half-offered. When it is ready it comes
- * back as one more entry in that menu and one more tab here; nothing else
- * about this file has to change.
+ * **No `audio`, and none is coming.** Turning a recording into text needs a
+ * speech model, and OpenChapter has had no AI since 2026-09-14.
  */
 export type SourceKind = "file" | "paste";
 

@@ -474,7 +474,7 @@ export function Bookshelf({
   const [sort, setSort] = useState<Sort>("recent");
   const [view, setView] = useState<ShelfView>("active");
   const [dialog, setDialog] = useState<
-    "help" | "support" | "feedback" | "community" | "audiobook" | null
+    "help" | "support" | "feedback" | "community" | null
   >(null);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -1078,10 +1078,8 @@ export function Bookshelf({
                           imported book arrived with no author, no genre and no
                           word-count goal while a blank one was asked for all
                           three. The three tabs that were inside that dialog are
-                          named here instead, because a writer with a recording
-                          cannot discover that this app takes recordings from a
-                          menu item that says "file", and each carries the writer
-                          into `/book/new` with the source it names. */}
+                          named here instead, and each carries the writer into
+                          `/book/new` with the source it names. */}
                     {(close) => (
                       <>
                         <MenuLabel>Start a book</MenuLabel>
@@ -1253,24 +1251,6 @@ export function Bookshelf({
             wondering whether you missed it.
           </ComingSoonDialog>
         )}
-        {/* Says what it will do and what is honestly true of it now. The
-            transcription itself is written and tested — what is not finished
-            is the way in, and claiming otherwise would be the "no claim the
-            code can't back" rule broken on the one screen where a writer is
-            deciding whether to trust the rest of it. */}
-        {dialog === "audiobook" && (
-          <ComingSoonDialog
-            title="Audiobook to text"
-            onClose={() => setDialog(null)}
-          >
-            Hand over a recording of your book being read and get the words
-            back, split into chapters at the pauses a narrator leaves. The
-            transcription behind it works; the way into it is not finished, so
-            it is named here rather than offered — you are not missing a button
-            somewhere.
-          </ComingSoonDialog>
-        )}
-
         {trashing && (
           <ConfirmDialog
             title="Move this book to the trash?"
@@ -1340,10 +1320,10 @@ export function Bookshelf({
                     : plural(noRoomForBatch.room, "more book")}
                 </span>
                 . Nothing has been restored — choose fewer, or take{" "}
-                {TIER_NAMES.draft} for unlimited books.
+                {TIER_NAMES.pro} for unlimited books.
               </>
             }
-            confirmLabel={`See ${TIER_NAMES.draft}`}
+            confirmLabel={`See ${TIER_NAMES.pro}`}
             onConfirm={() => router.push("/upgrade")}
             onClose={() => setNoRoomForBatch(null)}
           />
@@ -1414,7 +1394,7 @@ function MobileDashboardNavigation({
   onArea: (area: Area) => void;
   onClose: () => void;
   onDialog: (
-    dialog: "help" | "support" | "feedback" | "community" | "audiobook",
+    dialog: "help" | "support" | "feedback" | "community",
   ) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -2997,17 +2977,16 @@ function ProCard({ plan }: { plan: PlanState }) {
       <div className="min-w-0 flex-1">
         <h3 className="text-base font-bold text-white">Room for the next book</h3>
         <p className="mt-1.5 text-sm leading-relaxed text-white/85">
-          {TIER_NAMES.draft} takes the shelf from{" "}
-          {plural(TIER_LIMITS.free.books ?? 0, "book")} to unlimited, and brings
-          the writing assistant with{" "}
-          {TIER_LIMITS.draft.creditsPerMonth.toLocaleString("en-US")} credits a
-          month. Every export format is free on every plan, this one included.
+          {TIER_NAMES.pro} takes the shelf from{" "}
+          {plural(TIER_LIMITS.free.books ?? 0, "book")} to unlimited, and takes
+          the daily limit off title checks. Every export format is free on
+          every plan, this one included.
         </p>
         <Link
           href="/upgrade"
           className="mt-4 inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-upgrade-ink"
         >
-          See what {TIER_NAMES.draft} adds
+          See what {TIER_NAMES.pro} adds
         </Link>
       </div>
 

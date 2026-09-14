@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { TIER_NAMES, chatAllowed } from "@/lib/billing/tiers";
-import { UsageDialog } from "@/components/billing/usage-dialog";
+import { TIER_NAMES } from "@/lib/billing/tiers";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { signOut } from "@/app/auth/actions";
@@ -86,12 +85,6 @@ export function AccountMenu({
       : plan.tier
         ? `${TIER_NAMES[plan.tier]} plan`
         : "Free plan";
-
-  /* **Above the menu, not inside it.** `MenuBody` unmounts the moment the menu
-     closes — and the press that opens this dialog is also a press on a menu
-     item, which closes it. Held here, the dialog outlives the menu that asked
-     for it. */
-  const [usageOpen, setUsageOpen] = useState(false);
 
   const close = (returnFocus = true) => {
     setOpen(false);
@@ -288,16 +281,10 @@ export function AccountMenu({
               account={account}
               plan={plan}
               onClose={close}
-              onUsage={() => {
-                close(false);
-                setUsageOpen(true);
-              }}
             />
           </div>,
           document.body,
         )}
-
-      {usageOpen && <UsageDialog onClose={() => setUsageOpen(false)} />}
     </>
   );
 }
@@ -314,14 +301,11 @@ function MenuBody({
   account,
   plan,
   onClose,
-  onUsage,
 }: {
   account: Account | null;
   /** Asked once by the menu above, so the chip and this cannot disagree. */
   plan: ReturnType<typeof usePlan>;
   onClose: (returnFocus?: boolean) => void;
-  /** Asked of the parent: this dialog has to outlive the menu that opens it. */
-  onUsage: () => void;
 }) {
   /*
    * Cancelling is not offered here.
@@ -357,25 +341,6 @@ function MenuBody({
    * leaving an empty stripe behind.
    */
   const planSection = plan.loading || !plan.billing || plan.pro;
-
-  /*
-   * Whether the Usage row has anything to open onto.
-   *
-   * **Two questions, not one, and the tier answers only the first.** A plan
-   * that is granted credits keeps the row even at zero — that is where the
-   * refill date is, and a writer who has just run out is the likeliest person
-   * to look for it. And a Free account holding bought credits keeps it too,
-   * because it has a balance to report while its plan grants nothing.
-   *
-   * `total === null` is the unmetered deployment, where the dialog says so
-   * outright. `plan.tier` is null while `usePlan()` is still asking and the
-   * guard fails closed there on purpose — a row that appears a beat after the
-   * menu opens is worse than one that was never in it.
-   */
-  const showUsage =
-    (plan.tier !== null && chatAllowed(plan.tier)) ||
-    plan.credits?.total === null ||
-    (plan.credits?.total ?? 0) > 0;
 
   const until = plan.currentPeriodEnd
     ? new Date(plan.currentPeriodEnd).toLocaleDateString(undefined, {
@@ -456,15 +421,6 @@ function MenuBody({
           </MenuLink>
         )}
 
-        {/* **Only where there is a balance to report** — see `showUsage`. On
-            Free with nothing bought the dialog would open to say the plan
-            includes no credits, which the plans page says better. */}
-        {showUsage && (
-          <MenuButton onSelect={onUsage} icon={icons.usage}>
-            Usage
-          </MenuButton>
-        )}
-
         <Rule className="my-1.5" />
 
         {/* Theme, here rather than as a row of its own in the sidebar.
@@ -514,36 +470,6 @@ function Rule({ className = "" }: { className?: string }) {
 const ITEM = `flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left
   font-sans text-sm text-fg outline-none transition-colors hover:bg-raised
   focus-visible:ring-2 focus-visible:ring-accent/60`;
-
-/**
- * The same row as `MenuLink`, for the one that opens something instead of
- * going somewhere.
- *
- * Shares `ITEM` rather than restating it: Sign out already hand-copied those
- * classes once, and a third copy is how one row ends up a pixel taller than
- * its neighbours.
- */
-function MenuButton({
-  onSelect,
-  icon,
-  children,
-}: {
-  onSelect: () => void;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onSelect}
-      className={`${ITEM} cursor-pointer`}
-    >
-      <span className="shrink-0 [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
-      {children}
-    </button>
-  );
-}
 
 function MenuLink({
   href,
@@ -638,21 +564,6 @@ const icons = {
       <rect x="2.5" y="4" width="15" height="12" rx="2" strokeLinejoin="round" />
       <path d="M2.5 8.5h15" strokeLinecap="round" />
       <path d="M6 12.5h3" strokeLinecap="round" />
-    </svg>
-  ),
-  /* A gauge — a dial with a needle. The set is stroked at 1.8 on a 24 grid;
-     anything filled here would read as a different family. */
-  usage: (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4.5 17a8 8 0 1 1 15 0" />
-      <path d="M12 13.5 15.5 10" />
     </svg>
   ),
   signOut: (

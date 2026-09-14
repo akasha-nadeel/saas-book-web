@@ -32,7 +32,7 @@ export function selectPanel(
  * The rail's tabs, in groups, and the groups are the argument.
  *
  * They were one undivided run of nine — search, notes, ideas, bible,
- * bookmarks, assistant, versions, trash — which is a list to read rather than
+ * bookmarks, versions, trash — which is a list to read rather than
  * a shape to learn, and it put the two panels a writer wants *least* often in
  * the middle of the ones they want most. Grouped, the rail can be used by
  * position: near the top is finding your way about the book, below it is the
@@ -41,7 +41,7 @@ export function selectPanel(
  *
  * - **Finding a place in the book** — search, and the places already marked.
  * - **Kept beside the book** — the notes on this chapter, the ideas that are
- *   not this book's, the people and places, and the assistant that reads them.
+ *   not this book's, the people and places.
  * - **The safety nets**, pinned to the foot of the rail: what this chapter used
  *   to say, and what has been deleted. Material Design's rail guidance puts
  *   exactly this class of item in the trailing slot, and for the reason it
@@ -54,7 +54,7 @@ export function selectPanel(
  */
 const GROUPS: readonly (readonly PanelTab[])[] = [
   ["chapters", "search", "consistency"],
-  ["notes", "assistant"],
+  ["notes"],
   /* **How the page looks, and what goes on it.** Its own group because it is
      the one tab that changes the *book* rather than telling you about it —
      everything above reads the manuscript back to the writer, and this sets
@@ -82,7 +82,6 @@ const TAB_MARKS: Record<PanelTab, MarkName> = {
   notes: "notes",
   ideas: "ideas",
   bible: "bible",
-  assistant: "assistant",
   page: "tools",
   history: "history",
   trash: "trash",
@@ -99,10 +98,6 @@ const TAB_MARKS: Record<PanelTab, MarkName> = {
  *
  * - **Chapters.** The editor draws the book panel, which already is a chapter
  *   list, so the tab would be the same list twice.
- *
- * The assistant belongs here because it opens the left panel. Keeping the
- * button on the same side as the panel removes the old cross-screen jump from
- * the right rail.
  */
 export function WorkspaceRail({
   bookId,
@@ -111,7 +106,6 @@ export function WorkspaceRail({
   leftPanel,
   onPanel,
   chapters = true,
-  assistant = true,
   toolsOpen = false,
   onTools,
   className = "",
@@ -124,8 +118,6 @@ export function WorkspaceRail({
   onPanel: (open: boolean) => void;
   /** Offer the chapter-list tab. False where a book panel already shows one. */
   chapters?: boolean;
-  /** Offer the assistant tab. False only on screens that intentionally omit AI. */
-  assistant?: boolean;
   /**
    * Whether the tools strip is on screen, and how to open it.
    *
@@ -147,7 +139,6 @@ export function WorkspaceRail({
 
   const allowed = (value: PanelTab) =>
     (chapters || value !== "chapters") &&
-    (assistant || value !== "assistant") &&
     (!!onTools || value !== "page");
 
   /**

@@ -1,7 +1,7 @@
 /**
  * Where the Supabase project lives — and whether there is one at all.
  *
- * Accounts are optional the way the assistant's API key is optional: with these
+ * Accounts are optional the way every other key here is optional: with these
  * two values unset the app runs exactly as it always has — the local library,
  * no sign-in wall — and the account menu says so plainly rather than offering a
  * button that cannot work. A fresh clone therefore still runs before anyone has

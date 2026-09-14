@@ -18,15 +18,14 @@ import "server-only";
  *
  * **Configured or not, the same shape as everything else here.** No
  * `RESEND_API_KEY` and this answers `{ sent: false, reason: "not-configured" }`
- * rather than throwing — the same degradation the assistant, the two audio
- * routes and both payment gateways take. A self-hosted copy with no mail
+ * rather than throwing — the same degradation both payment gateways and the
+ * PDF renderer take. A self-hosted copy with no mail
  * provider goes on working exactly as this feature did before mail existed.
  *
  * **Resend is the provider because it is the only one.** Vercel's marketplace
  * lists exactly one messaging integration (`resend/resend-email`), so there was
  * no choice to agonise over; it is reached over its REST API rather than
- * through its SDK, for the reason `ai.ts` writes Gemini out by hand — the whole
- * of what we do is one POST, and a dependency for that is a dependency to keep
+ * through its SDK — the whole of what we do is one POST, and a dependency for that is a dependency to keep
  * patched, audit and eventually remove.
  */
 

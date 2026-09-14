@@ -91,31 +91,23 @@ export const PADDLE_SANDBOX = paddleSandboxFrom(
 );
 
 /**
- * The six prices — one per paid plan per cycle — made once in the Paddle
- * dashboard.
+ * The two prices — Pro, once per cycle — made once in the Paddle dashboard.
  *
  * Server-side on purpose. The transaction is created by our own route rather
  * than by the browser (see `/api/billing/paddle/checkout`), so the price the
  * writer is charged is chosen here and cannot be swapped for a cheaper one by
  * anybody reading the page source.
  *
- * **The old two-name pair is gone rather than kept as a fallback.** A
- * deployment still carrying `PADDLE_PRICE_MONTHLY` and none of the six must
- * fail `isPaddleConfigured()` loudly — falling back would sell Studio at the
- * Draft price, and nothing on either side would say so.
+ * **The retired names are gone rather than kept as a fallback.** A deployment
+ * still carrying the six `PADDLE_PRICE_{DRAFT,WRITER,STUDIO}_*` ids, or the
+ * older `PADDLE_PRICE_MONTHLY`, must fail `isPaddleConfigured()` loudly —
+ * falling back would sell Pro at a price it no longer has, and nothing on
+ * either side would say so.
  */
 const PRICE_IDS: Record<PaidTier, Record<Period, string>> = {
-  draft: {
-    monthly: process.env.PADDLE_PRICE_DRAFT_MONTHLY ?? "",
-    annual: process.env.PADDLE_PRICE_DRAFT_ANNUAL ?? "",
-  },
-  writer: {
-    monthly: process.env.PADDLE_PRICE_WRITER_MONTHLY ?? "",
-    annual: process.env.PADDLE_PRICE_WRITER_ANNUAL ?? "",
-  },
-  studio: {
-    monthly: process.env.PADDLE_PRICE_STUDIO_MONTHLY ?? "",
-    annual: process.env.PADDLE_PRICE_STUDIO_ANNUAL ?? "",
+  pro: {
+    monthly: process.env.PADDLE_PRICE_PRO_MONTHLY ?? "",
+    annual: process.env.PADDLE_PRICE_PRO_ANNUAL ?? "",
   },
 };
 
@@ -149,13 +141,13 @@ export function paddlePlanFrom(
 }
 
 /**
- * True once Paddle can actually take money. All nine are required: a client
+ * True once Paddle can actually take money. All five are required: a client
  * token with no API key opens a checkout nothing can create, an API key with no
  * webhook secret takes payments nobody is granted for, and a missing price id
- * is a card on the pricing page that cannot be bought.
+ * is a cycle on the pricing page that cannot be bought.
  *
- * **All six prices or none**, rather than per-plan availability — that would
- * mean the pricing page hiding a card, which is a product decision hidden
+ * **Both prices or neither**, rather than per-cycle availability — that would
+ * mean the pricing page hiding a cycle, which is a product decision hidden
  * inside a configuration check.
  */
 export function isPaddleConfigured(): boolean {

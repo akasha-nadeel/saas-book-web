@@ -165,7 +165,7 @@ const CARD_QUIET = `border border-transparent bg-transparent text-black dark:tex
  * from its own fill in daylight — readable in use, where selection is
  * persistent and a hover is under the pointer, but not in a screenshot. A tint
  * is unambiguous at a glance and costs no hue: it is the same `accent/10` the
- * search results and the assistant's rows now use for *this is the one*, so
+ * search results now use for *this is the one*, so
  * the panels agree about what selected looks like.
  *
  * The two backing signals stay: medium weight on the title, and the number or

@@ -22,7 +22,6 @@
 
 import type { CollabRole } from "./collab";
 import { clampZoom } from "@/lib/editor/zoom";
-import { asChatModel, type ChatModel } from "@/lib/chat-model";
 import { isPanelTab, type PanelTab } from "./panel-tabs";
 import {
   DEFAULT_SHELF_LAYOUT,
@@ -80,7 +79,6 @@ import {
   type BookLimit,
   type DailyLimit,
   type DailyUse,
-  type TotalLimit,
 } from "./free-limits";
 // Type-only, and publishing.ts imports Book the same way — a cycle that exists
 // for the compiler and never at runtime.
@@ -3377,31 +3375,6 @@ export interface Prefs {
   /** Which sub-tab the find & replace panel is currently showing ("find" | "replace"). */
   searchTab: "find" | "replace";
   /**
-   * Whether the assistant may offer to put a passage into the chapter.
-   *
-   * **Off by default, and it stays a preference rather than a plan check.** The
-   * plan decides whether the switch can be moved; this records whether the
-   * writer moved it. Reading the two as one thing would turn a lapsed
-   * subscription into a setting that changed itself, and would leave a returning
-   * Pro writer with write access they never asked for.
-   *
-   * Nothing is written by it on its own: with this on, the reply's offered
-   * prose grows an Apply control, and the change still waits for a press.
-   */
-  assistantWrite: boolean;
-  /**
-   * Which of the assistant's two models the writer last asked for.
-   *
-   * Stored rather than held in the panel, because the panel unmounts every time
-   * it is closed — a writer who chose Careful, shut the rail and came back
-   * would find themselves back on Quick, having asked for nothing of the sort.
-   * The same reasoning as `panelTab` two fields down.
-   *
-   * Defaults to `quick`: the cheap model on the daily meter. Whatever this is
-   * unsure about, it must not be the one that spends the scarcer allowance.
-   */
-  assistantModel: ChatModel;
-  /**
    * Which of the rail's panels is showing.
    *
    * Stored, with `leftPanel`, because **a navigation is not a decision.**
@@ -3508,19 +3481,6 @@ export interface Prefs {
    * makes.
    */
   usedOn: Partial<Record<BookLimit, string[]>>;
-  /**
-   * How many of each lifetime allowance have been spent. Never reset.
-   *
-   * The plainest of the three counters and the only one with nothing that can
-   * give a count back — no day to compare against, no set to union. That is
-   * what "for the life of the account" means, and it is why the sentences
-   * built from it may not borrow the daily ones' vocabulary.
-   *
-   * It counts *presses that produced something*: the screen records here when
-   * a reply lands, not when the button is pressed, so a failed request does
-   * not cost a writer one of five.
-   */
-  usedTotal: Partial<Record<TotalLimit, number>>;
 }
 
 const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -3535,15 +3495,9 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // Off, as in a word processor: shown when a writer goes looking for what is
   // taking up the space, not while they are simply writing.
   marks: false,
-  // Navigation is open by default; the assistant is opt-in, since it is the
-  // only part of the app that talks to a server.
+  // Navigation is open by default.
   leftPanel: true,
   searchTab: "find",
-  // Off: the assistant offers text and puts none of it in until asked to.
-  assistantWrite: false,
-  // The cheapest model, so a writer who never touches the picker never quietly
-  // spends ten replies' worth of credits on one.
-  assistantModel: "quick",
   panelTab: "search",
   // The grid the shelf has always drawn; a writer who wants another says so.
   shelfLayout: DEFAULT_SHELF_LAYOUT,
@@ -3574,7 +3528,6 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // objects rather than adding to these.
   usedToday: Object.freeze({ day: "", counts: Object.freeze({}) }) as DailyUse,
   usedOn: Object.freeze({}) as Partial<Record<BookLimit, string[]>>,
-  usedTotal: Object.freeze({}) as Partial<Record<TotalLimit, number>>,
 });
 
 const prefsListeners = new Set<() => void>();
@@ -3624,11 +3577,6 @@ function parsePrefs(raw: string | null): Prefs {
       marks: parsed.marks === true,
       leftPanel: parsed.leftPanel !== false,
       searchTab: parsed.searchTab === "replace" ? "replace" : "find",
-      assistantWrite: parsed.assistantWrite === true,
-      // Narrowed like `panelTab`: a value written by an older version — or by
-      // hand — must not reach `modelName` as a model id nobody sells.
-      assistantModel:
-        asChatModel(parsed.assistantModel) ?? DEFAULT_PREFS.assistantModel,
       panelTab: isPanelTab(parsed.panelTab)
         ? parsed.panelTab
         : DEFAULT_PREFS.panelTab,
@@ -3659,7 +3607,6 @@ function parsePrefs(raw: string | null): Prefs {
       // nonsense.
       usedToday: parseUsedToday(parsed),
       usedOn: parseUsedOn(parsed),
-      usedTotal: parseUsedTotal(parsed),
     };
   } catch {
     return DEFAULT_PREFS;
@@ -3723,28 +3670,7 @@ function parseUsedOn(parsed: Partial<Prefs>): Partial<Record<BookLimit, string[]
 }
 
 /**
- * The lifetime counters, as whatever storage happens to hold.
- *
- * A string, a fraction, a negative or a missing key all read as nought — no
- * compiler has ever checked what is in `localStorage`, and this number decides
- * whether somebody is refused. Erring at nought is the generous direction, and
- * it is the right one: charging a writer for work there is no evidence of is
- * worse than handing out one extra suggestion.
- */
-function parseUsedTotal(parsed: Partial<Prefs>): Partial<Record<TotalLimit, number>> {
-  const stored = parsed.usedTotal;
-  if (!stored || typeof stored !== "object") return {};
-
-  const usedTotal: Partial<Record<TotalLimit, number>> = {};
-  for (const [key, value] of Object.entries(stored as Record<string, unknown>)) {
-    if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) continue;
-    usedTotal[key as TotalLimit] = Math.floor(value);
-  }
-  return usedTotal;
-}
-
-/**
- * The three usage counters, merged rather than replaced, on the way down.
+ * The two usage counters, merged rather than replaced, on the way down.
  *
  * **Every other pref is last-writer-wins and should be** — a writer who picks a
  * light theme on their phone means it, and the newest answer is the right one.
@@ -3760,13 +3686,6 @@ function parseUsedTotal(parsed: Partial<Prefs>): Partial<Record<TotalLimit, numb
  *   of a set of books over a tally of attempts: two machines can each mark a
  *   different book and neither mark is lost, where two tallies can only be
  *   guessed between.
- * - **`usedTotal` takes the larger count per tool**, which is the only answer
- *   available and is deliberately not the sum. Summing would charge a writer
- *   twice for one press whenever a machine downloads a count it has already
- *   pushed — five would become two or three within a day of ordinary syncing.
- *   Taking the larger loses a genuine second press made offline on the other
- *   machine, which costs us one model call and never costs a writer anything
- *   they paid for. That is the direction to be wrong in.
  * - **`usedToday` takes the larger count per tool** when both machines are on
  *   the same local day, and otherwise the *later* day outright. A day string
  *   sorts correctly as text, and the empty day a fresh library carries sorts
@@ -3783,13 +3702,12 @@ function parseUsedTotal(parsed: Partial<Prefs>): Partial<Record<TotalLimit, numb
  * storage, so a merge can be asserted without staging two browsers.
  */
 export function mergeUsage(
-  local: Pick<Prefs, "usedToday" | "usedOn" | "usedTotal">,
+  local: Pick<Prefs, "usedToday" | "usedOn">,
   remote: Partial<Prefs>,
-): Pick<Prefs, "usedToday" | "usedOn" | "usedTotal"> {
+): Pick<Prefs, "usedToday" | "usedOn"> {
   const theirs = {
     usedToday: parseUsedToday(remote),
     usedOn: parseUsedOn(remote),
-    usedTotal: parseUsedTotal(remote),
   };
 
   const usedOn: Partial<Record<BookLimit, string[]>> = {};
@@ -3802,12 +3720,6 @@ export function mergeUsage(
     ];
   }
 
-  const usedTotal: Partial<Record<TotalLimit, number>> = { ...local.usedTotal };
-  for (const [key, value] of Object.entries(theirs.usedTotal)) {
-    const action = key as TotalLimit;
-    usedTotal[action] = Math.max(usedTotal[action] ?? 0, value ?? 0);
-  }
-
   if (theirs.usedToday.day !== local.usedToday.day) {
     return {
       usedToday:
@@ -3815,7 +3727,6 @@ export function mergeUsage(
           ? theirs.usedToday
           : local.usedToday,
       usedOn,
-      usedTotal,
     };
   }
 
@@ -3825,7 +3736,7 @@ export function mergeUsage(
     counts[action] = Math.max(counts[action] ?? 0, value ?? 0);
   }
 
-  return { usedToday: { day: local.usedToday.day, counts }, usedOn, usedTotal };
+  return { usedToday: { day: local.usedToday.day, counts }, usedOn };
 }
 
 /**
@@ -3957,25 +3868,6 @@ export function markToolBook(action: BookLimit, bookId: string) {
 /** Whether this book is already one of the ones that tool is counted on. */
 export function isToolBook(action: BookLimit, bookId: string): boolean {
   return (getPrefs().usedOn[action] ?? []).includes(bookId);
-}
-
-/**
- * Spend one of a lifetime allowance. The only way anything writes `usedTotal`.
- *
- * **Not idempotent, unlike `markToolBook`**, and it cannot be: there is no id
- * here to recognise a repeat by, and a second suggestion really is a second
- * call to pay for. So this is called exactly once per successful reply, by the
- * screen that received it — never by `useLimitGate`, which fires on the press
- * and would charge for a request that failed.
- */
-export function spendTotalUse(action: TotalLimit) {
-  const usedTotal = getPrefs().usedTotal;
-  setPref("usedTotal", { ...usedTotal, [action]: (usedTotal[action] ?? 0) + 1 });
-}
-
-/** How many of a lifetime allowance have gone. */
-export function totalUsed(action: TotalLimit): number {
-  return getPrefs().usedTotal[action] ?? 0;
 }
 
 /**
@@ -4147,87 +4039,6 @@ export function subscribeToBibles(
   };
 }
 
-
-// ---------------------------------------------------------------------------
-// Conversations
-//
-// One key per conversation, like the bible: unbounded text that belongs to one
-// chapter or one book and must not ride along in a shelf write.
-//
-// **Every chat in the app kept its transcript in component state**, and all
-// three panels unmount when they close — `LeftPanel` owns its own mounting so
-// it can animate out, and the two workshops sit inside tool screens that come
-// and go. So a writer who closed the assistant to look at their chapter came
-// back to an empty panel, having lost the reading they had just asked for. It
-// read as the app forgetting on purpose.
-//
-// **It does not sync, and each of the three screens says so.** A transcript
-// carries the prose that was sent with the question, and every tool store here
-// is local for that reason. It is wiped with the rest by `clearLocalLibrary()`
-// when a different account signs in, which is what makes a shared browser safe.
-// ---------------------------------------------------------------------------
-
-const CHAT_PREFIX = "openchapter:chat:";
-const chatKey = (id: string) => `${CHAT_PREFIX}${id}`;
-const chatListeners = new Set<() => void>();
-
-/**
- * How many messages a conversation keeps.
- *
- * **Stated once, here, beside the store it bounds.** A transcript grows without
- * limit and competes with the manuscript for room — the store already raises a
- * storage alarm when the origin fills — so the oldest turns are dropped rather
- * than allowed to accumulate. Forty is roughly twenty exchanges, far more than
- * any of these three conversations is shaped for: the assistant answers about
- * one chapter, and both workshops are metered at three conversations for good.
- */
-export const CHAT_KEEP = 40;
-
-export function subscribeToChat(id: string, onStoreChange: () => void) {
-  chatListeners.add(onStoreChange);
-  const key = chatKey(id);
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === null || event.key === key) onStoreChange();
-  };
-  window.addEventListener("storage", onStorage);
-  return () => {
-    chatListeners.delete(onStoreChange);
-    window.removeEventListener("storage", onStorage);
-  };
-}
-
-export function getChatRaw(id: string): string | null {
-  return readRaw(chatKey(id));
-}
-
-export function getServerChatRaw(): string | null {
-  return null;
-}
-
-/**
- * Write a conversation back, keeping only the last `CHAT_KEEP` messages.
- *
- * **Swallowed on failure, unlike the bible.** This is not what the writer
- * typed — it is a record of an exchange they can have again — so a full disk
- * should cost the transcript rather than the answer on screen. The panel holds
- * the messages in its own state either way; this is only what survives it
- * closing.
- */
-export function saveChat(id: string, messages: readonly unknown[]) {
-  const kept = messages.slice(-CHAT_KEEP);
-  try {
-    window.localStorage.setItem(chatKey(id), JSON.stringify(kept));
-  } catch {
-    return;
-  }
-  for (const listener of chatListeners) listener();
-}
-
-/** Empty a conversation — what a panel's Clear button presses. */
-export function clearChat(id: string) {
-  window.localStorage.removeItem(chatKey(id));
-  for (const listener of chatListeners) listener();
-}
 
 // ---------------------------------------------------------------------------
 // Advance copies
@@ -4477,35 +4288,6 @@ function rememberVersion(chapterId: string, body: string, words: number) {
     if (!shouldSnapshot(history, body, now)) return;
 
     const next = addSnapshot(history, { at: now, body, words });
-    void writeStored(HISTORY, chapterId, JSON.stringify(next));
-    sweepHistory(chapterId);
-    for (const listener of historyListeners) listener();
-  } catch {
-    // Deliberately silent. See the note at the head of this section.
-  }
-}
-
-/**
- * Keep this version now, whatever the usual rules say.
- *
- * **The one caller is the assistant putting a passage into the chapter**, and
- * it is why this exists at all: `rememberVersion` declines most saves, so a
- * replacement made a minute after the last snapshot would have had no version
- * behind it. Undo covers the next few seconds; this covers the hour after,
- * when the writer has kept typing and the change is somewhere up the page.
- *
- * A machine-made change to somebody's prose is the one edit that has to be
- * recoverable from the History panel by name, so the guard is skipped rather
- * than loosened — loosening it would take more snapshots of every ordinary
- * save too, which is the budget this section spends its length defending.
- *
- * Silent on failure, like everything else here: a full origin means no version,
- * never a refused write.
- */
-export function keepVersionNow(chapterId: string, body: string, words: number) {
-  try {
-    const history = parseHistory(getHistoryRaw(chapterId));
-    const next = addSnapshot(history, { at: Date.now(), body, words });
     void writeStored(HISTORY, chapterId, JSON.stringify(next));
     sweepHistory(chapterId);
     for (const listener of historyListeners) listener();

@@ -329,7 +329,6 @@ function TogetherVisual() {
       </div>
       <div className="flex h-16 items-center gap-4 rounded-xl border border-lp-edge bg-lp-ground px-4.5 shadow-[0_8px_24px_-16px_rgba(15,15,16,0.5)] sm:gap-5 sm:px-5">
         <IconMark name="Saved versions" src="/icons/icon-history.png" />
-        <IconMark name="Assistant" src="/icons/icon-assistant.png" />
         <IconMark name="Export" src="/icons/icon-export.png" />
         <IconMark name="Consistency" src="/icons/icon-consistency.png" />
       </div>
@@ -421,7 +420,7 @@ export function FeatureBento() {
             tone="neutral"
             span="order-5 sm:order-4 sm:col-span-1 lg:order-5 lg:col-span-2"
             title="Everything for your book, together"
-            body="Shelf, import, editor, saved versions, assistant and export. One workspace, and no second account."
+            body="Shelf, import, editor, saved versions, the consistency check and export. One workspace, no second account, and no AI."
           >
             <TogetherVisual />
           </Card>

@@ -14,31 +14,10 @@ import type { PlanTier } from "@/lib/billing/tiers";
  * browser's to own. `library-store.ts` stays the only thing touching
  * localStorage, and this is deliberately not part of it.
  *
- * Nothing here gates anything that costs money. The two billed routes check the
- * subscription themselves, server-side, because that is the only check a reader
- * with devtools cannot edit. What this is for is showing a writer the truth
+ * Nothing here is the real limit. The book limit is a Postgres trigger, because
+ * that is the only check a reader with devtools cannot edit. What this is for is showing a writer the truth
  * about their own account — which button to offer, which state to describe.
  */
-
-/**
- * What is left to spend on the assistant.
- *
- * **Two buckets, because they behave differently.** `grantLeft` is this
- * month's allowance and disappears on the 1st; `purchased` was paid for and
- * does not. A gate asks `total`; `/billing` prints the split, so a writer can
- * see what they are about to lose and what they are not.
- *
- * `null` throughout means *nothing is metered here* — no payment gateway
- * configured, which is the self-hosted case — and must read as unlimited
- * rather than as empty.
- */
-export interface CreditBalance {
-  grantLeft: number | null;
-  purchased: number | null;
-  total: number | null;
-  /** ISO instant. Rendered in the reader's own time zone, never as a phrase. */
-  resetAt: string | null;
-}
 
 export interface PlanState {
   /** Still asking. Distinguish this from "on the free plan" before rendering. */
@@ -46,17 +25,9 @@ export interface PlanState {
   /** Is there a payment gateway configured at all? */
   billing: boolean;
   signedIn: boolean | null;
-  /**
-   * Which of the four plans, once known.
-   *
-   * **Anything gating the assistant must read this, never `pro`.** Draft is a
-   * paid plan with no AI, so `pro` answers true for a writer who may not use
-   * the assistant at all — a gate written against `pro` unlocks it for them,
-   * and a paid feature whose gate is visibly decorative teaches a reader that
-   * the rest are too.
-   */
+  /** Which of the two plans, once known. */
   tier: PlanTier | null;
-  /** Any paid plan at all. The right question for books, trash and tools. */
+  /** On Pro. The question books, the trash and title checks ask. */
   pro: boolean;
   status: SubscriptionStatus | null;
   period: Period | null;
@@ -66,18 +37,6 @@ export interface PlanState {
   canCancel: boolean;
   /** Present only when an order id was asked about. */
   order: { id: string; status: string } | null;
-  /**
-   * What is left to spend on the assistant, reported by the backend.
-   *
-   * **This, not `tier`, is what gates the panel.** A Free account holding
-   * bought credits has some; a Writer who has spent the month has none. Both
-   * are facts about the balance rather than the plan, and `aiChatClosed()` in
-   * `launch.ts` reads `credits.total` for exactly that reason.
-   *
-   * `resetAt` is an instant rather than a phrase because 00:00 UTC on the 1st
-   * is 5:30am in Colombo — every screen renders it in the reader's own time.
-   */
-  credits: CreditBalance | null;
   /** Book allowance. `null` means unlimited. */
   books: { limit: number | null } | null;
   /** Export formats by plan. */
@@ -98,7 +57,6 @@ const UNKNOWN: PlanState = {
   currentPeriodEnd: null,
   canCancel: false,
   order: null,
-  credits: null,
   books: null,
   exports: null,
 };

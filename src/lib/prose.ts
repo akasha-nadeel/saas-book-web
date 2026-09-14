@@ -9,9 +9,8 @@
  *
  * So this counts and never corrects. It is the `storeReadiness()` pattern
  * pointed at prose instead of metadata: here is what is in your chapter, in
- * numbers, and the decision is yours. That is not modesty — it is the only
- * version of this feature that does not contradict the assistant having no
- * write access to the manuscript.
+ * numbers, and the decision is yours. That is not modesty — nothing in
+ * OpenChapter writes into a manuscript but the writer.
  *
  * **There is no score.** No number out of a hundred, no grade, no "readability
  * rating". Every one of those is invented to look like an answer, and prose is

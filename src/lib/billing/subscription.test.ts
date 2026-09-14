@@ -14,10 +14,9 @@ function sub(overrides: Partial<Subscription> = {}): Subscription {
     // are about entitlement rather than about who took the money — isPro()
     // reads the status and the date and has never cared which.
     provider: "payhere",
-    // Writer because it is what the old single paid plan became: unlimited
-    // books plus the assistant. These cases are about the date arithmetic, and
-    // isPro() has never read the plan name.
-    tier: "writer",
+    // The one paid plan. These cases are about the date arithmetic, and isPro()
+    // has never read the plan name.
+    tier: "pro",
     status: "active",
     period: "monthly",
     currentPeriodEnd: new Date("2026-08-15T12:00:00.000Z"),

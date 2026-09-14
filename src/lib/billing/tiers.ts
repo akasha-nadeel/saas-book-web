@@ -1,11 +1,10 @@
 /**
- * The four plans, what each one gives, and the order they climb in.
+ * The two plans, what each one gives, and the order they climb in.
  *
- * **Plan used to be a boolean.** `isPro()` answered yes or no, and every gate
- * in the tree asked that one question. The column `subscriptions.plan` existed
- * from the first billing migration, was written on every purchase and was never
- * once read back — a name with nowhere to be said. This module is what makes it
- * mean something.
+ * **Two since 2026-09-14.** There were four — Free, Draft, Writer and Studio —
+ * and the three paid ones differed only by how many assistant credits they
+ * granted. The assistant was removed with every other model call, which left
+ * three identical products at three prices, so they became one: Pro.
  *
  * **Its own file, importing nothing.** `plans.ts` is about money and `launch.ts`
  * is about what the MVP hides; the tier is a third thing that both of them and
@@ -15,12 +14,11 @@
  * values. That rule has already cost this codebase one 500.
  *
  * **The limits here are the browser's copy. Postgres holds the real one** —
- * `claim_assistant_reply` and the free-book trigger decide in SQL, because a
- * number a browser can edit is not a limit. The two are two statements of one
- * rule and must move together, the same way `booksAgainstPlan` and the book
- * trigger already do. SQL cannot import TypeScript; that is the whole of why
- * this is stated twice, and it is deliberate rather than a duplication waiting
- * to be tidied away.
+ * the free-book trigger decides in SQL, because a number a browser can edit is
+ * not a limit. The two are two statements of one rule and must move together,
+ * the same way `booksAgainstPlan` and the book trigger already do. SQL cannot
+ * import TypeScript; that is the whole of why this is stated twice, and it is
+ * deliberate rather than a duplication waiting to be tidied away.
  */
 
 /**
@@ -28,32 +26,24 @@
  * positions in this array, so a tier inserted in the wrong place silently opens
  * or shuts every gate above it.
  */
-export const TIER_ORDER = ["free", "draft", "writer", "studio"] as const;
+export const TIER_ORDER = ["free", "pro"] as const;
 
 export type PlanTier = (typeof TIER_ORDER)[number];
 
-/** The three that can be bought. `free` is the absence of a subscription row. */
+/** What can be bought. `free` is the absence of a subscription row. */
 export type PaidTier = Exclude<PlanTier, "free">;
 
-export const PAID_TIERS: readonly PaidTier[] = ["draft", "writer", "studio"];
+export const PAID_TIERS: readonly PaidTier[] = ["pro"];
 
 /**
  * What each plan gives.
  *
- * **The assistant is where the plans differ, and it differs by amount rather
- * than by kind.** Every paid plan gets all three models; what a plan buys is
- * how many replies a month. Everything else — imports, sync, all three export
- * formats, the title and consistency checks, unlimited words and chapters — is
- * on every tier including Free, and that is not an oversight to be monetised
- * later. *Export must never move behind the plan.*
- *
- * **One credit balance, not two meters.** This carried `quickPerDay` and
- * `carefulPerMonth` until 2026-09-04 — two allowances on two windows, which let
- * a writer run out of the careful model on the 3rd with twenty-five daily quick
- * replies going unused, gave them no way to buy more, and would have needed a
- * third counter on a third window the moment a third model arrived. A month's
- * credits are now spent however the writer likes; see `credits.ts` for what
- * each model costs.
+ * **Books are the one difference the server enforces.** Everything else —
+ * imports, sync, all three export formats, the consistency check, unlimited
+ * words and chapters — is on both plans, and that is not an oversight to be
+ * monetised later. *Export must never move behind the plan.* The daily title
+ * check allowance is the other difference, and it lives in `free-limits.ts`
+ * with the rest of the browser's meters.
  *
  * `books: null` means unlimited. It is `null` rather than `Infinity` because
  * this value is serialised to the browser through `/api/billing/subscription`
@@ -61,47 +51,16 @@ export const PAID_TIERS: readonly PaidTier[] = ["draft", "writer", "studio"];
  */
 export const TIER_LIMITS = {
   free: {
-    books: 5 as number | null,
-    chat: false,
-    creditsPerMonth: 0,
-    assistantWrite: false,
+    books: 1 as number | null,
   },
-  draft: {
+  pro: {
     books: null as number | null,
-    chat: true,
-    creditsPerMonth: 2_000,
-    assistantWrite: true,
-  },
-  writer: {
-    books: null as number | null,
-    chat: true,
-    creditsPerMonth: 5_000,
-    assistantWrite: true,
-  },
-  studio: {
-    books: null as number | null,
-    chat: true,
-    creditsPerMonth: 10_000,
-    assistantWrite: true,
   },
 } as const satisfies Record<PlanTier, TierLimits>;
 
 export interface TierLimits {
   /** How many books may be held. `null` is unlimited. */
   books: number | null;
-  /**
-   * Whether this plan is *granted* assistant credits each month.
-   *
-   * **Not the same question as whether the panel opens.** A Free account
-   * holding bought credits may use the assistant; what it does not have is a
-   * monthly grant. `aiChatClosed()` in `launch.ts` asks about the balance, and
-   * this asks about the plan.
-   */
-  chat: boolean;
-  /** Credits granted each UTC calendar month. Mirrored in `claim_credits`. */
-  creditsPerMonth: number;
-  /** Whether the assistant may offer text to put into the chapter. */
-  assistantWrite: boolean;
 }
 
 /**
@@ -114,19 +73,17 @@ export interface TierLimits {
  */
 export const TIER_NAMES: Record<PlanTier, string> = {
   free: "Free",
-  draft: "Draft",
-  writer: "Writer",
-  studio: "Studio",
+  pro: "Pro",
 };
 
 /**
  * Narrows whatever came back off a URL, a request body or a database row.
  *
- * **`"pro"` is refused rather than mapped.** Rows written before the tiers
- * existed carry it, and the migration that adds the CHECK constraint rewrites
- * them to `writer` in the same statement. Quietly translating it here would
- * hide a row the migration missed, and a subscriber silently on the wrong plan
- * is worse than one whose plan reads as `free` until somebody looks.
+ * **The retired tiers are refused rather than mapped.** `draft`, `writer` and
+ * `studio` rows are rewritten to `pro` by the migration that retired them.
+ * Quietly translating them here would hide a row the migration missed, and a
+ * subscriber silently on the wrong plan is worse than one whose plan reads as
+ * `free` until somebody looks.
  */
 export function asTier(value: unknown): PlanTier | null {
   return typeof value === "string" &&
@@ -144,21 +101,11 @@ export function asPaidTier(value: unknown): PaidTier | null {
 /**
  * Whether `tier` reaches `minimum`.
  *
- * Every server gate asks this rather than naming tiers, so adding a fifth plan
- * is an edit to `TIER_ORDER` and nothing else.
+ * Every server gate asks this rather than naming tiers, so adding a plan is an
+ * edit to `TIER_ORDER` and nothing else.
  */
 export function tierAtLeast(tier: PlanTier, minimum: PlanTier): boolean {
   return TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf(minimum);
-}
-
-/** Whether the assistant is reachable on this plan at all. */
-export function chatAllowed(tier: PlanTier): boolean {
-  return TIER_LIMITS[tier].chat;
-}
-
-/** Whether the assistant may offer text to put into the chapter. */
-export function assistantWriteAllowed(tier: PlanTier): boolean {
-  return TIER_LIMITS[tier].assistantWrite;
 }
 
 /** How many books this plan holds. `null` is unlimited. */

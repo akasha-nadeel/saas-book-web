@@ -1,6 +1,5 @@
-import { asPeriod, displayPrice, priceOf, type Period } from "@/lib/billing/plans";
+import { asPeriod, displayPrice, priceOf } from "@/lib/billing/plans";
 import { asPaidTier, TIER_NAMES } from "@/lib/billing/tiers";
-import { STARTER_PASS } from "@/lib/billing/starter-pass";
 import type { InterestPeriod, InterestTier } from "@/lib/plan-interest";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -56,46 +55,14 @@ function asSource(value: unknown): Source | null {
   return value === "upgrade" || value === "landing" ? value : null;
 }
 
-/**
- * The pass narrows on its own, because `asPaidTier` will not take it.
- *
- * That refusal is correct — a `PaidTier` is something a subscription can be —
- * so the pass is checked beside it rather than by widening the type every gate
- * in the billing code reads. Both still end up narrowed before anything is
- * written; nothing here trusts the body.
- */
-function asInterestTier(value: unknown): InterestTier | null {
-  return value === "pass" ? "pass" : asPaidTier(value);
-}
-
-function asInterestPeriod(value: unknown): InterestPeriod | null {
-  return value === "once" ? "once" : asPeriod(value);
-}
-
-/**
- * What was wanted, said the way the pricing page says it.
- *
- * The pass has no `TIER_NAMES` entry and no `priceOf` — it is not a tier and
- * has no cycle — so it is named from `STARTER_PASS` instead of being forced
- * through helpers that describe subscriptions.
- */
+/** What was wanted, said the way the pricing page says it. */
 function describe(
   tier: InterestTier,
   period: InterestPeriod,
 ): { name: string; terms: string } {
-  if (tier === "pass") {
-    return {
-      name: "the Starter Pass",
-      terms: `${displayPrice(STARTER_PASS.price)}, charged once`,
-    };
-  }
-  /* `once` cannot reach here — POST refuses a plan carrying it — but the two
-     narrowings happen on separate fields and TypeScript cannot see the pairing
-     between them, so the cycle is settled rather than asserted. */
-  const cycle: Period = period === "once" ? "monthly" : period;
   return {
     name: TIER_NAMES[tier],
-    terms: `${cycle === "annual" ? "annual" : "monthly"}, ${displayPrice(priceOf(tier, cycle))}`,
+    terms: `${period === "annual" ? "annual" : "monthly"}, ${displayPrice(priceOf(tier, period))}`,
   };
 }
 
@@ -123,22 +90,13 @@ export async function POST(request: Request) {
      impossible — there is no field for a stranger to put a sentence in. The
      only text that ever reaches the email is an address out of a verified
      session. */
-  const tier = asInterestTier(body?.tier);
-  const period = asInterestPeriod(body?.period);
+  const tier = asPaidTier(body?.tier);
+  const period = asPeriod(body?.period);
   const source = asSource(body?.source);
 
   if (!tier || !period || !source) {
     /* Still 200. A malformed press is nothing to tell a visitor about, and the
        browser that sent it has no interface for the news. */
-    return Response.json({ ok: true });
-  }
-
-  /* **`once` belongs to the pass and to nothing else.** Each field narrows on
-     its own, so "studio, once" and "pass, annual" both survive that and would
-     land as rows describing products this app does not sell. Refused here
-     rather than left to the CHECK constraints, which would take the row but
-     lose the reason. */
-  if ((tier === "pass") !== (period === "once")) {
     return Response.json({ ok: true });
   }
 
@@ -175,7 +133,8 @@ export async function POST(request: Request) {
    * means somebody pressed; it does not mean anybody was told. Five Starter
    * Pass presses landed during the hour every send was being refused, and the
    * cap then read those five as "already reported" and kept suppressing the one
-   * plan that had never once been mailed about. The count now reads
+   * plan that had never once been mailed about. (The pass is gone; the lesson
+   * is not.) The count now reads
    * `alerted_at`, which is written only after the provider has taken the
    * message — so a failed send leaves the next press free to try again.
    *

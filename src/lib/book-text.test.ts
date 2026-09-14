@@ -1,12 +1,42 @@
 import { describe, expect, it } from "vitest";
 
-import { breaksIn } from "./book-text";
+import { breaksIn, proseFrom } from "./book-text";
 import type { Block } from "./export/blocks";
 
 const para = (text: string): Block => ({
   kind: "paragraph",
   depth: 0,
   runs: [{ text }],
+});
+
+describe("proseFrom", () => {
+  it("keeps the paragraphing, which search.ts throws away", () => {
+    expect(proseFrom([para("One."), para("Two.")])).toBe("One.\n\nTwo.");
+  });
+
+  it("joins the runs inside a paragraph", () => {
+    expect(
+      proseFrom([
+        { kind: "paragraph", depth: 0, runs: [{ text: "He " }, { text: "ran." }] },
+      ]),
+    ).toBe("He ran.");
+  });
+
+  it("drops images rather than reading a megabyte of base64", () => {
+    const image: Block = {
+      kind: "image",
+      depth: 0,
+      src: "data:image/png;base64,AAAA",
+      runs: [],
+    };
+    expect(proseFrom([para("One."), image, para("Two.")])).toBe("One.\n\nTwo.");
+  });
+
+  it("drops blocks with nothing in them", () => {
+    expect(proseFrom([para("One."), para("   "), para("Two.")])).toBe(
+      "One.\n\nTwo.",
+    );
+  });
 });
 const rule: Block = { kind: "sceneBreak", depth: 0, runs: [] };
 

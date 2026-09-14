@@ -37,7 +37,7 @@ import { DESTINATIONS, type Mark } from "./works-with";
 
 type Format = {
   label: string;
-  mark: "markdown" | "html" | "word" | "file" | "audio";
+  mark: "markdown" | "html" | "word" | "file";
 };
 
 /** Coming in — see `parseFile` in src/lib/import/index.ts. */
@@ -47,7 +47,6 @@ const IN: Format[] = [
   { label: "MD", mark: "markdown" },
   { label: "TXT", mark: "file" },
   { label: "HTML", mark: "html" },
-  { label: "Audio", mark: "audio" },
 ];
 
 /**
@@ -259,18 +258,6 @@ const MARKS: Record<Format["mark"], React.ReactNode> = {
     >
       <path d="M11.4 2.4H6.2a1.6 1.6 0 0 0-1.6 1.6v12a1.6 1.6 0 0 0 1.6 1.6h7.6a1.6 1.6 0 0 0 1.6-1.6V6.4z" />
       <path d="M11.4 2.4v3.1a.9.9 0 0 0 .9.9h3.1" />
-    </svg>
-  ),
-  audio: (
-    <svg
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      className="h-6 w-6 text-accent"
-    >
-      <path d="M3 10v1M6.2 7v6.6M9.4 4.4v11.2M12.6 6.6v6.8M15.8 8.4v3.2M18.6 10v1" />
     </svg>
   ),
 };

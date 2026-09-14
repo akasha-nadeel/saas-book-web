@@ -54,7 +54,7 @@ export function TrashedBookDialog({
       </h2>
       <p className="mt-2 font-sans text-sm leading-6 text-tremor-content">
         Free opens the books on your shelf. Put this one back to read it —{" "}
-        {TIER_NAMES.draft}
+        {TIER_NAMES.pro}
         opens a book where it sits, trash and all.{" "}
         <Link
           href="/upgrade"
@@ -62,7 +62,7 @@ export function TrashedBookDialog({
                      underline-offset-2 outline-none hover:opacity-80
                      focus-visible:ring-2 focus-visible:ring-tremor-brand/60"
         >
-          See what {TIER_NAMES.draft} costs
+          See what {TIER_NAMES.pro} costs
         </Link>
         .
       </p>
@@ -160,7 +160,7 @@ function ClosedIfFree({
         </h1>
         <p className="mt-2 text-sm leading-6 text-muted">
           Free opens the books on your shelf. Put this one back from the trash
-          to read it — {TIER_NAMES.draft} opens a book where it sits.
+          to read it — {TIER_NAMES.pro} opens a book where it sits.
         </p>
 
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
@@ -177,7 +177,7 @@ function ClosedIfFree({
             className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold
                        text-accent-ink transition-opacity hover:opacity-90"
           >
-            See what {TIER_NAMES.draft} costs
+            See what {TIER_NAMES.pro} costs
           </Link>
         </div>
       </div>

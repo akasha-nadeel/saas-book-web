@@ -137,14 +137,6 @@ export const shelfIcons = {
       <path d="M8.5 10h7M8.5 13.5h7M8.5 17h4" />
     </Svg>
   ),
-  /** A recording, for the audiobook route in. */
-  audio: (
-    <Svg>
-      <rect x="9" y="2.5" width="6" height="11" rx="3" />
-      <path d="M5.5 11a6.5 6.5 0 0 0 13 0" />
-      <path d="M12 17.5V21" />
-    </Svg>
-  ),
   compass: (
     <Svg>
       <circle cx="12" cy="12" r="9" />

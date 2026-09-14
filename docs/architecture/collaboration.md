@@ -107,8 +107,8 @@ Five things hold it:
   to what it was before mail existed.
 
 Resend is the provider because Vercel's marketplace lists exactly one messaging
-integration; it is reached over its REST API rather than its SDK, for the reason
-`ai.ts` writes Gemini out by hand.
+integration; it is reached over its REST API rather than its SDK, because the
+whole of what we do is one POST.
 
 Emailing the link is only safe because the link is a *pointer, not a credential*
 — `/invite/[token]` sits behind the sign-in wall, and `acceptInvite` refuses

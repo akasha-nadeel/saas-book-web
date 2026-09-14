@@ -151,7 +151,7 @@ combined page with the writer's prose in it, and it lists, opens, renames and
 exports like any other matter page.
 
 The panes live in the *pages* rather than in `book/[bookId]/layout.tsx`, because
-the left panel needs the chapter id and the assistant needs the editor instance,
+the left panel needs the chapter id and the tools need the editor instance,
 neither of which a layout can see. The import banner is the exception and does
 live in that layout — it has to survive the writer clicking chapter to chapter.
 

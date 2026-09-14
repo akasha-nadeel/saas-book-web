@@ -6,17 +6,7 @@ import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
 import { ToolSaveBar } from "@/components/ui/tool-save";
 import { blurbReport } from "@/lib/blurb";
-import { BlurbWorkshop } from "@/components/blurb/blurb-workshop";
-import { MAX_WORKSHOP_OPENING } from "@/lib/blurb-workshop";
-import { openingFrom, proseFrom } from "@/lib/comps/rank";
-import { toBlocks } from "@/lib/export/blocks";
-import {
-  chapterMatterOf,
-  findBook,
-  getBody,
-  orderedChapters,
-  setPublishing,
-} from "@/lib/library-store";
+import { findBook, setPublishing } from "@/lib/library-store";
 import { BLURB_MAX } from "@/lib/publishing";
 import { useHydrated, useShelf } from "@/lib/use-library";
 import { useToolSave } from "@/lib/use-tool-save";
@@ -30,7 +20,7 @@ import {
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
- * The blurb workshop: a place to write it, and a count of what was written.
+ * The blurb screen: a place to write it, and a count of what was written.
  *
  * The blurb is the part writers say they are worst at, and what they reach for
  * is a chatbot — after which they report that the AI-written blurb hurt their
@@ -67,12 +57,7 @@ import { toolShell, type ToolPageProps } from "@/lib/tool-page";
  * unused here, so a future caller with trustworthy data can pass one.
  */
 /**
- * How tall the composer is, and therefore how tall the conversation is.
- *
- * **One number, written once**, because the two columns have to agree: the
- * grid stretches the chat to whatever the left column comes to, so this is the
- * only place a height is stated and there is nothing for the other side to
- * drift from.
+ * How tall the composer is.
  *
  * Shorter in the roadmap's panel, where the whole screen is a sheet over the
  * road and a box this tall would be most of it. Tailwind reads class names as
@@ -108,40 +93,6 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
     () => blurbReport(text, { title: book?.title }),
     [text, book?.title],
   );
-
-  /**
-   * The opening of the manuscript, for the workshop.
-   *
-   * The first *body* chapter with prose in it — front matter is a title page
-   * and a dedication, which say nothing about the book — walked through the
-   * export path and cut at a paragraph. The same `useMemo` the comps screen
-   * uses, and deliberately the same helpers: two ways of deciding what "the
-   * opening" means would eventually disagree.
-   *
-   * **Cut short of `rank.ts`'s length on purpose.** Everything past the
-   * opening is where the ending lives, and this is the one feature where a
-   * model that has read too far writes the ending onto the back cover. It is
-   * cut again on the server, because a browser is not where that promise is
-   * kept.
-   */
-  const opening = useMemo(() => {
-    if (!book) return "";
-    for (const chapter of orderedChapters(book)) {
-      if (chapterMatterOf(chapter) !== "body") continue;
-      const raw = getBody(chapter.id);
-      if (!raw) continue;
-      try {
-        const prose = openingFrom(
-          proseFrom(toBlocks(JSON.parse(raw))),
-          MAX_WORKSHOP_OPENING,
-        );
-        if (prose) return prose;
-      } catch {
-        // A corrupt body contributes nothing, as it does to search.
-      }
-    }
-    return "";
-  }, [book]);
 
   /* Saved on a press now, not on blur.
      "Saved when you click away" was true and nobody believed it — this is the
@@ -311,15 +262,7 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
             />
           </div>
 
-          {/* No `items-start`: the two columns stretch to a shared height, so
-              the rail ends on the same line as the composer instead of being a
-              short card with a column of empty under it. */}
-          {/* `24rem`, up from `20rem`: the rail now holds a conversation as
-              well as the findings, and at the old width a chat bubble wrapped
-              every four or five words. Below `@3xl` it is one column and both
-              cards fall under the composer, which is the layout the roadmap's
-              panel gets. */}
-          <div className="mt-6 grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <div className="mt-6">
             {/* The left column: what the writer types into, and the two notices
               that qualify the act of saving it. */}
             <div>
@@ -334,19 +277,9 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
                 <LimitBanner allowance={gate.allowance} refused={gate.refused} className="mb-4" />
               )}
               <LeftPill allowance={gate.allowance} className="mb-4" />
-              {/* **A fixed height, shared with the conversation beside it.**
-                  Both boxes used to size themselves — the composer by its row
-                  count, the chat by its contents — so the two columns were
-                  different heights on arrival and the right-hand one grew as
-                  the conversation did, walking the page down under a writer
-                  who was mid-sentence in the left. A screen where one column
-                  moves because the other is busy is a screen that cannot be
-                  written in.
-
-                  So the box is the height, and the text scrolls inside it.
-                  `COMPOSER_HEIGHT` is the one place that number lives; the
-                  chat is stretched to it by the grid rather than repeating it,
-                  which is what stops the two drifting when either is edited.
+              {/* **A fixed height**, so the box does not walk the page down
+                  under a writer who is mid-sentence: the text scrolls inside it.
+                  `COMPOSER_HEIGHT` is the one place that number lives.
 
                   `flex` here so the textarea can take the space the footer
                   leaves rather than being told a row count. */}
@@ -377,9 +310,8 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
                    `resize-y` stays either way: whatever we pick is a guess at
                    somebody else's paragraph. */
                   /* **No row count and no `resize-y` any more.** The box's
-                     height is set above and shared with the conversation, so a
-                     handle that let a writer drag one column taller than the
-                     other would undo the thing that fix was for. What the
+                     height is set above, so a handle that let a writer drag it
+                     taller would undo the thing that fix was for. What the
                      writer gets instead is a thin scrollbar and a box that
                      never moves. */
                   placeholder="What happens, who it happens to, and what is at stake."
@@ -410,69 +342,6 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
 
             </div>
 
-            {/* **The rail holds one thing, and that is what makes it a rail.**
-
-              The measured boxes moved to the top of the screen, where they
-              describe the whole blurb. What is left beside the composer is the
-              one part that had to be asked for and takes a moment to arrive —
-              so the column is a place a writer looks *after* pressing
-              something, rather than a second list competing with the first.
-
-              **It scrolls with the page.** Pinning it was tried, on the
-              reasoning that an answer is read against the words that prompted
-              it — but every other box on this screen moves, and one that stays
-              put while they pass reads as a panel bolted to the window rather
-              than as part of the page. It also followed the writer down past
-              the findings below the composer, which it has nothing to do with.
-
-              Below `@3xl` it is not beside anything at all: the grid is one
-              column there and this falls under the box, which is the layout the
-              roadmap's panel gets. */}
-            {/* `items-start`, so this column is its content's height rather
-                than being stretched to the row's. Both boxes state the same
-                height themselves; a stretched aside would add whatever else
-                the left column carries — the upgrade banner, the count pill —
-                onto the chat's box and put the two out of step again. */}
-            <aside className="flex flex-col items-stretch gap-6 self-start">
-              {/* **The workshop first, the reader second, and the order is the
-                  argument.** Both cards involve a model and they answer
-                  opposite moments: this one is for an empty box, which is
-                  where writers say they are stuck, and the reader below needs
-                  a blurb to already exist. A screen that put the critic on top
-                  would be offering to mark work nobody has written.
-
-                  `min-h` rather than a fixed height: the chat scrolls inside
-                  itself, so it needs a floor to be worth scrolling in, and a
-                  ceiling would waste the column on a screen with room.
-
-                  `embedded` is the narrow flag — in the roadmap's panel this
-                  column is ~300px, where the wide upgrade banner does not fit
-                  and `LimitNote` is the stacked version of the same fill. */}
-              {/* **The same fixed height as the composer, stated the same
-                  way — not `flex-1`.**
-
-                  `flex-1` inside a stretched grid cell looks like it should
-                  match the other column, and does not: a grid row is `auto`,
-                  so it grows to fit its *tallest* item. The chat was that
-                  item, the row grew with the conversation, and the composer
-                  sat at 32rem beside a column twice its height with no
-                  scrollbar in sight — because nothing was ever overflowing.
-
-                  A height, shared from one constant, is what actually pins
-                  them. It is also what makes the scroll real: the messages can
-                  only overflow a box that has a size. */}
-              <div className={`flex ${COMPOSER_HEIGHT} flex-col`}>
-                <BlurbWorkshop
-                  bookId={book.id}
-                  title={book.title}
-                  genre={book.genre}
-                  draft={text}
-                  getOpening={() => opening}
-                  onUseDraft={setDraft}
-                  narrow={embedded}
-                />
-              </div>
-            </aside>
           </div>
         </div>
       </div>

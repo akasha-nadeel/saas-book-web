@@ -37,10 +37,7 @@ import {
 } from "@/lib/editor/zoom";
 import { useStoredZoom } from "@/lib/editor/use-stored-zoom";
 import { suspendPagination } from "@/lib/editor/pagination";
-import {
-  WorkspaceRail,
-  selectPanel,
-} from "@/components/editor/workspace-rail";
+import { WorkspaceRail } from "@/components/editor/workspace-rail";
 import { ToolsPopover } from "@/components/editor/tools-popover";
 import { icons } from "@/components/editor/icon-rail";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -66,7 +63,6 @@ import {
   clearSearchHighlights,
   deselectEditorText,
 } from "@/lib/editor/search-highlight";
-import { WrittenHighlight } from "@/lib/editor/written-highlight";
 import {
   useDictation,
   useDictationLive,
@@ -185,7 +181,7 @@ export function ChapterEditor({
 
   const [editingCover, setEditingCover] = useState(false);
   const [sharing, setSharing] = useState(false);
-  // Lifted out of the surface so the toolbar and the assistant can both reach
+  // Lifted out of the surface so the toolbar and the panels can both reach
   // it — they are siblings of the manuscript, not children of it.
   const [editor, setEditor] = useState<Editor | null>(null);
   const [formatOpen, setFormatOpen] = useState(false);
@@ -376,7 +372,7 @@ export function ChapterEditor({
    * instance there reaches through a null `view`, and `editor.can()` in the
    * formatting rail throws outright.
    *
-   * So the rail, the assistant and dictation all read this instead. Derived
+   * So the rail, the panels and dictation all read this instead. Derived
    * rather than cleared in an effect, because an effect would leave exactly the
    * render that crashes. `isDestroyed` is safe to read on a dead editor — it
    * answers from `editorView?.isDestroyed ?? true` rather than assuming a view.
@@ -609,11 +605,6 @@ export function ChapterEditor({
         leftPanel={panelOpen}
         onPanel={setEditorPanel}
         chapters
-        // There is one rail now, so there is one way in. The assistant used
-        // to be offered on both edges of the window — a sparkle on the right
-        // beside the tools, a tab on the left — for one panel that opened in
-        // the same place either way.
-        assistant
         toolsOpen={toolsOpen}
         onTools={setToolsOpen}
         className="editor-workspace-rail hidden md:flex"
@@ -677,8 +668,6 @@ export function ChapterEditor({
           chapterId={chapterId}
           chapterTitle={chapter.title}
           editor={liveEditor}
-          getChapterText={() => liveEditor?.getText() ?? ""}
-          canWrite={canWriteThis}
           onClose={() => setEditorPanel(false)}
         />
 
@@ -748,21 +737,12 @@ export function ChapterEditor({
             dictation={dictation}
             onEditorReady={setEditor}
             formatOpen={formatOpen}
-            assistantOpen={panelOpen && tab === "assistant"}
             moreOpen={moreOpen}
             onOpenChapters={openMobileBookNavigation}
             onFormat={() => {
               captureSelection();
               setMoreOpen(false);
               setFormatOpen((open) => !open);
-            }}
-            onAssistant={() => {
-              captureSelection();
-              selectPanel(
-                "assistant",
-                { tab, open: panelOpen },
-                { onSelectTab: setTab, onPanel: setEditorPanel },
-              );
             }}
             onMore={() => {
               captureSelection();
@@ -1039,11 +1019,9 @@ function EditorSurface({
   dictation,
   onEditorReady,
   formatOpen,
-  assistantOpen,
   moreOpen,
   onOpenChapters,
   onFormat,
-  onAssistant,
   onMore,
 }: {
   bookId: string;
@@ -1096,11 +1074,9 @@ function EditorSurface({
   dictation: Dictation;
   onEditorReady: (editor: Editor) => void;
   formatOpen: boolean;
-  assistantOpen: boolean;
   moreOpen: boolean;
   onOpenChapters: () => void;
   onFormat: () => void;
-  onAssistant: () => void;
   onMore: () => void;
 }) {
   const holdCaret = useTypewriter(prefs.typewriter);
@@ -1348,8 +1324,6 @@ function EditorSurface({
       SmartQuotes,
       // Search match highlights in the live manuscript (active match = green, others = grey).
       SearchHighlight,
-      // The passage the assistant just wrote, lit until the writer's next move.
-      WrittenHighlight,
       // Print layout: measures the prose and lays it out on real page sheets.
       // The closures are held by the plugin and only ever run later, from its
       // measure loop — never during render — so reading the ref here is safe.
@@ -1860,10 +1834,8 @@ function EditorSurface({
           <MobileWritingDock
             editor={editor}
             formatOpen={formatOpen}
-            assistantOpen={assistantOpen}
             moreOpen={moreOpen}
             onFormat={onFormat}
-            onAssistant={onAssistant}
             onMore={onMore}
           />
         </>

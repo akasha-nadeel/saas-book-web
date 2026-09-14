@@ -7,47 +7,40 @@ Read before touching `src/lib/billing/`, `src/lib/free-limits.ts`, `src/componen
 > Cross-references reading "above", "below" or "the note in the styling section" may now
 > point at a sibling file in `docs/` -- see the table in CLAUDE.md.
 
-> ## ⚠️ There are four plans now, not two (2026-09-03)
+> ## Two plans, Free and Pro, and no AI (2026-09-14)
 >
-> This file was written when a writer was either Free or Pro, and most of it
-> still reads that way. **`src/lib/billing/tiers.ts` is the current statement**
-> of what a plan is; where this file says "Pro", read "one of the three paid
-> plans" and check that module for the specifics. What changed:
+> **`src/lib/billing/tiers.ts` is the current statement** of what a plan is, and
+> `docs/plans/2026-09-14-ai-free-pro-plan-design.md` is the decision behind it.
 >
-> - **`PlanTier` is `free | draft | writer | studio`**, cheapest first, with
->   `TIER_LIMITS` holding what each one gives and `TIER_NAMES` the words.
->   `subscriptions.plan` — written since the first billing migration and never
->   once read back — is now the column that carries it, under a CHECK.
-> - **Paying is the line, and above it the plans differ by amount.** Every paid
->   plan carries the assistant and all three models; what a plan buys is credits
->   a month. (This read "Free and Draft have no writing assistant at all" until
->   2026-09-04.) `onFreePlan()` is still the *wrong* test for anything AI,
->   because Draft is paid.
-> - **The gate is the balance, not the tier.** `aiChatClosed()` in `launch.ts`
->   reads `credits.total`, so a Free account holding bought credits opens and a
->   Writer who has spent the month does not. `chatAllowed(tier)` survives as the
->   *pricing* question and is not the gate.
-> - **One credit balance on one window**, not two meters: a reply costs 10 / 30 /
->   100 credits (Quick / Careful / Deep) out of a monthly grant, claimed by
->   `claim_credits(p_cost)`. `src/lib/billing/credits.ts` is the whole economy
->   and `20260904000000_ai_credits.sql` is its ledger.
-> - **Six Paddle price ids**, one per plan per cycle, and `paddlePlanFrom()`
->   maps them back on the way in. `isPaddleConfigured()` requires all six.
-> - **`/api/billing/paddle/change-plan`** moves an existing subscription between
->   plans with `prorationBillingMode: "prorated_immediately"`. The two 409
->   guards on the *checkout* routes stay — they protect one authorisation per
->   writer, which was never meant to mean "cannot change plan".
-> - **USD only.** The LKR table came out with the fourth plan.
+> - **`PlanTier` is `free | pro`.** From 2026-09-03 to 2026-09-14 there were
+>   four — Free, Draft, Writer and Studio — and the three paid ones differed only
+>   by how many assistant credits a month they granted. The assistant and every
+>   model route were deleted, which left three identical products, so they are
+>   one. `20260914000000_ai_free_pro_plan.sql` rewrites every retired row to
+>   `pro` and narrows the CHECKs; `asTier` refuses the old names.
+> - **Pro buys two things**: unlimited books (Free holds one) and unlimited
+>   title checks (Free runs two a day). **$5.99 a month or $49.99 a year.**
+> - **The credit economy is gone** — `credits.ts`, `starter-pass.ts`,
+>   `aiChatClosed()`, `claimCredits`, `ai_credits`, `ai_usage`, `requirePro()`
+>   and `requireTier()`. The one server-side limit left is the book trigger.
+> - **Two Paddle price ids**, `PADDLE_PRICE_PRO_MONTHLY` and `_ANNUAL`, and
+>   `paddlePlanFrom()` maps them back on the way in.
+> - **`/api/billing/paddle/change-plan`** now switches the cycle — it was
+>   written to move between plans, and the two 409 guards on the *checkout*
+>   routes still protect one authorisation per writer.
+> - **USD only.**
+>
+> Where the text below says "Pro", it means exactly that again. Where it
+> describes a metered model route, that route no longer exists.
 
 **Payments are Paddle *or* PayHere, one at a time, and optional in the same way
 everything else is.** Configure either gateway and the app grows plans; leave
 both unset and there are no plans *and nothing is held back* — every paid
 screen works, and the Upgrade button says why there is nothing to buy. That
 falls out of the subscription route answering `pro: true` when there is no
-gateway, which `ProGate` and `requirePro()` both read. `billingConfigured()` is
-checked first everywhere, and `requirePro()` passes everyone when it is false,
-so a self-hosted copy running on its owner's API keys behaves exactly as it did
-before billing existed.
+gateway, which `ProGate` reads. `billingConfigured()` is checked first
+everywhere, so a self-hosted copy behaves exactly as it did before billing
+existed.
 
 **`provider.ts` is the whole of which gateway sells, and there will not be a
 third.** PayHere came first and is verified against its sandbox end to end;
@@ -82,119 +75,62 @@ carries a `NEXT_PUBLIC_` prefix **except Paddle's client token**, which is
 designed to be public — Paddle.js authenticates with it in the browser and it
 can do nothing but open a checkout. An accidental client import of the rest
 reads empty strings, so `isPaddleConfigured()` answers false rather than leaking
-a secret. `server.ts` is `requirePro()`, the
-gate in front of `/api/chat`, `/api/narrate`, `/api/transcribe`,
-`/api/comps/query`, `/api/comps/rank`, `/api/comps/categories`,
-`/api/comps/keywords`, `/api/comps/keywords/chat`, `/api/blurb/critique` and
-`/api/blurb/workshop` — 401 when
-signed out, **402** when signed in and unpaid,
-and the three are different messages because "sign in" shown to someone already
-signed in is a loop.
+a secret. `server.ts` reads a writer's subscription (`subscriptionFor`,
+`currentSubscription`) and holds `requireSignedIn`. It used to hold
+`requirePro()` too, the gate in front of ten model routes; those routes were
+deleted on 2026-09-14 and the gate with them.
 
-**Two cycles, and both renew.** Three paid plans across them: Draft
-$7.98/$71.82, Writer $14.98/$134.99, Studio $29.98/$269.82. Every annual price
-is 25% below twelve monthly ones and displays as about $5.98, $11.25 and $22.49
-a month. The exact total is stored in `plans.ts`; the displayed monthly
-equivalent is derived from that total so rounding happens once.
-`uniformAnnualSaving()` is what lets the period toggle print one "Save 25%"
-badge over three columns — it answers null when the three stop agreeing, so the
-badge disappears rather than lying.
+**Two cycles, and both renew.** Pro is $5.99 a month or $49.99 a year, which
+displays as about $4.17 a month and rounds to 30% off twelve monthly payments.
+The exact total is stored in `plans.ts`; the displayed monthly equivalent is
+derived from that total so rounding happens once. `uniformAnnualSaving()` still
+guards the one "Save" badge, so a second paid plan whose saving differed would
+make the badge disappear rather than lie.
 
-This lower first-launch price is deliberate: the public MVP now sells a focused
-book-writing workspace, a monthly writing-assistant allowance, five Free
-books and unlimited Pro books. Every export format is free on both plans. It is priced below mature author
-software while still protecting AI costs with hard usage limits. After there
-are paying subscribers, a price change is an announcement rather than an edit,
-and Paddle leaves an existing subscription on the price it was bought at
+**How the price was reached** (2026-09-14): backwards from a floor of $5 kept on
+every monthly sale after Paddle's 5% + 50¢ — $5.99 keeps $5.19 — and sideways
+from the AI-free writing apps that give more for more (WriteO $9.49 a month,
+Novlr Starter $8 a month billed yearly, Plottr $9.99 a month). Pro adds two
+things, so it sits under all of them. The design note has the full table. After
+there are paying subscribers, a price change is an announcement rather than an
+edit, and Paddle leaves an existing subscription on the price it was bought at
 regardless. **A price change is three edits, not one:** this table, two *new*
 prices in Paddle's catalog (never an edit of the live ones), and the resulting
-six `PADDLE_PRICE_<TIER>_<CYCLE>` ids in the environment — and
-Paddle checks that the site's prices match the live catalog, so the two must
-not sit out of step across a review.
-The LKR table came out on 2026-09-03: three plans times two cycles times two
-currencies is twelve figures to keep true and eleven were never rendered, since
-this deployment charges in USD. Putting a second currency back means restoring
-the record shape in `plans.ts` and its `FORMAT` entry; nothing else reads it. A lifetime tier was
-built on 2026-08-03 and removed the same day — worth knowing only because the
-removal is a decision rather than an omission: selling outright is what this
-market mostly does, and it trades recurring revenue for a support obligation
-with no end date. If it ever returns, the expensive parts in code are that
-PayHere must be sent **no `recurrence` and no `duration`** or it bills the
-one-off price every month, that there is no period end to store, and that
+`PADDLE_PRICE_PRO_MONTHLY` / `_ANNUAL` ids in the environment — and Paddle
+checks that the site's prices match the live catalog, so the two must not sit
+out of step across a review.
+
+The LKR table came out on 2026-09-03. Putting a second currency back means
+restoring the record shape in `plans.ts` and its `FORMAT` entry; nothing else
+reads it. A lifetime tier was built on 2026-08-03 and removed the same day, and
+the owner chose monthly and yearly only again on 2026-09-14 — worth knowing
+because the absence is a decision rather than an omission: selling outright is
+what this market mostly does, and it trades recurring revenue for a support
+obligation with no end date. If it ever returns, the expensive parts in code
+are that PayHere must be sent **no `recurrence` and no `duration`** or it bills
+the one-off price every month, that there is no period end to store, and that
 `isPro` has to answer without a date.
 
-**What is free is enough to understand the product.** Free includes five books,
-unlimited chapters and words, autosave/sync where accounts are configured,
-**every export format**, and the title and consistency checks. It is granted
-**no assistant credits**. Draft ($7.98) adds unlimited books, unlimited title
-checks, 2,000 credits a month and letting the assistant write into the chapter;
-Writer ($14.98) is 5,000 credits and Studio ($29.98) 10,000 — nothing else
-separates those three. EPUB and PDF were Pro until 2026-08-27; see the
-note in `launch.ts` for why that was the wrong thing to charge for, and
-`launch.test.ts` for what now stops it drifting back. The backend enforces expensive or paid limits: the book limit is in the
-database trigger (which counts the active shelf only, and fires on the
-restore as well as the insert so archive-and-restore cannot walk past it),
-assistant usage is claimed through a Supabase RPC, and PDF
-export checks launch entitlements before rendering.
+**What is free is enough to understand the product.** Free includes **one
+book**, unlimited chapters and words, autosave/sync where accounts are
+configured, **every export format**, the consistency check, voice typing and two
+title checks a day. Pro adds unlimited books and unlimited title checks, and
+nothing else. **One free book is stricter than every AI-free competitor
+checked** (WriteO and Novlr give two, Reedsy Studio unlimited) — that is the
+owner's deliberate push towards paying, and the first thing to revisit if
+sign-ups stall. EPUB and PDF were Pro until 2026-08-27; see the note in
+`launch.ts` for why that was the wrong thing to charge for, and
+`launch.test.ts` for what now stops it drifting back. The backend enforces the
+book limit in the database trigger (which counts everything but the trash, and
+fires on the restore as well as the insert so trash-and-restore cannot walk past
+it); `launch.test.ts` reads the migration so the SQL number and
+`LAUNCH_LIMITS.freeBooks` cannot drift apart. PDF export checks for a session
+before rendering.
 
-**Writing a blurb is free; having one *read* is not.** `/api/blurb/critique` is
-the newest metered route and the one that most needed the refusal spelled out,
-because this is where a paid generator would obviously sell — see
-`src/lib/blurb-critique.ts` for the whole argument. Three things about it. **It
-reports and never writes**, like everything else here: the parsed shape has no
-field for a rewritten sentence, a "note" long enough to be replacement copy is
-dropped server-side, and a test asserts both. **The stores are not the reason**
-— Amazon's AI disclosure covers the manuscript, a description is *metadata* and
-needs no declaration at all, so a generator would be permitted and is refused on
-product grounds: generated blurbs are generic exactly where a blurb cannot
-afford to be, and generating one honestly would mean sending the whole book,
-which yields a synopsis with the ending in it. And **no prose leaves** — what
-goes is the description, the title and the genre, all typed into form fields, so
-this route is not on the short list of places the manuscript can travel.
-
-**Its sibling writes, and the shape is what makes that allowed.**
-`/api/blurb/workshop` over the pure `src/lib/blurb-workshop.ts` is a
-*conversation*: it asks who the book is about, what they want, what is in the
-way and what failure costs, and assembles a draft **from the writer's own
-answers**. The specifics are theirs; the model does the shaping. That is a
-different thing from the generator refused above, and the two failures that
-refusal names are avoided by construction rather than by prompting — the
-prompt forbids stating any fact the writer did not give it, and only the
-*opening* is sent, so there is no ending to leak onto the back cover. The
-public promise is untouched either way: the landing page refuses covers and
-*prose*, and a blurb is metadata.
-
-Five things hold it, and the first is the interesting one:
-
-- **The draft is tagged, not guessed at.** An earlier shape asked for prose and
-  tried to work out which paragraph was the blurb; every heuristic for that is
-  wrong somewhere, because a long answer to "why does that opening not work"
-  looks exactly like a draft. `<blurb>` is a signal the model either sends or
-  does not, so a turn that is a question simply has no button — and a draft
-  over `BLURB_MAX` is **refused rather than truncated**, since a paragraph cut
-  mid-sentence would be offered as though somebody had written it.
-- **It sends prose, which is the third such route**, so it carries the
-  obligations: `/privacy` names it, and the panel lists what leaves *above the
-  input, before the press*. The opening is capped **shorter than `rank.ts`'s**
-  — everything past the opening is where the ending lives — and cut again
-  server-side, because a browser is not where that promise is kept.
-- **Nothing reaches the book without a press.** A draft lands in the *draft*,
-  so the save bar appears and the writer commits it; the box is never
-  overwritten silently.
-- **Nothing is persisted**, exactly as the assistant's chat is not — a
-  conversation about a draft is scaffolding.
-- **It is not streamed, and that is now a choice rather than a constraint.**
-  The reasoning was that this has to run on whichever provider is configured
-  while the assistant could afford to be Anthropic-only, and that an SSE reader
-  for Gemini was the complication `ai.ts` was scoped to avoid. Both halves have
-  since gone: the assistant cannot afford it either, and `streamModel` is that
-  SSE reader, written and tested. So switching this to stream is now swapping
-  `askModel` for `streamModel` and reading the pieces — worth doing if a draft
-  arriving all at once ever feels slow, and deliberately not done on spec.
-
-Send a chapter from the *critique* route and it needs a line on the privacy
-page and a sentence above the button, as the prose report and the workshop
-have.
+**There is no blurb critique and no blurb workshop.** Both were model routes
+(`/api/blurb/critique`, `/api/blurb/workshop`) and went on 2026-09-14. The
+blurb screen is still built and still hidden; what is left on it counts what the
+writer wrote against the shops' limits and writes nothing.
 
 **Everything else is metered in the unit its own work comes in, and
 `src/lib/free-limits.ts` is the whole of the policy.** There is no single global
@@ -202,55 +138,26 @@ number, and there was: a version of this gave the free plan "every tool,
 unlimited, on five books". A *container* limit cannot hold a container whose
 contents are arbitrary — the comps box and the title-check box take any words a
 writer types, so one book slot was a general-purpose research desk for any number
-of manuscripts. Four shapes replaced it:
+of manuscripts. Three shapes replaced it:
 
 | Shape | Tools | Free |
 |---|---|---|
-| **Per day** | comps, covers, title check | 2 / 3 / 2 a day |
+| **Per day** | comps, covers, title check | 3 / 3 / 2 a day |
 | **Per book** | blurb, prose report, track | 5 / 6 / 2 books |
 | **By occupancy** | ARC readers, seats | 10 a book / 2 a book |
-| **In total, for good** | keyword suggestions, blurb chat, keyword chat | 5 / 3 / 3 ever |
 
-**The fourth shape follows the cost, not the work, and it is the only one that
-never comes back.** The three daily limits guard things that are free to us —
-two keyless catalogues and arithmetic in a browser — so a writer who resets the
-counter costs nothing and gets more of something that was free anyway. Keyword
-suggestions ask a model on every press. Counted per day, one free account could
-spend seven hundred model calls a year; counted five in total, it costs at most
-five, ever. Five is what it takes to do one book properly (two or three runs
-before the seven boxes look right), which covers the listing somebody came here
-for and does not cover a backlist.
+**The title check is the live row, and its number is a pricing decision rather
+than a cost one** (2026-09-14): unlimited title checks are one of the two things
+Pro sells, so Free runs two a day while comps and covers, still hidden, stay at
+three.
 
-**The members of that shape carry different numbers, and the ratio is the
-bill.** A keyword press is one short model call; a conversation — about a blurb
-or about the seven boxes — is five to fifteen, so one of those costs roughly
-fifty times one of these, hence three rather than five. The two chats are
-counted **separately** (`blurbChat` and `keywordChat`, three each) rather than
-out of one pot, because they belong to different screens and a writer who used
-their allowance on the blurb should not find the keyword box already shut. **A
-conversation is the unit, not a message**: counting messages would stop a
-writer mid-brainstorm, and the blurb interview asks four questions before it
-offers anything. It is spent on the *first message* of a chat, so opening the
-panel and reading it costs nothing, and a reload with nothing said costs
-nothing either. `WORDS` says "conversations" for both for that reason — "3
-chats left" beside a chat box would otherwise be read as three messages, which
-is a different and much smaller promise.
-
-**Its sentences may not borrow the daily vocabulary**, and a test enforces that:
-no "today", no "tomorrow", no "a day", because all three would be untrue of a
-wall that stays shut. `leftLine` says "2 free suggestions left."; `spentLine`
-says the plan includes five and they are used, and stops — the dialog beside it
-is where Pro is offered, and a spent line that also sold something would be
-doing two jobs at the moment of refusal.
-
-**It is also the first counter here in front of a route that bills**, which is
-worth stating plainly: clearing storage really does hand somebody another five,
-and the damage is five short prompts, which is not worth a table in Postgres to
-prevent. What is *not* left to the browser is the wall — `/api/comps/keywords`
-carries `requirePro()` like every other model route, so the sixth press is
-refused by the server whatever the client believes. And **`useLimitGate` does
-not record for this shape**: the screen calls `spendTotalUse` when a reply
-actually lands, because a gateway 502 must not cost one of five.
+**There was a fourth shape, "in total, for good"**, for work that cost a
+model call every press — keyword suggestions, the blurb conversation and the
+keyword conversation, five, three and three for the life of the account. It
+went with the AI on 2026-09-14, and with it `totalAllowance`, `spendTotalUse`
+and the `usedTotal` counter in prefs. If a limit that never comes back is ever
+needed again, the lesson it left is that its sentences may not borrow the daily
+vocabulary.
 
 Which shape a tool takes follows from what it does. The three that send a query
 to a catalogue are counted **per day**, which is what every serious research tool
@@ -307,9 +214,9 @@ and mean different things. And the lines that do *not* come back may not say
 
 **These are browser gates and cannot be otherwise**, which the file header says
 outright: the daily ones are resettable by anybody willing to move their
-machine's clock. That is accepted rather than papered over, because the routes
-that actually cost money are gated by `requirePro()` on the server and none of
-this touches them.
+machine's clock. That is accepted rather than papered over, because nothing
+they guard costs money to run; the one limit that binds, the book count, is a
+Postgres trigger.
 
 `src/components/upgrade/free-limit.tsx` is every limited screen's shared voice,
 for the reason `ProGate` is one component — and it **escalates in three steps**,
@@ -377,8 +284,8 @@ These are browser gates and are honest about it: `/api/comps` stays free and
 keyless, which is the thing that must not change to enforce this server-side.
 
 **The gates are of two kinds and the pricing page's own comment says which.**
-The metered routes are `requirePro()` on the server, which is the only check a
-reader with devtools cannot edit. Everything else is computed in the browser: the
+The book count is a Postgres trigger, which is the only check a reader with
+devtools cannot edit. Everything else is computed in the browser: the
 per-tool allowances through `useLimitGate`, and the two remaining all-or-nothing
 Pro pieces through `ProGate` / `useEntitled` (`src/components/upgrade/pro-gate.tsx`)
 — one component so the gated screens cannot drift into six tones of upsell, and it
@@ -464,9 +371,9 @@ every visit is a third party watching people who are only looking.
 derives**: the plan lives in Postgres and changes when the gateway says so — a
 webhook away, months later, with no page open — so there is nothing local to
 read it from, and it is deliberately not part of `library-store.ts`. Nothing it
-returns gates anything that costs money; the billed routes check server-side,
-which is the only check a reader with devtools cannot edit. It exists to tell a
-writer the truth about their own account.
+returns is the real limit; the book trigger is, which is the only check a reader
+with devtools cannot edit. It exists to tell a writer the truth about their own
+account.
 
 **Four legal pages exist because a gateway reviews the site before it lets
 anybody take a card**, and a missing privacy or refund policy is a standard

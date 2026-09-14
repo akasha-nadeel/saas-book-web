@@ -42,15 +42,13 @@ describe("prices", () => {
   });
 
   /**
-   * **A hand-edited three-tier table gets transposed, and both orders look
-   * plausible.** Nothing else in the tree would notice Studio priced below
-   * Writer — the cards would render it, the checkout would charge it, and the
-   * only symptom is revenue.
+   * **The floor the price was set against.** At least $5.00 kept on a monthly
+   * sale after Paddle's 5% + 50¢; see the note on `PRICES`. A price moved
+   * below it is a plan that costs more to sell than it returns.
    */
-  it("makes each plan dearer than the one below it", () => {
-    for (const period of ["monthly", "annual"] as const) {
-      expect(priceOf("draft", period)).toBeLessThan(priceOf("writer", period));
-      expect(priceOf("writer", period)).toBeLessThan(priceOf("studio", period));
+  it("keeps at least five dollars of a monthly sale after the gateway's fee", () => {
+    for (const tier of PAID_TIERS) {
+      expect(priceOf(tier, "monthly") * 0.95 - 0.5).toBeGreaterThanOrEqual(5);
     }
   });
 });
@@ -63,20 +61,13 @@ describe("displayPrice", () => {
     expect(displayPrice(53.99)).toBe("$53.99");
   });
 
-  it("uses the three ladders the cards print", () => {
-    expect(priceOf("draft", "monthly")).toBe(7.98);
-    expect(priceOf("writer", "monthly")).toBe(14.98);
-    expect(priceOf("studio", "monthly")).toBe(29.98);
-
-    expect(priceOf("draft", "annual")).toBe(71.82);
-    expect(priceOf("writer", "annual")).toBe(134.99);
-    expect(priceOf("studio", "annual")).toBe(269.82);
+  it("uses the prices the cards print", () => {
+    expect(priceOf("pro", "monthly")).toBe(5.99);
+    expect(priceOf("pro", "annual")).toBe(49.99);
   });
 
   it("divides the annual total rather than printing a typed figure", () => {
-    expect(displayPrice(perMonthOf("draft", "annual"))).toBe("$5.98");
-    expect(displayPrice(perMonthOf("writer", "annual"))).toBe("$11.25");
-    expect(displayPrice(perMonthOf("studio", "annual"))).toBe("$22.49");
+    expect(displayPrice(perMonthOf("pro", "annual"))).toBe("$4.17");
   });
 });
 
@@ -113,7 +104,7 @@ describe("what PayHere is told", () => {
         );
       }
     }
-    expect(itemNameOf("writer", "annual")).toBe("OpenChapter Writer (annual)");
+    expect(itemNameOf("pro", "annual")).toBe("OpenChapter Pro (annual)");
   });
 
   it("reads the cycle as a phrase for the checkout summary", () => {
@@ -169,7 +160,7 @@ describe("annualSavingPercent", () => {
     // than typed precisely so that moving a price moves the badge — the
     // previous hand-written figure survived a price change and became a false
     // claim on the one page a customer reads before paying.
-    for (const tier of PAID_TIERS) expect(annualSavingPercent(tier)).toBe(25);
+    for (const tier of PAID_TIERS) expect(annualSavingPercent(tier)).toBe(30);
   });
 
   it("agrees with the two prices it describes", () => {
@@ -198,15 +189,14 @@ describe("annualSavingPercent", () => {
  * **The badge's precondition, and the reason it is a function rather than an
  * assumption.**
  *
- * One "Save 25%" chip now sits above three columns. That it is true of all
- * three today is arithmetic that happens to work out, not a rule anybody
- * enforces — so the toggle asks before printing, and this asserts the answer it
- * currently gets. If a price moves and the three stop agreeing, the badge
- * disappears rather than lying, and this test says so out loud.
+ * One "Save 30%" chip sits above the paid columns. With one paid plan that is
+ * Pro's own saving; the toggle still asks before printing, so a second plan
+ * whose saving differs makes the badge disappear rather than lie, and this
+ * test says so out loud.
  */
 describe("uniformAnnualSaving", () => {
   it("is the one figure the period toggle may print", () => {
-    expect(uniformAnnualSaving()).toBe(25);
+    expect(uniformAnnualSaving()).toBe(30);
     for (const tier of PAID_TIERS) {
       expect(annualSavingPercent(tier)).toBe(uniformAnnualSaving());
     }

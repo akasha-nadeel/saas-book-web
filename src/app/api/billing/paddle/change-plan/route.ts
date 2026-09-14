@@ -19,10 +19,11 @@ import { asPaidTier } from "@/lib/billing/tiers";
  * rule.** Both of them refuse an active subscriber with a 409 — one live
  * authorisation per writer, because `subscriptions` holds one row per writer
  * and two authorisations against one card is two charges a month. That guard is
- * still right and still there. What it was never meant to mean is *a customer
- * on Draft cannot buy Writer* — but with one paid plan the two were
- * indistinguishable, and with three they are not: a Draft writer who wanted the
- * assistant had to cancel and sit out the period they had already paid for.
+ * still right and still there. What it was never meant to mean is *a monthly
+ * subscriber cannot move to the yearly price* — which, without this route,
+ * meant cancelling and sitting out the period they had already paid for. (It
+ * was written for moving between Draft, Writer and Studio; since 2026-09-14
+ * there is only Pro, so what it changes now is the cycle.)
  *
  * So a **change** is its own route. Paddle swaps the price on the existing
  * subscription; there is no second authorisation, and the row this app keeps
@@ -92,16 +93,13 @@ export async function POST(request: Request) {
   try {
     await paddle.subscriptions.update(subscription.paddleSubscriptionId, {
       items: [{ priceId: paddlePriceId(tier, period), quantity: 1 }],
-      /* **Charged now, and effective now.** The convention for an upgrade, and
-         the honest one: a writer pressing "Upgrade to Writer" wants the
-         assistant in this sitting, not at the end of the month they have
-         already paid for. Paddle works the difference out itself — a Draft
-         writer eleven days into a month pays for nineteen days of Writer, not
-         a whole one.
+      /* **Charged now, and effective now.** Paddle works the difference out
+         itself: a monthly subscriber eleven days in who moves to the year pays
+         for the year less what is left of the month, not a whole year on top.
 
-         It reads the same way going down: the credit for the plan being left
-         lands against the cheaper one, so nobody is charged twice for one
-         period. */
+         It reads the same way in the other direction: the credit for the
+         period being left lands against the new one, so nobody is charged
+         twice for one period. */
       prorationBillingMode: "prorated_immediately",
     });
   } catch (error) {

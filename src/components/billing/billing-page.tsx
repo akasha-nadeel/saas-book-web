@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
 import Link from "next/link";
 import type { PaymentTone } from "@/lib/billing/history";
+import { FREE_LIMITS } from "@/lib/free-limits";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 import { plural } from "@/lib/plural";
 import { usePlan } from "@/lib/use-plan";
@@ -198,7 +199,7 @@ export function BillingPage({
                 {!plan.pro && (
                   <p className="mt-0.5 font-sans text-xs text-muted">
                     {plural(TIER_LIMITS.free.books ?? 0, "book")}, every
-                    export format, no writing assistant
+                    export format, {FREE_LIMITS.titleCheck.free} title checks a day
                   </p>
                 )}
               </div>
@@ -443,10 +444,14 @@ export function BillingPage({
               </h3>
               <ul className="mt-3 space-y-2 rounded-xl border border-line bg-surface p-4 font-sans text-sm text-muted">
                 <li>
-                  {plural(LAUNCH_LIMITS.freeBooks, "book")}, and the rest kept safe
-                  but read-only above that.
+                  Room for {plural(LAUNCH_LIMITS.freeBooks, "book")}: every book
+                  you already have stays and stays editable, but a new one waits
+                  until you are under that.
                 </li>
-                <li>Five assistant replies a month instead of sixty.</li>
+                <li>
+                  {FREE_LIMITS.titleCheck.free} title checks a day instead of
+                  unlimited.
+                </li>
                 {/* Export is on both plans, so cancelling takes nothing
                     away there — and a writer deciding whether to cancel is
                     exactly who needs told that their book still comes out. */}

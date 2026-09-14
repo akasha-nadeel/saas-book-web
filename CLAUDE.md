@@ -11,12 +11,23 @@ sixteen per-book tools around the manuscript (comps, blurb, categories, covers,
 paperback setup, structure, prose, progress, money, ARC readers, a publishing
 roadmap) with the editor as one part rather than the whole. It runs almost
 entirely in the browser: the manuscript never leaves the machine except for the
-assistant, the two audio routes, the server-rendered PDF, and a comp search that
-sends only words the writer typed for a shop to read.
+server-rendered PDF, and the title check sends only words the writer typed.
+
+**As of 2026-09-14 OpenChapter has no AI, and that is a product promise, not a
+gap.** The writing assistant, every model route (blurb, keywords, categories,
+comps ranking and query translation, narration, transcription), the credit
+ledger and the Starter Pass were deleted, and the site says "No AI" out loud.
+Nothing in `src/` calls a language model; `@anthropic-ai/sdk` and `ai` are no
+longer dependencies. **Do not add a model call, an AI SDK or an "assistant"
+back** — that is a reversal of the pitch, not a feature, and it needs the owner's
+decision first. Voice typing stays: it is the browser's own `SpeechRecognition`,
+and `/privacy` says Chrome sends its audio to Google. The decision and the
+competitor pricing behind it are in
+`docs/plans/2026-09-14-ai-free-pro-plan-design.md`.
 
 **`TODO.md` is the canonical statement of that direction** — what shipped and
 why, what each feature deliberately refuses to do, and what was ruled out
-(marketplaces, AI covers, AI editing) so it is not re-proposed. Read it before
+(marketplaces, AI of any kind) so it is not re-proposed. Read it before
 proposing a feature or rebuilding something that looks missing.
 
 ## The launch MVP is smaller than this file — read `src/lib/launch.ts` first
@@ -28,35 +39,41 @@ description of what a writer can open. Check `src/lib/launch.ts` before
 assuming a screen or a route is live.
 
 - **`src/lib/launch.ts` is the one statement of what the MVP sells** — prices,
-  free/Pro limits, and `HIDDEN_BOOK_TOOL_PATHS`, the sixteen segments the proxy
+  free/Pro limits, and `HIDDEN_BOOK_TOOL_PATHS`, the fifteen segments the proxy
   redirects home. `/tools` and `/invite/*` go home with them. Its sibling
   `launch-server.ts` is the API half: `launchFeatureEnabled()` gates a route and
   `hiddenLaunchApiResponse()` answers **404** rather than 501 or 402.
 - **The flag is off by default and inverted.** `launchFeatureEnabled()` is
   `process.env.OPENCHAPTER_LAUNCH_MVP === "0"` — unset means the full product is
-  hidden. It is **not in `.env.local.example`**, which is the one exception to
-  that file being the canonical env list.
+  hidden. It is in `.env.local.example` (commented out) with the same warning
+  as the next point.
 - **The flag governs the API half only — the page half has no flag.**
   `src/proxy.ts` calls `hiddenLaunchRoute()` *unconditionally*, before it looks
   at anything else; `launch.ts` reads no environment at all. So setting
-  `OPENCHAPTER_LAUNCH_MVP=0` un-404s the model routes and leaves every hidden
+  `OPENCHAPTER_LAUNCH_MVP=0` un-404s the gated API routes (only
+  `/api/comps/subjects` since the model routes went) and leaves every hidden
   screen still redirecting home. **To work on a gated tool locally, take its
   segment out of `HIDDEN_BOOK_TOOL_PATHS`** — the env var will not do it.
 - **What is live**: the shelf, `/book/new`, `/book/import`, the editor,
   `/book/[bookId]/export`, `/book/[bookId]/consistency`,
-  `/book/[bookId]/title-check`, the assistant, upgrade/billing and the legal
+  `/book/[bookId]/title-check`, upgrade/billing and the legal
   pages — and `/api/comps`, which was un-gated on 2026-09-02 because it is the
   route the title check runs on.
-  **What is gated**: every other model route, `/api/comps/subjects` included,
-  `/api/narrate`, `/api/transcribe`, and the fourteen other tool screens.
+  **What is gated**: `/api/comps/subjects` and the fourteen other tool screens.
 - **`launch.ts` holds three more decisions this file used not to name.**
-  `COMPS_RANKING_LIVE` is the client-side half of the comps gate — false, so
-  `comps-page.tsx` draws no Rank button the gated route would refuse (the house
-  rule about dead UI, pointed at a flag). `onFreePlan(plan)` is the one
+  `onFreePlan(plan)` is the one
   three-part test for *known to be metered* — `!loading && billing && !pro` —
   written once so it cannot go missing a part in a fourth call site.
-  `trashedBookClosed()` reads the **book**, never the shelf view, so a pasted
-  editor URL and a card press answer the same question.
+  `trashedBookClosed()` reads the **book**, never the
+  shelf view, so a pasted editor URL and a card press answer the same question.
+  **`PLANS_ON_SALE` is false since 2026-09-07**: Paddle is configured with live
+  prices, but no checkout has been proven end to end, so every paid button
+  opens "Available Soon" and the press is recorded (see Billing).
+  **Never take the plans off sale by unsetting the Paddle variables** — with
+  `billingConfigured()` false there are no plans and nothing is held back, so
+  every writer gets Pro for nothing, which is the state production sat
+  in from 2026-08-23 to 2026-09-07 while six renamed price ids went unset. The
+  gate goes over the buttons; the billing config stays intact underneath.
 - **`LAUNCH_POST_BACKLOG` is the list of what comes back**, in the order it is
   meant to. Adding a feature to the MVP means taking it off both that list and
   `HIDDEN_BOOK_TOOL_PATHS`, not deleting the gate.
@@ -71,7 +88,7 @@ is the thing to read **before changing that area**, not after.
 |---|---|
 | The store, IndexedDB, cross-tab notes, storage limits, React hooks | `docs/architecture/storage.md` |
 | Dashboard, checkup findings, roadmap, the sixteen tool screens, save bars | `docs/architecture/dashboard-and-tools.md` |
-| Comps, keywords, title check, blurb routes, `ai.ts`, the assistant, audio | `docs/architecture/ai-and-model-routes.md` |
+| Why there is no AI, and the Free/Pro decision | `docs/plans/2026-09-14-ai-free-pro-plan-design.md` |
 | Tiptap editor, rails, panels, front/back matter pages, series bible | `docs/architecture/editor.md` |
 | Reading view, pagination, the export wizard's Preview | `docs/architecture/reader.md` |
 | Export (EPUB, PDF, Word, Markdown), typesetting, front matter, covers | `docs/architecture/export.md` |
@@ -121,9 +138,13 @@ do not treat its absence of a subject as a gap to fill unless somebody asks.
   `public/write-band.webp`). Also one-shot, also reads sources from outside the
   tree, and it needs `sharp`, which is **not a dependency** — install it by hand
   to run this.
+- `assets/social/*.html` — social-post generators (e.g. an eight-slide
+  1080×1350 carousel) drawn on canvas and saved as PNGs. Open the file in a
+  browser; no dependencies, no network, not part of the build. Its palette is
+  copied from `globals.css`, so it goes stale when the tokens move.
 
-The suite is 111 files / 2,133 tests and takes about 95 seconds (measured
-2026-09-02, all green); jsdom prints `HTMLCanvasElement's getContext()` warnings
+The suite is 106 files / 2,029 tests and takes about a minute and a half
+(measured 2026-09-14 after the AI removal, all green, run on its own); jsdom prints `HTMLCanvasElement's getContext()` warnings
 from the image recoder and `Not implemented: navigation to another Document`
 from the routing tests — both are expected, not failures.
 
@@ -157,8 +178,8 @@ thousands of bundled files, and `npm run lint` reports thousands of problems.
 count is still noise rather than news.
 
 **`src/` no longer lints clean, and the doc used to say it did.** As of
-2026-09-01, re-measured 2026-09-02, `npm run lint` reports **7 errors and 11
-warnings**, all in four files: `components/ui/tremor.tsx` (six `no-explicit-any`),
+2026-09-01, re-measured 2026-09-02 and 2026-09-14 with no change, `npm run lint`
+reports **7 errors and 11 warnings**, all in four files: `components/ui/tremor.tsx` (six `no-explicit-any`),
 `components/editor/search-panel.tsx` (one `set-state-in-effect` error plus three
 warnings, all in its head), `components/shelf/bookshelf.tsx` (four unused-var
 warnings — the banner sections `95386a2` removed and left behind) and
@@ -172,16 +193,19 @@ to clear, not as the normal state.
 and `book-panel.tsx` gained four that nobody recorded. The errors have not
 moved.
 
-Every environment variable is optional and all but one are documented, with
-their failure modes, in `.env.local.example`. That file is the canonical list —
-read it rather than grepping for `process.env`. The exception is
-`OPENCHAPTER_LAUNCH_MVP`, which is missing from it and should be added.
+Every environment variable is optional and documented, with its failure mode,
+in `.env.local.example`. That file is the canonical list — read it rather than
+grepping for `process.env`, and add a variable to it in the same commit that
+first reads it. Two have gone missing before: the six renamed
+`PADDLE_PRICE_<TIER>_<CYCLE>` ids sat unset in production for fifteen days, and
+`PADDLE_PRICE_STARTER_PASS` is a switch that turns on a live buy button (see
+Billing). **Some variables are switches, not settings** — read the entry before
+filling one in.
 
 ## Stack
 
 Next.js 16 (App Router) · React 19 · TypeScript (strict) · Tailwind CSS v4 ·
-Tiptap 3 editor · `@anthropic-ai/sdk` (the assistant) · `ai` v7 through Vercel AI
-Gateway (speech and transcription) · `docx` + `jszip` for exports. Path alias
+Tiptap 3 editor · `docx` + `jszip` for exports. No AI SDK of any kind. Path alias
 `@/*` → `src/*`.
 
 This is a newer Next.js than your training data (see AGENTS.md). Two things that
@@ -339,69 +363,33 @@ invented number; facts rather than verdicts; **detected beats ticked**; every
 figure carries its provenance and *how many records carried the field*; and **an
 empty result is never rendered as a good one** unless the search actually ran.
 
-### Model routes — `docs/architecture/ai-and-model-routes.md`
+### The catalogue search, and no model routes
+
+**There are no model routes.** `docs/architecture/ai-and-model-routes.md` was
+deleted with them on 2026-09-14; what survives of that cluster is the free,
+keyless catalogue search.
 
 **Two free catalogues sit behind `/api/comps`** (Google Books and Open Library),
 server-side for a shared cache and to keep a reader's browser off two third
 parties. Records merge **field by field** on ISBN, or title-plus-author.
-**The manuscript never goes** — what leaves is a query. `/api/comps` and
-`/api/comps/subjects` are **free, keyless, and stay that way** by design; that
-is the whole reason the model steps are separate routes rather than flags on
-them. (Both are behind the launch flag today and answer 404 — a temporary gate
-over the design, not a change to it.)
+**The manuscript never goes** — what leaves is a query. `/api/comps` is live
+because the title check runs on it; `/api/comps/subjects` is behind the launch
+flag and answers 404.
 
 - `openLibraryQuery()` translates dialects: Google wants `intitle:`, Open
   Library wants `title:`, and **Open Library answers an unknown prefix with zero
   results rather than an error** — which is how the title check silently read
   one catalogue for its whole life while the page claimed two.
 - **No search volume, no competition score, no rank — anywhere in this
-  cluster.** It cannot be had honestly; three modules have tests asserting their
+  cluster.** It cannot be had honestly; the modules have tests asserting their
   shape carries no such number, and those tests are not to be "fixed".
-- Every model route goes through **`src/lib/ai.ts`** — `askModel()` for one-shot
-  JSON, `streamModel()` for the assistant and anything streaming.
-  `ANTHROPIC_API_KEY` makes it Claude, `GOOGLE_GENERATIVE_AI_API_KEY` makes it
-  Gemini, both set and Claude wins; `modelProvider()` returning null is how a
-  route answers **501** with a message saying so. **Four model jobs** in
-  `DEFAULTS` — `task` for the bounded routes, and the assistant's `quick` /
-  `careful` / `deep` (Haiku, Sonnet, Opus), each overridable on its own with
-  `OPENCHAPTER_{MODEL,QUICK_MODEL,CAREFUL_MODEL,DEEP_MODEL}`. The first chunk is
-  pulled before the response is returned so a rejected key is a 401 rather than
-  an apology in the prose; `splitSse` is pure and tested because a network chunk
-  is not a message.
-- **`chatTuning` is keyed off the job, never off a parsed model id.** Quick
-  sends *neither* `thinking` nor `output_config` — `claude-haiku-4-5` is pre-4.6
-  and rejects both, a 400 that surfaces as "The assistant is unavailable" with
-  nothing on screen to explain it — and Careful and Deep differ only in effort
-  (`medium` / `high`). Omitting the fields is legal on every model in the table
-  and sending them is not, so that direction is one-way safe. `ai.test.ts` is
-  the only guard; there is no test of `streamAnthropic`.
-- **The three assistant models must stay three real models on a billed
-  deployment**, because `credits.ts` charges 10 / 30 / 100 by job. Google's
-  three defaults are deliberately one id, which is safe *only* because credits
-  are claimed nowhere `billingConfigured()` is false. Do not "fix" the mismatch
-  by flattening the costs.
-- **Two cache breakpoints on an Anthropic assistant request, not one**: the
-  chapter block, which holds across the turns of an exchange, and the
-  conversation, marked on the **second to last** message. Marking the newest one
-  would cache a prefix ending in the question just asked — a write every turn
-  and a read never.
-- **Nothing here invents a book.** `/api/comps/rank` may only choose from books
-  that were fetched, by numbered id, enforced **server-side**; there is no score
-  field; generated text is treated as hostile input.
-- **Three routes send prose** — the assistant, `/api/comps/rank`, and the blurb
-  workshop. Each caps and cuts the opening, lists exactly what leaves *before*
-  the button, and is named on `/privacy`. **Add a field to what is sent and add
-  it to that list and to `/privacy` in the same commit.**
-- Suggested keywords, category paths and blurb critiques **report or suggest;
-  they never write into the book** without a press, and the keyword checker
-  (`keywordReport`) is the *filter* on suggestions — anything it flags is
-  **dropped, never truncated or repaired**.
-- `src/lib/keywords/guide.ts` is the same knowledge with no model behind it,
-  free and offline, because a self-hosted copy has no key.
-- **Audio is three separate things and they are not interchangeable**:
-  `/api/narrate` (text → audio, currently with no way in), `/api/transcribe`
-  (audio → text, feeding the ordinary import path), and browser `SpeechRecognition`
-  dictation (free, no key, Chrome/Edge only). Don't "unify" the last two.
+- **The comps screen searches and does not judge.** Its "Rank these" button and
+  the translation of plain words into a catalogue query were model calls and
+  are gone; the words in the box are the search.
+- `src/lib/keywords/guide.ts` is the keyword knowledge with no model behind it,
+  free and offline, and is what the (hidden) categories screen opens.
+- **Voice typing is browser `SpeechRecognition`** (`use-dictation.ts`) — free,
+  no key, Chrome/Edge only, and it is the one thing that sends audio anywhere.
 
 ### The editor — `docs/architecture/editor.md`
 
@@ -499,11 +487,11 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   the navigator (`toolPanelOpen` in `workspace-rail.tsx`). The connector rules
   go with it: `connectToPage` is false while a panel is over the navigator, or
   they run out from behind it pointing at a card nobody can see.
-- One header for all ten tabs, four ways out that are one toggle, and
+- One header for all the tabs, four ways out that are one toggle, and
   `LeftPanel` owns its own mounting so it can animate out. **The tabs are named
   once, in `src/lib/panel-tabs.ts`** — chapters, search, consistency, notes,
-  ideas, bible, bookmarks, assistant, page, history, trash, of which `page` is
-  the card and the other ten are the panel — and not in the panel,
+  ideas, bible, bookmarks, page, history, trash, of which `page` is
+  the card and the other nine are the panel — and not in the panel,
   because which tab is open is a stored preference and `library-store.ts` needs
   the type without importing a `"use client"` component. The rail owns the
   order; that module owns the words.
@@ -563,7 +551,7 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   the `bookPanel` pref, `BackToBooks`, and the `[data-matter="book"]` sheet
   edge. **The panes live in the pages rather than in
   `book/[bookId]/layout.tsx`**, because the left panel needs the chapter id and
-  the assistant needs the editor instance; the import banner is the one
+  the tools need the editor instance; the import banner is the one
   exception and does live in that layout.
 - `book-panel.tsx` is the navigator and has **one face** (front/body/back as
   cards, each opening into a list — chapters in the body, the sixteen divisions
@@ -709,8 +697,8 @@ local-only, with the account menu saying why. Every entry point checks
   the request, and must copy the `headers` argument onto the response, or a CDN
   serves one writer's `Set-Cookie` to the next reader. The gate reads
   **`getClaims()`**, which verifies the JWT signature — never `getSession()`,
-  which trusts the cookie. It skips `/api` on purpose, so `/api/chat` checks for
-  itself.
+  which trusts the cookie. It skips `/api` on purpose, so each route checks for
+  itself (`/api/export/pdf` through `requireLaunchExport`).
 - **Everything funnels through `/auth/confirm`** — password reset, email
   confirmation and Google alike; `/reset-password` is therefore gated rather
   than public. `safeNext()` is the open-redirect guard on `?next=`.
@@ -742,17 +730,22 @@ local-only, with the account menu saying why. Every entry point checks
   absent** — PostgREST refuses the whole select for one unknown column, so the
   entire library download would fail for everybody.
 - **Schema changes belong in `supabase/migrations/`**, not only in the
-  dashboard. There are **thirteen**; the first seven were applied live as of
-  2026-08-20 and the last six have not been confirmed here — the eighth
-  (`20260822071735_launch_mvp_entitlements.sql` — `ai_usage`, the assistant
-  claim/refund RPCs and the free-book trigger), the ninth
-  (`20260824000000_free_book_limit_five.sql`) and the tenth
-  (`20260826000000_free_book_limit_counts_archived.sql`) — so
-  check before blaming a 502 from the assistant on the route —
-  `20260801000000_feedback.sql` had been outstanding since it was written and
-  the feedback dialog failed for every writer until it went in, and
-  `20260820000000_chapter_unnumbered.sql` landed the same day. Check rather than
-  assume before blaming a route: `select to_regclass('public.<table>')`.
+  dashboard. There are **fifteen**. The first seven were confirmed applied live
+  on 2026-08-20; the eighth through the fifteenth
+  (`20260822071735_launch_mvp_entitlements.sql` through
+  `20260914000000_ai_free_pro_plan.sql`) have not been confirmed here, so check
+  before blaming a route. **The fifteenth must be applied before the code that
+  ships with it**: the app reads `subscriptions.plan` as `free | pro` only, so a
+  row still saying `writer` reads as Free. It has happened:
+  `20260801000000_feedback.sql` sat unapplied from the day it was written, and
+  the feedback dialog failed for every writer until it went in. Check rather
+  than assume: `select to_regclass('public.<table>')`.
+- **A table written by nothing but the server still needs a grant to
+  `service_role`.** This schema never leans on Supabase's default privileges;
+  every server-written table names the role (`book_members`,
+  `plan_interest`). The first `plan_interest` migration granted nothing, and
+  every press failed with `42501 permission denied for table` — which reads
+  nothing like an RLS refusal, so log the error code in full.
 
 **Sharing: two roles, editor and viewer, and no third.** *An editor writes the
 book, the owner owns the book* — chapters, bodies and notes are the editor's;
@@ -798,8 +791,8 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
 - **Only the webhook grants Pro.** `authenticated` has no insert or update grant
   on `subscriptions`; both notify routes use the secret key. A return_url proves
   nothing, so `/upgrade/done` polls and Paddle's button has no success handler.
-- **`/billing` is the account seen from the money side** — plan, card, assistant
-  usage, invoices, and cancellation last so nobody lands on it by accident. It
+- **`/billing` is the account seen from the money side** — plan, card,
+  invoices, and cancellation last so nobody lands on it by accident. It
   is display only. Two rules hold it together: the **status column is read from
   the gateway's own words** (`billing/history.ts`, pure and tested — an
   unrecognised status is shown as itself and **never as "Paid"**), and the
@@ -824,120 +817,88 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
 - **Neither checkout lets the browser say what it is buying** — the transaction
   is created server-side, so the price comes from `plans.ts` and the buyer's id
   from their own session.
-- **There are four plans, and `src/lib/billing/tiers.ts` is where they are
-  named.** `PlanTier` is `free | draft | writer | studio`, cheapest first —
-  `tierAtLeast` compares positions in `TIER_ORDER`, so a tier inserted in the
-  wrong place opens or shuts every gate above it. `TIER_LIMITS` is the one
-  TypeScript statement of what each plan gives (books, chat, the monthly credit
-  grant, write mode); `TIER_NAMES` is the one place the words are written.
-  The module is pure and imports nothing, so a Server Component, a client
-  component and `library-store.ts` can all read it.
-- **Paying is the line, and above it the plans differ by amount rather than by
-  kind** (2026-09-04). Every paid plan carries the assistant and all three
-  models; what a plan buys is how many credits a month. Everything else —
-  imports, sync, all three export formats, unlimited words and chapters, the
-  title and consistency checks — is on every plan including Free.
-- **`aiChatClosed()` asks about the balance, not the plan, and that is the one
-  thing to get right here.** It reads `credits.total` — so a Free account
-  holding bought credits opens and a Writer who has spent the month does not,
-  neither of which is a fact about the tier. `chatAllowed(tier)` is still the
-  *pricing* question ("does this plan come with credits") and is what
-  `account-menu.tsx` and the cards read; it is **not** the gate.
-  `onFreePlan` remains wrong for anything AI, for the older reason: Draft is
-  paid, so `pro` is true.
-- Prices live once in `plans.ts`, keyed **tier × period**: Draft $7.98/$71.82,
-  Writer $14.98/$134.99, Studio $29.98/$269.82 — all three 25% off annually, and
-  the per-month figure divided from the total rather than typed, with a test on
-  it. **USD only**; the LKR table came out when the plans went to four, because
-  three tiers × two cycles × two currencies is twelve figures to keep true and
-  eleven were never rendered. `uniformAnnualSaving()` is what lets the period
-  toggle print one "Save 25%" badge above three columns — it answers null when
-  the three stop agreeing, so the badge disappears rather than lying. **A price
-  change is three edits**: this table, *new* prices in Paddle's catalog (never an
-  edit of a live one), and the resulting env ids — **six of them now**,
-  `PADDLE_PRICE_<TIER>_<CYCLE>`, and `isPaddleConfigured()` requires all six
-  rather than selling one plan and hiding the others.
+- **There are two plans, Free and Pro, and `src/lib/billing/tiers.ts` is where
+  they are named** (2026-09-14). `PlanTier` is `free | pro` — `tierAtLeast`
+  compares positions in `TIER_ORDER`, so a tier inserted in the wrong place opens
+  or shuts every gate above it. `TIER_LIMITS` is the one TypeScript statement of
+  what each plan gives, and it now holds one field, `books`; `TIER_NAMES` is the
+  one place the words are written. The module is pure and imports nothing, so a
+  Server Component, a client component and `library-store.ts` can all read it.
+  There were four (Free, Draft, Writer, Studio) and the paid three differed only
+  by assistant credits, so removing the AI left three identical products; the
+  migration folds every retired row into `pro`, and `asTier` refuses the old
+  names rather than mapping them.
+- **Pro buys exactly two things**: unlimited books (Free holds **one**) and
+  unlimited title checks (Free runs **two a day**, `FREE_LIMITS.titleCheck`).
+  Everything else — imports, sync, all three export formats, unlimited words and
+  chapters, the consistency check, voice typing — is on both plans.
+- **Prices live once in `plans.ts`: Pro is $5.99 a month or $49.99 a year** —
+  30% off, the top of the band `plans.test.ts` allows, with the per-month figure
+  divided from the total rather than typed. Priced backwards from a floor of $5
+  kept per monthly sale after Paddle's 5% + 50¢ ($5.99 keeps $5.19) and under
+  the AI-free apps that give more (WriteO $9.49/mo, Novlr Starter $8/mo yearly,
+  Plottr $9.99/mo); the design note has the research. **USD only.**
+  `uniformAnnualSaving()` still guards the one "Save" badge. **A price change is
+  three edits**: this table, *new* prices in Paddle's catalog (never an edit of a
+  live one), and the resulting env ids — **two of them**,
+  `PADDLE_PRICE_PRO_MONTHLY` and `PADDLE_PRICE_PRO_ANNUAL`, both required by
+  `isPaddleConfigured()`.
 - **Export is free on both plans, and *export must never move behind the plan*
-  is the rule again.** The launch MVP sold EPUB and PDF as the two things Pro
+  is the rule.** The launch MVP sold EPUB and PDF as the two things Pro
   bought; that was undone on 2026-08-27, because a writer has to be able to take
   the book and go and a tool that holds the finished file back is the thing this
-  trade's writers check for first. `freeExports` and `proExports` now carry the
+  trade's writers check for first. `freeExports` and `proExports` carry the
   same three formats, and the pair stays as a pair so the decision has somewhere
   to live and narrowing it is still one edit. **`launch.test.ts` pins it** —
   nothing else would notice the array changing, and `exportAllowed(format, pro)`
   keeps its **boolean** signature deliberately — teaching it what a tier is would
-  make narrowing it a plausible edit again. What is free is **five books**,
-  unlimited words and chapters, imports, sync and every export format. **Draft
-  ($7.98) buys three things**: unlimited books, unlimited title checks — which
-  falls out of `FREE_LIMITS.titleCheck` reading against `pro`, and is what keeps
-  that card from being a sixth book slot for $7.98 — and 2,000 assistant credits
-  a month with write mode. **Writer ($14.98) is 5,000** and **Studio ($29.98) is
-  10,000**; nothing else separates the three.
-- **One credit balance, not two meters** (2026-09-04), and
-  `src/lib/billing/credits.ts` is the whole economy: `CREDIT_COST` prices a
-  reply at **10 / 30 / 100** for Quick / Careful / Deep, `repliesFrom` turns a
-  balance into the count every screen actually prints, and `bestAffordable` is
-  what the panel offers after a refusal. It replaced `quickPerDay` and
-  `carefulPerMonth`, which let a writer run out of the careful model on the 3rd
-  with twenty-five daily quick replies going unused, gave them no way to buy
-  more, and would have wanted a third counter on a third window the moment a
-  third model arrived. **The ratio is the published token prices against the
-  request shape `/api/chat` already caps** (chapter, history, 2,000 out) — not a
-  marketing ladder — and a credit is budgeted at $0.0008.
-- **The grant is monthly and UTC**, which is *not* the writer's midnight —
-  `resetAt` is an instant and every screen renders it in local time rather than
-  saying "next month". **Unspent grant does not carry over**; the ledger's
-  second bucket (`purchased`) does not expire and is spent *after* the grant,
-  so a month's rollover cannot quietly burn something bought. **Nothing sells
-  credits yet** — the bucket is built because retrofitting one into a
-  grant-only ledger is the change that goes wrong, not because a pack is on
-  sale, so **naming one to a writer is a claim the code cannot back** until
-  there is a price, a checkout and a webhook that credits the row.
-- **The status codes mean one thing each.** `requireTier("free", …)` in
-  `/api/chat` is now the *sign-in* gate (kept over `requireSignedIn` because the
-  tier it returns is what the write-mode question needs), and it runs **before**
-  any credit is claimed. So **402 means "your plan does not include this"** —
-  write mode, in practice — and **429 always means "you have spent your
-  credits"**. The panel branches on that pair, offers the dearest model the
-  balance still covers, and reads the structured `credits` off the body; the
-  reply also carries `X-OpenChapter-AI-Cost` and `X-OpenChapter-AI-Remaining` so
-  the panel can move its own balance without asking `/api/billing/subscription`
-  again.
-- **What costs model time is metered on the server**:
-  `billing/launch-entitlements.ts` claims a reply through the
-  `claim_credits(p_cost)` RPC against `ai_credits` (with a `refund_credits` that
-  takes **the split the claim returned** rather than working it out again, so a
-  reply that never lands goes back to the buckets it came from),
-  `requireLaunchExport()` now only checks for a session — free is not
-  anonymous, since `/api/export/pdf` launches a browser on markup a caller sent —
-  and the free book limit is
-  a **Postgres trigger** (`enforce_launch_book_limit`) rather than a browser
-  count. `new-book-form.tsx` mirrors it in the UI; the trigger is what enforces
-  it. **Every limit is stated twice and both have to move** — `TIER_LIMITS` in
-  `billing/tiers.ts` and the SQL. Two is the floor, because SQL cannot import
-  TypeScript; it was three until the hardcoded `pro ? 60 : 5` came out of
-  `launch-entitlements.ts`. The book count lives in `TIER_LIMITS.free.books` and
-  the trigger body, whose current value is set by the ninth
-  migration (`20260824000000_free_book_limit_five.sql`) rather than by the
-  eighth, because the eighth may already have been applied. The tenth
-  (`20260826000000_free_book_limit_counts_archived.sql`) changes *what* is
-  counted, not how many. The eleventh and twelfth
-  (`20260902000000_plan_tiers.sql`, `20260902000100_plan_tier_entitlements.sql`)
-  are the four tiers: the CHECK constraints that make `subscriptions.plan`
-  mean something, the two-window `claim_assistant_reply(p_kind)`, and
-  `openchapter_internal_plan_tier` replacing `openchapter_internal_is_pro`. The
-  thirteenth (`20260904000000_ai_credits.sql`) is the credit ledger: the
-  `ai_credits` table (**one row a writer**, not one a period, because a bought
-  balance outlives every period and one row means one lock),
-  `claim_credits(p_cost)`, `refund_credits(p_from_grant, p_from_purchased)`, and
-  the two retired reply functions dropped — **`ai_usage` itself stays**, unread,
-  because dropping it would throw away every writer's reply history to reclaim
-  nothing. The grant figures are in that function's `case` **and** in
-  `TIER_LIMITS`; `credits.test.ts` reads the migration and holds the two
-  together, which is the one thing in the tree that would notice them drifting.
-  **They must be applied before the app that calls them** — a route asking for
-  `claim_credits(10)` against a database that has never seen the thirteenth is a
-  502 on every send.
+  make narrowing it a plausible edit again.
+- **While `PLANS_ON_SALE` is false, every press on a paid button is recorded**
+  rather than lost. `notePlanInterest()` (`src/lib/plan-interest.ts`) is the
+  one caller-side function, and it sends with `sendBeacon` first because the
+  landing page's buttons are `<Link>`s that navigate on the same press and
+  would cancel a `fetch`. `/api/plan-interest` is public on purpose (the
+  signed-out press is the interesting one), so it guards itself by shape:
+  **three enums and no free text** (`pro`, the cycle, the source), always `{ ok:
+  true }`, and the row written through `createAdminClient()` so `anon` still
+  has no grant. One alert mail per plan per cycle per hour goes to
+  `PLAN_INTEREST_ALERT_EMAIL`, falling back to `CONTACT_EMAIL`. **The cap
+  counts rows with `alerted_at` set**, which is written only after the mail
+  provider accepts the message. Two earlier caps failed because they counted
+  something next to the fact: Resend's idempotency key (a 24-hour window, and
+  a 409 when the body differs) and plain row counts (presses, not alerts,
+  which silenced the one plan never mailed about). `/privacy` names the record.
+  The table's CHECK still admits the retired tiers and the Starter Pass so rows
+  recorded before 2026-09-14 stay valid; the route writes only `pro`.
+- **A plan change says what it will charge before it charges.** With one paid
+  plan, a change is a switch of cycle.
+  `/api/billing/paddle/change-plan/preview` returns Paddle's own
+  `previewUpdate` figure — never a difference worked out from `plans.ts`,
+  because an annual switch charges the whole prorated year — $68.61 under a
+  $7.98 heading, when the plans had other prices — and "roughly right" is an
+  invented number. The button is two
+  presses. A preview that fails does not block the change and says so in its
+  own `failed` field, since "nothing to pay today" and "we could not find out"
+  are opposite things to tell somebody about to spend money.
+- **A declined card is a 402, not a 502.** `isPaddleDecline` sits beside
+  `isPaddleSetupFault` in `billing/paddle.ts` because they point at different
+  people — a decline is the cardholder's to fix, a setup fault the owner's —
+  and `change-plan-button.tsx` reads the **status**, not the wording, to decide
+  whether to draw the link to `/billing`. Codes go into either set once they
+  have been seen.
+- **The one limit enforced on the server is the book count.**
+  `requireLaunchExport()` (`billing/launch-entitlements.ts`, all that file holds
+  now) only checks for a session — free is not anonymous, since
+  `/api/export/pdf` launches a browser on markup a caller sent — and the free
+  book limit is a **Postgres trigger** (`enforce_launch_book_limit`) rather than
+  a browser count. `new-book-form.tsx` mirrors it in the UI; the trigger is what
+  enforces it. **The number is stated three times and they must move together**:
+  `LAUNCH_LIMITS.freeBooks`, `TIER_LIMITS.free.books`, and the trigger body,
+  whose current value (**one**) is set by the fifteenth migration.
+  `launch.test.ts` reads that migration and fails if the SQL and the TypeScript
+  disagree. `requirePro`, `requireTier`, the credit ledger (`ai_credits`,
+  `claim_credits`, `refund_credits`), `ai_usage` and the assistant reply
+  functions are all gone — the migration drops the SQL half.
 - **The book limit counts everything but the trash**, so the archive is not a
   way round it and **unarchiving is never gated**. It was the active shelf alone
   until 2026-08-26, on the Trello/Figma convention where archiving opens a slot
@@ -954,9 +915,12 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   restores Postgres then refuses. **A book shared *with* this writer counts on
   neither side**, which the browser got wrong until 2026-09-01: the trigger
   counts `where b.owner = new.owner`, so a shared row has never spent one of
-  the owner's five, while `booksAgainstPlan` counted every book on the shelf —
+  the owner's slots, while `booksAgainstPlan` counted every book on the shelf —
   so accepting two editor invitations appeared to eat two slots, and a writer
   with three of their own was refused a fourth the server would have taken.
+  **An edit to a book already counted is never refused**, so a writer over the
+  limit (a lapsed Pro subscriber) keeps writing in every book they have; they
+  only cannot start or restore another.
 - **A limit gate must never fire while the plan is still unknown.** `usePlan()`
   starts at `UNKNOWN` (`loading: true`, `pro: false`) and asks the server on
   mount, so for the width of one request a Pro account looks exactly like a free
@@ -970,31 +934,30 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   one on a live path (`ShareDialog` still opens from the editor and the
   Collaborators area, while **`/invite/[token]` redirects home**, which is worth
   knowing before debugging an invite that cannot be accepted). It stays because
-  it is the design to return to, and its four shapes are still the house rule
-  for anything metered in the browser:
+  it is the design to return to, and its shapes are still the house rule for
+  anything metered in the browser. **The title check row is live**, and it is
+  one of the two things Pro sells:
 
   | Shape | Tools | Free |
   |---|---|---|
-  | **Per day** | comps, covers, title check | 2 / 3 / 2 a day |
+  | **Per day** | comps, covers, title check | 3 / 3 / 2 a day |
   | **Per book** | blurb, prose report, track | 5 / 6 / 2 books |
   | **By occupancy** | ARC readers, seats | 10 a book / 2 a book |
-  | **In total, for good** | keyword suggestions, blurb chat, keyword chat | 5 / 3 / 3 ever |
 
-  The fourth shape follows the cost rather than the work and never comes back.
-  `onThisBook` means a book already counted is never blocked; the daily
+  There was a fourth, **in total, for good**, for work that cost a model call
+  per press; it went with the AI. `onThisBook` means a book already counted is
+  never blocked; the daily
   reset lives in `dailyAllowance` and not in the parser; **every limit is spent
   on a press, never on arrival**; the counters live in `prefs`; `warnAt` caps the
   warning at `limit - 1`. The words must match the shape, and tests enforce it —
-  a limit that never comes back may not say "today" or "tomorrow".
+  a limit that does not come back may not say "today" or "tomorrow".
 - **`LimitDialog` fires on the press that is refused, never from an effect**, and
   the controls stay live so there is a press to refuse. `useLimitGate(ask)` is
   the one path, and `ask` is a discriminated union so the compiler refuses a book
   limit with no book.
-- **These are browser gates and are honest about it** — the routes that cost
-  money are gated by `requirePro()` on the server (401 signed out, **402** signed
-  in and unpaid, three different messages), and under the launch MVP by
-  `launchFeatureEnabled()` ahead of it. Do not add a Pro row whose value depends
-  on a browser gate being unbreakable.
+- **These are browser gates and are honest about it** — nothing they guard
+  costs money to run, and the book count is the one limit Postgres holds. Do
+  not add a Pro row whose value depends on a browser gate being unbreakable.
 - **Four legal pages exist because a gateway reviews the site signed out** — they
   are in `PUBLIC_EXACT` in `src/proxy.ts`, and `src/lib/legal.ts` states each
   fact once. **The privacy page names every route that sends anything**, so
@@ -1004,8 +967,11 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
 
 **`mvp-landing-page.tsx` is what a signed-out visitor actually gets**, and as
 of 2026-08-24 it is a whole page rather than a placeholder: hero, the programs
-a finished file opens in, four feature rows, the export, what leaves the
-browser, the two plans, a FAQ, the closing ask and the footer. It sells the
+a finished file opens in, three feature rows, the export, what leaves the
+browser, the two plans, a FAQ, the closing ask and the footer. **It says "No
+AI" in the hero, as the first FAQ and on both pricing cards**, and the FAQ names
+voice typing as the one thing that sends audio anywhere — keep that sentence, or
+the claim is no longer true. It sells the
 smaller product and reads `LAUNCH_LIMITS`, `plans.ts`, `IMPORT_FORMATS`,
 `MAX_SNAPSHOTS`, `DESTINATIONS` and `legal.ts` so no figure on it can drift
 from the thing that enforces it. `landing-page.tsx` is the fuller sixteen-tool
@@ -1021,16 +987,12 @@ over an empty column — **the proxy redirects it home under the launch flag**.
   invitation cannot be accepted), the reading view is gated, and the sixteen
   tools are gated. **`HIDDEN_BOOK_TOOL_PATHS` is the list to check before adding
   a sentence to this page.**
-- **Its figures are five drawn screens** in `mvp-screens.tsx` — shelf, editor,
-  versions, import, assistant — plus the export wizard's own `ExportScreen`. All
-  six are markup at a fixed design mapped onto `cqw`, so no figure on the page
-  ships a line of script. **The page itself now ships two islands, not one** —
-  `landing-header.tsx` and, since the plans went to four, `pricing-cards.tsx`,
-  which holds the cycle toggle and the four cards. The section carried a monthly
-  figure with the yearly one written underneath and no toggle at all, on the
-  reasoning that choosing a cycle is a decision for the page that takes the
-  money; four plans is eight prices, and reading half of them out of a note
-  under the other half is work a toggle does better. **The drawn design is ~770px wide, not the 1000px
+- **Its figures are four drawn screens** in `mvp-screens.tsx` — shelf, editor,
+  versions, import — plus the export wizard's own `ExportScreen`. All
+  five are markup at a fixed design mapped onto `cqw`, so no figure on the page
+  ships a line of script. **The page itself ships two islands** —
+  `landing-header.tsx` and `pricing-cards.tsx`, which holds the cycle toggle and
+  the Free and Pro cards. **The drawn design is ~770px wide, not the 1000px
   `export-screen.tsx` uses**, and the note on `W` in that file records why: a
   1000px design in this page's figure column renders its body text at 8.5px.
   The hero is capped at `max-w-4xl` and the export at `max-w-5xl` for the same
@@ -1128,7 +1090,7 @@ other's screen first; with no Supabase configured everyone gets the dashboard ·
 (public, and public is the point) · `/upgrade` plans (public — a price is read
 before an account exists) · `/upgrade/checkout/[orderId]` → a form POST straight
 to PayHere · `/upgrade/done` PayHere's return_url, which polls · `/billing` the
-plan, payment method, assistant usage and invoice list (signed in only; display
+plan, payment method and invoice list (signed in only; display
 only — the subscription row is written by the webhook and nothing else) ·
 `/privacy` ·
 `/terms` · `/refunds` · `/contact` (public, and public is the point) ·
@@ -1149,26 +1111,18 @@ holds **fifteen** entries — the fourteen hidden tools plus `read`. **Read the
 set rather than this sentence**: `comps` came off it on 2026-09-02 and went
 back on 2026-09-03, so the count is the thing that moves most often here.
 
-**API routes:** `/api/chat` · `/api/narrate` · `/api/transcribe` · `/api/comps` ·
-`/api/comps/subjects` · `/api/comps/query` · `/api/comps/rank` ·
-`/api/comps/categories` · `/api/comps/keywords` · `/api/comps/keywords/chat` ·
-`/api/blurb/critique` · `/api/blurb/workshop` · `/api/export/pdf` ·
+**API routes:** `/api/comps` · `/api/comps/subjects` · `/api/export/pdf` ·
+`/api/plan-interest` ·
 `/api/billing/*` (`subscription`, `cancel`, `resume`, `history`, `notify`,
-`paddle/checkout`, `paddle/notify`, `paddle/update-payment-method`). All except
-`/api/comps`, `/api/comps/subjects` and `/api/export/pdf` are metered and gated
-by `requirePro()`. **Under the launch flag every model route answers 404
-first**, `/api/comps/subjects` included — the paragraph below describes the
-design, not what is currently reachable. **`/api/comps` itself is the one
-exception and is live** as of 2026-09-02, because the title check runs on it:
-gating a screen and gating the data behind it are separate decisions, and this
-is the case that shows why they have to be. The first two are
-free, keyless and stay that way; the third is free **on purpose and for good** —
-export must never move behind the plan — but it is not anonymous, since it
-launches a browser on markup a caller supplied: it takes `requireSignedIn`
-instead. The two comps routes are free, keyless and stay that way —
-which is the whole reason the model steps around the comps search (query, rank,
-categories, keywords and the keyword chat) are routes of their own rather than
-flags on it.
+`invoice/[id]`, `paddle/checkout`, `paddle/notify`, `paddle/change-plan`,
+`paddle/change-plan/preview`, `paddle/update-payment-method`). **There are no
+model routes** — `/api/chat`, `/api/narrate`, `/api/transcribe`,
+`/api/comps/{query,rank,categories,keywords,keywords/chat}` and
+`/api/blurb/{critique,workshop}` were deleted on 2026-09-14. `/api/comps` is
+live and free because the title check runs on it; `/api/comps/subjects` answers
+404 under the launch flag; `/api/export/pdf` is free **on purpose and for good**
+— export must never move behind the plan — but not anonymous, since it launches
+a browser on markup a caller supplied; `/api/plan-interest` is public on purpose.
 
 ## Styling — `docs/styling.md`
 
@@ -1322,10 +1276,6 @@ custom properties the editor and the reading view both read.
   button inside a dialog uses the primitive**; one on an ordinary screen is
   still hand-classed against the app's own tokens, because the primitive wears
   the dialog palette.
-- **`assistant-reply.tsx` over the pure `markdown.ts` is what every assistant
-  panel prints with.** The parser returns **data, never HTML** — nothing
-  downstream may reach for `dangerouslySetInnerHTML` — a link keeps its words and
-  loses its destination, and the clipboard gets the words without the notation.
 
 `<body>` is `overflow-hidden` (for the editor shell). A standalone scrolling page
 therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reach.
@@ -1347,42 +1297,15 @@ therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reac
   says nothing rather than something plausible. Report facts, never verdicts —
   the people selling verdicts to this audience are the ones it has been burned
   by.
-- **The assistant never changes somebody's prose without them seeing it.** This
-  is the rule, and it has now outlived two implementations of itself. It was
-  *"it reads and reports; it never writes into the book"*, then *"every word it
-  puts there is a press"* — and on 2026-09-05 the press went too, because a
-  writer who asks for a rewrite and is handed two buttons has been given
-  homework. With the switch on, a reply is applied where the writer was already
-  working; the page scrolls to it and it stays lit until their next keystroke.
-  **Four things carry the rule now, and none may be dropped**: the anchor is the
-  writer's own selection or caret and *never* text matched back out of the
-  manuscript; the whole change is one transaction, so one undo reverts it; the
-  chapter as it stood is kept in history first; and it applies **only when the
-  reply offers exactly one passage** — `isOffered` says *this is prose*, never
-  *this is the prose you asked for*, so two offers is a choice and falls back to
-  the buttons. Off by default, and still `requirePro`.
-
-  **The diff is what was dropped, and the trade is worth stating.** The industry
-  consensus runs the other way — Cursor's users filed a *regression* when edits
-  began applying without one — but that consensus comes from code editors, where
-  a change touches files and hunks nobody can see at once. This puts one passage
-  in the paragraph the writer is looking at, with the previous version already
-  in history. Canva's assistant applies to the canvas for the same reason. The
-  safeguard moved from *before* the change to *around* it, and the pieces that
-  make that true are the four above — weaken any of them and the diff has to
-  come back.
-
-  **What it still cannot do is choose where.** "Add after the last line" names a
-  place, and nothing reads a reply for one: the target is the selection or the
-  caret. Making the model return a target needs a structured reply instead of
-  the blockquote, and a mis-parsed range rewrites a paragraph nobody chose —
-  which is the failure the anchor rule exists to prevent. The prose report still has no rewrite button —
-  it reports on a whole book nobody has selected, which is the case none of the
-  four above can cover. **Two features are still ruled out and stay ruled out:
-  AI-generated covers and AI editing** — meaning the editorial *job*, sold in
-  place of a human editor. See TODO.md, which says why the two are not the same
-  thing. `src/components/chat/chat-panel.tsx` and `src/lib/editor/assistant-write.ts`
-  are where this lives; `/api/chat` gates write mode with `requirePro`.
+- **No AI.** Nothing in the app writes, rewrites, summarises or generates, and no
+  part of a book is sent to a language model. This outlived three versions of a
+  narrower rule — *the assistant never changes somebody's prose without them
+  seeing it* — and on 2026-09-14 the assistant itself went. **"No AI" is now a
+  public claim the code has to back**, so the no-claim rule applies to it in
+  both directions: adding a model call breaks a promise on the landing page, the
+  pricing cards, the FAQ, the Help dialog, `/terms` and `/privacy` at once. The
+  prose report, the consistency check and the title check report facts and
+  change nothing; that is the shape every checking tool here takes.
 - **The Help dialog is documentation and goes stale like documentation.** When a
   feature ships, add it to the `SECTIONS` list in `shelf/help-dialog.tsx` — it's
   the only place in the app that explains what exists.
@@ -1394,10 +1317,6 @@ therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reac
     sound** (`ambience.ts` + `use-ambience.ts` + `sounds-dialog.tsx`) — their
     shelf buttons are gone, so adding a rail item that opens the real dialog is
     the whole of switching either on.
-  - **The audiobook export** (`/api/narrate`, `export/narrate.ts`,
-    `export/audiobook.ts`) — the card came off the export page on 2026-08-14.
-    Four pages had claims reworded and `/privacy` lost its Narration entry;
-    those return with it.
   - **The export wizard's four review panes** (`review-pane.tsx`,
     `preview-sheet.tsx`) — unhooked 2026-08-17; a Preview step showing the
     reading view stands in their place, and it cannot check the packaged file.

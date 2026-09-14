@@ -11,7 +11,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.112.4",
     "@floating-ui/dom": "^1.8.0",
     "@paddle/paddle-js": "^1.6.4",
     "@paddle/paddle-node-sdk": "^3.10.0",
@@ -23,7 +22,6 @@
     "@tiptap/pm": "^3.28.0",
     "@tiptap/react": "^3.28.0",
     "@tiptap/starter-kit": "^3.28.0",
-    "ai": "^7.0.41",
     "docx": "^9.7.1",
     "docx-preview": "^0.4.0",
     "jszip": "^3.10.1",

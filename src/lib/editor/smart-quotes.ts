@@ -16,8 +16,7 @@ import { Extension, InputRule, escapeForRegEx, textInputRule } from "@tiptap/cor
  * Novelists do not type those on purpose, and a writer who does — in a
  * character's chat log, in a recipe, in a fraction — would find their prose
  * quietly altered. Four rules is not worth a dependency to keep patched: the
- * same reasoning `ai.ts` gives for writing Gemini out by hand and `email/send.ts`
- * for reaching Resend over REST.
+ * same reasoning `email/send.ts` gives for reaching Resend over REST.
  *
  * **Nothing already written is touched.** These are input rules: they fire on
  * the keystroke that completes the pattern and nowhere else, so an imported

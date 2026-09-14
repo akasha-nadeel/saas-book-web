@@ -43,8 +43,7 @@ import { DialogClose } from "@/components/ui/dialog";
  * last thing they did.
  */
 
-/** The audiobook is a zip rather than a `Format`, and it ends the same way. */
-export type DoneFormat = Format | "audiobook";
+export type DoneFormat = Format;
 
 export interface ExportDone {
   format: DoneFormat;
@@ -68,7 +67,6 @@ const READY: Record<DoneFormat, string> = {
   epub: "Your EPUB is ready",
   docx: "Your Word file is ready",
   markdown: "Your Markdown file is ready",
-  audiobook: "Your audiobook is ready",
   pdf: "Your PDF is ready",
 };
 
@@ -77,8 +75,7 @@ const READY: Record<DoneFormat, string> = {
  *
  * A map rather than a comparison against the format id, because that list is
  * written for a reader — "DOCX", "Markdown" — and this is the one place the two
- * vocabularies meet. A format with nothing against it simply shows no row: the
- * audiobook zip opens in whatever plays MP3s, which is not a claim worth making.
+ * vocabularies meet. A format with nothing against it simply shows no row.
  */
 const CATALOGUE_FORMAT: Partial<Record<DoneFormat, string>> = {
   epub: "EPUB",

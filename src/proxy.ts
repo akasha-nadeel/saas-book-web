@@ -190,7 +190,7 @@ export const config = {
      *
      * The API is left out on purpose: redirecting a fetch to an HTML sign-in
      * page produces a baffling parse error rather than a 401, so routes answer
-     * for themselves — see app/api/chat/route.ts.
+     * for themselves — see app/api/export/pdf/route.ts.
      */
     /*
      * `txt` is here for `public/typo-words.txt`, the word list the consistency

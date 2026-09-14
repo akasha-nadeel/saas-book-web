@@ -20,7 +20,7 @@ both read — so one setting styles the writing surface and the read-through ali
 
 **`src/components/ui/` is the shared-primitive shelf, and it is deliberately
 narrow** — `menu.tsx`, `spinner.tsx`, `book-cover.tsx`, `copy-button.tsx`,
-`tool-save.tsx` and `assistant-reply.tsx`. Things land there on the third copy,
+and `tool-save.tsx`. Things land there on the third copy,
 not the first: `Spinner` was extracted once a tool screen needed the ring the
 checkout result already drew, because that is how one product ends up with two
 loading states spinning at different weights. Both it and `Menu` take
@@ -30,44 +30,11 @@ miniature — its first draft used `border-current/25`, which v4 silently drops,
 so it would have shipped as a plain circle. Check the built CSS, per the build
 note above.
 
-**`assistant-reply.tsx` over the pure `markdown.ts` is what the three assistant
-panels print with**, and it arrived on 2026-08-15 by the third-copy rule
-exactly. The editor's assistant, the blurb workshop and the keyword workshop
-each rendered the model's answer with `whitespace-pre-wrap` — so all three put
-`* **Tightening:** Cut fluff` on screen with the asterisks in it. Every model
-answers in Markdown unprompted; nobody was parsing it. Four things hold it:
-
-- **The parser is written, not installed**, for the reason `ai.ts` writes Gemini
-  out by hand. A CommonMark library is mostly syntax no model emits into a chat
-  panel — reference links, HTML blocks, tables nobody can read in a 300px rail.
-  What is there is the subset that turns up, tested.
-- **Generated text is hostile input, so the output is data and never HTML.**
-  `markdown.ts` returns blocks and runs of plain strings; the component makes
-  React elements. Nothing downstream may reach for `dangerouslySetInnerHTML`.
-  Raw HTML in the source renders as characters, and **a link keeps its words and
-  loses its destination** — a model-supplied URL is attacker-shaped, and the
-  assistant has no reason to send a writer off-site.
-- **Underscores do not emphasise inside a word.** `snake_case_name` had its
-  middle set in italic until a test caught it; CommonMark forbids intraword `_`
-  for this reason, and these replies are full of `ANTHROPIC_API_KEY`. Asterisks
-  are deliberately left loose, because `**Label:**text` is commoner than
-  intraword `*`.
-- **An unclosed code fence renders anyway.** A streaming reply has one on almost
-  every frame, and waiting for the closing fence would make offered prose appear
-  only once the model had finished — the moment a reader is watching hardest.
-
-**What is copyable is what is *offered*, not everything.** `isOffered` says a
-fenced block and a blockquote are where a model puts prose it is handing over;
-those get a button, a paragraph explaining a suggestion does not, or every reply
-becomes a column of buttons and the one that matters stops standing out. The
-editor's assistant adds one for the whole reply, which appears only once the
-reply has finished. And **the clipboard gets the words without the notation** —
-`blockText` drops the marks, because the destination is somebody's novel and
-pasting `**bold**` into a manuscript puts asterisks in a book. The two workshops
-pass `copyable={false}` on the conversation itself: what is worth taking there
-is the draft or the candidate list, which already have their own controls, and a
-second button beside them would be two ways to take the same words, one of which
-does less.
+**`assistant-reply.tsx` and `markdown.ts` are gone** (2026-09-14). They printed
+the assistant's and the two workshops' Markdown replies — as data, never HTML,
+because generated text is hostile input — and went with the AI. If anything
+ever renders Markdown from outside the writer's own hands again, that rule
+comes back with it.
 
 **One palette in two values: greyscale by day, indigo by night.** The light set
 is the `:root[data-theme="light"]` block and is neutral, with no hue anywhere

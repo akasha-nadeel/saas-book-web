@@ -105,7 +105,7 @@ export interface Subscription {
  * A renewal charge and its notification do not land on the stroke of the hour,
  * and a card that needs one retry is a normal Tuesday, not a lapsed customer.
  * Three days is short enough that a genuinely dead subscription closes within
- * the week and long enough that nobody loses the assistant mid-sentence over
+ * the week and long enough that nobody loses their plan mid-sentence over
  * PayHere's queue.
  */
 const GRACE_DAYS = 3;

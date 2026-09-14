@@ -2,24 +2,14 @@ import type { Period } from "@/lib/billing/plans";
 import type { PaidTier } from "@/lib/billing/tiers";
 
 /**
- * What can be wanted: the three plans, and the Starter Pass.
- *
- * **The pass is not a `PaidTier` and is not being made one.** `PaidTier` is
- * what a subscription can be — `tierAtLeast` orders it, `TIER_LIMITS` gives
- * each one a monthly grant, and the plan column in the database is checked
- * against it. A one-time $0.99 charge is none of those things, and widening
- * that type to carry it would put "pass" in front of every gate in the billing
- * code for the sake of one button.
+ * What can be wanted: Pro. The Starter Pass went with the AI on 2026-09-14,
+ * and `InterestTier` stays a name of its own so the record keeps reading the
+ * way the pricing page reads.
  */
-export type InterestTier = PaidTier | "pass";
+export type InterestTier = PaidTier;
 
-/**
- * How it would be charged, `once` being the pass.
- *
- * The word the pricing card already uses — *charged once, never renews* — so
- * the record reads the way the page reads.
- */
-export type InterestPeriod = Period | "once";
+/** How it would be charged. */
+export type InterestPeriod = Period;
 
 /**
  * Tell the server somebody wanted a plan we are not currently selling.

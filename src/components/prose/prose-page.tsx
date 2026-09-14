@@ -35,8 +35,7 @@ import { useHydrated, usePrefs, useShelf } from "@/lib/use-library";
  * So this counts and stops. It is `storeReadiness()` aimed at prose: here is
  * what is in the chapter, and the decision is yours. No score, no grade, no
  * suggested rewrite, and no button that changes a word — which is also the only
- * shape this feature can take without contradicting the assistant having no
- * write access.
+ * shape this feature can take in an app with no AI.
  *
  * ---
  *

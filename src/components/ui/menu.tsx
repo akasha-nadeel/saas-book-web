@@ -180,11 +180,10 @@ export function Menu({
        *
        * The rule above is "anything that moves the trigger invalidates the
        * position", and a container that does not *contain* the trigger cannot
-       * have moved it. Without this the assistant's model menu shuts on the
-       * next token of a streaming reply: `use-chat-scroll.ts` writes
-       * `scrollTop` on the transcript on every chunk, that fires a scroll
-       * event, and the capture-phase listener above took it as the page
-       * moving underneath.
+       * have moved it. Without this a menu shuts whenever an unrelated panel
+       * scrolls itself — a list that follows new content writes `scrollTop`,
+       * that fires a scroll event, and the capture-phase listener above takes
+       * it as the page moving underneath.
        *
        * Safe for every call site — the trigger is either inside the scrolling
        * container (still dismissed, as before) or in unrelated chrome that the

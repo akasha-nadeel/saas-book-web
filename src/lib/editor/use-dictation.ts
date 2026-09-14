@@ -11,11 +11,9 @@ import {
 /**
  * Dictation: speak, and the words land on the page.
  *
- * This uses the browser's own SpeechRecognition rather than the transcriber
- * behind the audiobook import, and the difference is not an oversight. That one
- * takes a finished file and costs money per minute; this one is live, free, and
- * already running on the machine. Sending a continuous microphone stream to a
- * paid API to watch words appear would be the wrong trade in both directions.
+ * This uses the browser's own SpeechRecognition, and OpenChapter calls no speech
+ * model of its own — there is no AI in the app. It is live, free, and already
+ * running on the machine.
  *
  * The cost is reach: it is a Chrome and Edge feature. `supported` says so, and
  * the button that uses this hides itself rather than offering something that

@@ -290,8 +290,7 @@ export function Rail({
       /* Marks both rails as "not outside the tool panel".
 
          The panel closes on a press anywhere else, and the controls that open
-         and close it live here — on the left as tabs, on the right as the
-         Assistant button. Without this the toggle eats itself: pressing the tab
+         and close it live here, as tabs. Without this the toggle eats itself: pressing the tab
          you are on would close the panel on `pointerdown` and the `click`
          behind it would find it shut and open it straight back up. */
       data-rail={side}

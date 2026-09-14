@@ -99,12 +99,9 @@ interface FormatOption {
 /**
  * The four ways out.
  *
- * **There were five, and the audiobook was taken off on 2026-08-14.** It is
- * coming back — the machinery is untouched and still tested (`/api/narrate`,
- * `export/narrate.ts`, `export/audiobook.ts`, and its own preview in
- * `format-previews.tsx`), it is simply not offered while the rest of the
- * publishing side settles. Putting it back is this row and the branches that
- * went with it; see TODO.md under "Taken out on purpose" for the list.
+ * **There were five, and the audiobook came off on 2026-08-14.** It is not
+ * coming back: it was narrated by a speech model, and every model call left
+ * the app on 2026-09-14.
  *
  * EPUB leads because it is the only one of the four a shop will take, and the
  * only one the store-listing steps exist for.

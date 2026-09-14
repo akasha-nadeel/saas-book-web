@@ -3,7 +3,6 @@ import { planTierOf } from "@/lib/billing/subscription";
 import { isPaddleConfigured } from "@/lib/billing/paddle";
 import { canManageSubscriptions } from "@/lib/billing/payhere";
 import { billingConfigured } from "@/lib/billing/provider";
-import { creditBalanceFor } from "@/lib/billing/launch-entitlements";
 import { currentSubscription } from "@/lib/billing/server";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 import { createClient } from "@/lib/supabase/server";
@@ -39,7 +38,6 @@ export async function GET(request: Request) {
       currentPeriodEnd: null,
       canCancel: false,
       order: null,
-      assistant: { used: 0, limit: null, remaining: null, resetAt: null },
       books: { limit: null },
       exports: { free: LAUNCH_LIMITS.freeExports, pro: LAUNCH_LIMITS.proExports },
     });
@@ -66,20 +64,9 @@ export async function GET(request: Request) {
   }
 
   const tier = planTierOf(subscription);
-  /* Kept alongside `tier` and derived from it, so the nine screens that only
-     ever asked "is this a paid plan" need no edit. Its meaning is now exactly
-     that — *any* paid tier — which is the right question for books, the trash,
-     the hidden tools and export, and the wrong one for the assistant. Anything
-     gating AI reads `tier`. */
+  /* Kept alongside `tier` and derived from it, so the screens that only ever
+     asked "is this a paid plan" need no edit. */
   const pro = tier !== "free";
-
-  /* A signed-out reader is told zero rather than null: null means *unmetered*,
-     and a visitor who has not signed in has no balance rather than an
-     unlimited one. `resetAt` stays null because there is no grant to refill. */
-  const credits =
-    supabase && userId
-      ? await creditBalanceFor(supabase, userId, subscription)
-      : { grantLeft: 0, purchased: 0, total: 0, resetAt: null };
 
   return Response.json({
     billing: true,
@@ -107,7 +94,6 @@ export async function GET(request: Request) {
           ? subscription.paddleSubscriptionId && isPaddleConfigured()
             : subscription.payhereSubscriptionId && canManageSubscriptions()),
     ),
-    credits,
     books: { limit: TIER_LIMITS[tier].books },
     exports: { free: LAUNCH_LIMITS.freeExports, pro: LAUNCH_LIMITS.proExports },
   });

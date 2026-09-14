@@ -61,18 +61,14 @@ function DockButton({
 export function MobileWritingDock({
   editor,
   formatOpen,
-  assistantOpen,
   moreOpen,
   onFormat,
-  onAssistant,
   onMore,
 }: {
   editor: Editor | null;
   formatOpen: boolean;
-  assistantOpen: boolean;
   moreOpen: boolean;
   onFormat: () => void;
-  onAssistant: () => void;
   onMore: () => void;
 }) {
   useEditorState(editor);
@@ -100,12 +96,6 @@ export function MobileWritingDock({
       <DockButton label="Format" active={formatOpen} onClick={onFormat}>
         Aa
       </DockButton>
-      <DockButton
-        label="AI"
-        active={assistantOpen}
-        onClick={onAssistant}
-        mark="assistant"
-      />
       <DockButton label="More" active={moreOpen} onClick={onMore}>
         •••
       </DockButton>

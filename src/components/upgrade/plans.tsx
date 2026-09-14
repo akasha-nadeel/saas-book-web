@@ -13,34 +13,17 @@ import { PaddleUpgradeButton } from "@/components/upgrade/paddle-checkout";
 import { ChangePlanButton } from "@/components/upgrade/change-plan-button";
 import { PaddleInlineCheckout } from "@/components/upgrade/paddle-inline-checkout";
 import { PlanTable } from "@/components/upgrade/plan-table";
-import {
-  BEST_FOR,
-  PASS_BEST_FOR,
-  PASS_HIGHLIGHTS,
-  highlightsFor,
-  replyCountsFor,
-} from "@/lib/billing/plan-highlights";
-import { STARTER_PASS, passReplyCounts } from "@/lib/billing/starter-pass";
+import { BEST_FOR, highlightsFor } from "@/lib/billing/plan-highlights";
 import { PeriodToggle } from "@/components/upgrade/period-toggle";
 import {
   PLAN_BUTTON_PLAIN,
   planButton,
 } from "@/components/upgrade/plan-button";
-import {
-  TIER_NAMES,
-  tierAtLeast,
-  type PaidTier,
-} from "@/lib/billing/tiers";
+import { TIER_LIMITS, TIER_NAMES, type PaidTier } from "@/lib/billing/tiers";
 import { PLANS_ON_SALE } from "@/lib/launch";
 import { notePlanInterest } from "@/lib/plan-interest";
-import {
-  KeyIcon,
-  NibIcon,
-  PenIcon,
-  PlanCard,
-  ShelfIcon,
-  StackIcon,
-} from "@/components/upgrade/plan-card";
+import { NibIcon, PlanCard, StackIcon } from "@/components/upgrade/plan-card";
+import { plural } from "@/lib/plural";
 
 /**
  * The two plans, presented as a pricing section rather than a settings screen:
@@ -57,24 +40,12 @@ import {
  * keeps it a card standing off the page instead of a hole cut in one, and is
  * the whole of why the palette is written as jobs rather than as hues.
  *
- * **Every line below is true of the code.** Two were not, once — a shelf
- * counted to fifty and an eleventh import refused — and both were deleted
- * rather than reworded, because nothing counted either and a limit promised on
- * a pricing page that no code enforces is the same failure as a feature claim
- * the app cannot back. The counted rows are back because the counting is:
- * `prefs.usage` is stamped by `countUse` at each of the six places that spend
- * one, and `lib/free-limits.ts` holds the four numbers this file quotes. The
- * shelf limit is *not* back and is not planned — books a writer starts here
- * are free and unbounded, which is the promise the product rests on.
- *
- * The rows differ in *how* they are enforced, and it is worth knowing which is
- * which. The three metered ones — assistant, ranked comps, audio import — are
- * checked server-side by `requirePro()`, which is the only check a
- * reader with devtools cannot edit. The rest are computed in the browser and
- * are therefore gated in the browser: the prose report, the money screens, the
- * advance-copy list, the writing record and the series bible. That is normal
- * for local-first software and it is not a secret, but do not add a row here
- * whose value depends on the gate being unbreakable.
+ * **Every line below is true of the code.** A limit promised on a pricing page
+ * that no code enforces is the same failure as a feature claim the app cannot
+ * back. The book limit is a Postgres trigger; the title check allowance is a
+ * browser gate, which is normal for local-first software and not a secret —
+ * but do not add a row here whose value depends on a browser gate being
+ * unbreakable.
  *
  * The figures are not written here. They come from lib/billing/plans.ts, which
  * is also what signs the amount into the PayHere checkout, so the number on the
@@ -92,71 +63,13 @@ import type { Period } from "@/lib/billing/plans";
 
 
 /**
- * The comparison, read across a line: label, what Starter gives, what Pro does.
+ * The one paid card.
  *
- * **The split is by what a row costs to run and who it is for**, not by what
- * would squeeze hardest. Three lines govern it:
- *
- * - **Writing a book and getting it out is free, whole**, and as of 2026-08-27
- *   that is true again rather than aspirational — the launch MVP sold EPUB and
- *   PDF as Pro for a while and it has been undone. All three exports, the
- *   pre-upload check and the roadmap included. Every competitor charges for
- *   formatting — Scrivener at $60, Atticus at $147, Vellum at $200 and up — so
- *   giving it away is the wedge, and the landing page has already promised it
- *   in those words: get it out without paying to find out what was wrong.
- * - **Anything with a bill attached is Pro.** The four metered routes cost real
- *   money per use and are the only things here that do.
- * - **The business layer is Pro.** Earnings, advance readers, the curve, the
- *   evidence document: a drafting writer has no money and a selling one does.
- * - **A cap Pro *raises* is a fourth kind, and the three above do not cover
- *   it.** People per book and the story bible are not metered per use and are
- *   not the business layer — they are one feature, sized. So they read "2 / 10"
- *   and "Per book / Across a series" rather than "Unlimited" or a cross, either
- *   of which would be false in a different direction: the free plan really does
- *   share a book with somebody, and Pro really does not make that unbounded.
- *   Both numbers come from `SEATS_PER_BOOK`, so this page cannot drift from what
- *   the database enforces.
- *
- * Two rows were removed rather than reworded. "Books 50" and "Imports 10 files"
- * were limits the code has never enforced — a promise on a pricing page that
- * nothing implements is the same failure as a claim the code cannot back, and
- * this is the page a sceptical reader checks hardest.
+ * **Pro, since 2026-09-14.** There were three paid plans that differed only by
+ * how many assistant credits a month they granted; with the AI gone they were
+ * one product at three prices. The mark is the nib the featured plan wore.
  */
-
-
-/**
- * The three paid cards, in the order they are read.
- *
- * Data rather than three hand-written blocks, because four columns of the same
- * shape written out four times is four places for one of them to drift — which
- * is the drift `plan-rows.ts` already exists to prevent one level down.
- *
- * **Writer is the featured one**, and the reason changed under it on
- * 2026-09-04. It used to be "where the assistant first appears" — true while
- * Draft had none, and false the moment every paid plan got credits. What is
- * still true is that it is the middle anchor: featuring the dearest card would
- * make the ask $29.98 of an audience that mostly has not decided whether it
- * wants an assistant at all, and featuring the cheapest gives the page nothing
- * to compare against.
- *
- * **The words are gone from this array**, which is the point of the 2026-09-04
- * rebuild: the positioning line comes from `BEST_FOR`, the contents from
- * `highlightsFor`, and every actual claim from `ROWS` through `PlanTable`
- * below. What is left here is the mark and which card is featured — the two
- * things that really are decisions about *this page*.
- *
- * **The four marks run page → pencil → nib → shelf**, which is the ladder the
- * plans themselves climb.
- */
-const PAID_CARDS: {
-  tier: PaidTier;
-  mark: React.ReactNode;
-  featured?: boolean;
-}[] = [
-  { tier: "draft", mark: <PenIcon /> },
-  { tier: "writer", mark: <NibIcon />, featured: true },
-  { tier: "studio", mark: <ShelfIcon /> },
-];
+const PRO: PaidTier = "pro";
 
 export function Plans({
   /** Decides where the starter card's button goes — the shelf, or the way in. */
@@ -188,7 +101,7 @@ export function Plans({
   } | null;
   cancelled?: boolean;
 }) {
-  /* **Annual, not monthly.** The toggle's own badge says a year saves 25%, and
+  /* **Annual, not monthly.** The toggle's own badge says what a year saves, and
      opening on the cycle that badge is about means the first figure a reader
      sees is the one being recommended. Switching to monthly is one press. */
   const [period, setPeriod] = useState<Period>("annual");
@@ -205,21 +118,8 @@ export function Plans({
     null,
   );
 
-  /**
-   * The plan whose "not on sale" dialog is open, or null.
-   *
-   * **Widened from a boolean when `PLANS_ON_SALE` arrived.** It used to answer
-   * only "there is no gateway on this copy", which is one fact about the
-   * deployment and needs no plan name. Now it also answers "this plan is not
-   * being sold yet", which is a fact about a plan — and a dialog headed
-   * "Plans" over a press on Studio is answering a question nobody asked.
-   */
-  const [soon, setSoon] = useState<PaidTier | null>(null);
-  /* Its own flag rather than sharing `soon`: "no gateway is configured here"
-     and "the pass has no checkout yet" are different facts, and one dialog
-     answering both would be wrong for whichever reader it was not written
-     for. */
-  const [passSoon, setPassSoon] = useState(false);
+  /** Whether the "not on sale" dialog is open. */
+  const [soon, setSoon] = useState(false);
 
   const [state, checkout, pending] = useActionState<CheckoutState, FormData>(
     startCheckout,
@@ -292,9 +192,9 @@ export function Plans({
                      font-medium text-fg/80"
         >
           Every format is free, on every plan — take your book and go whenever
-          you like. {TIER_NAMES.draft} is for more than five books; every paid
-          plan adds the writing assistant, and what differs is how many credits
-          a month you get to spend on it.
+          you like. {TIER_NAMES.pro} is for more than{" "}
+          {plural(TIER_LIMITS.free.books ?? 0, "book")} and title checks without
+          a daily limit. No AI on either plan: every word is yours.
         </p>
 
         <PeriodToggle period={period} onChange={setPeriod} />
@@ -312,26 +212,7 @@ export function Plans({
           </p>
         )}
 
-        {/* **Four cards, one array, one component.**
-
-            `xl:grid-cols-4` rather than four across from `sm`: four columns at
-            768px is 190px each and every row in them wraps. The 2×2 in between
-            falls as (Free, Draft) and (Writer, Studio) — the half without the
-            assistant and the half with it — which is the right seam for the
-            pair to break on.
-
-            items-start so the featured card grows upward on its own rather
-            than stretching its neighbours to match. */}
-        {/* **`items-stretch`, which the old grid did not do.** The four cards
-            carry lists of different lengths and their buttons are the row a
-            reader compares last; equal heights plus `mt-auto` on the action is
-            what puts those four on one line. Ragged card feet under a tidy row
-            of prices reads as a layout that gave up halfway.
-
-            `xl:grid-cols-4` rather than four across from `sm`: four columns at
-            768px is 190px each and every figure in them wraps. The 2×2 in
-            between falls as (Free, Draft) and (Writer, Studio). */}
-        <div className="mt-10 grid gap-3.5 sm:grid-cols-2 sm:items-stretch xl:grid-cols-5">
+        <div className="mx-auto mt-10 grid max-w-3xl gap-3.5 sm:grid-cols-2 sm:items-stretch">
           <PlanCard
             mark={<StackIcon />}
             name={TIER_NAMES.free}
@@ -352,68 +233,23 @@ export function Plans({
             }
           />
 
-          {/* **Second, between Free and Draft, because that is what it is
-              for.** The pass is the step a reader takes when Free has shown
-              them the tool and $7.98 a month is still a bigger decision than
-              they are ready to make. Putting it at the end of the row — with
-              the plans — would file it as the cheapest subscription, which is
-              the one thing it is not. */}
           <PlanCard
-            tone="pass"
-            badge="New writers only"
-            mark={<KeyIcon />}
-            name="Starter Pass"
-            bestFor={PASS_BEST_FOR}
-            price={displayPrice(STARTER_PASS.price)}
-            note="Charged once, never renews"
-            highlights={PASS_HIGHLIGHTS}
-            replies={passReplyCounts()}
-            action={
-              /* **Honest about not being on sale yet.** The card draws because
-                 the pass is a decided product with settled numbers; the button
-                 says what is actually true, which is that there is no checkout
-                 behind it until a one-time price exists in Paddle and a webhook
-                 credits the ledger. A button that opened nothing would be the
-                 dead UI the house rules forbid, and a card quietly missing from
-                 the row would lose the argument the row is making.
-
-                 **The one-time checkout goes here** when `passOnSale()` starts
-                 answering true — one branch beside this one, the same shape as
-                 the plan buttons below. */
-              <button
-                type="button"
-                onClick={() => {
-                  notePlanInterest("pass", "once", "upgrade");
-                  setPassSoon(true);
-                }}
-                className={`w-full cursor-pointer ${PLAN_BUTTON_PLAIN}`}
-              >
-                Get the Starter Pass
-              </button>
-            }
-          />
-
-          {PAID_CARDS.map(({ tier, mark, featured }) => (
-            <PlanCard
-              key={tier}
-              tone={featured ? "featured" : "plain"}
-              badge={featured ? "Most chosen" : undefined}
-              mark={mark}
-              name={TIER_NAMES[tier]}
-              bestFor={BEST_FOR[tier]}
-              price={displayPrice(perMonthOf(tier, period))}
+              tone="featured"
+              mark={<NibIcon />}
+              name={TIER_NAMES[PRO]}
+              bestFor={BEST_FOR[PRO]}
+              price={displayPrice(perMonthOf(PRO, period))}
               note={
                 period === "annual"
-                  ? `${displayPrice(priceOf(tier, "annual"))} billed annually`
+                  ? `${displayPrice(priceOf(PRO, "annual"))} billed annually`
                   : "Billed monthly"
               }
-              highlights={highlightsFor(tier)}
-              replies={replyCountsFor(tier)}
+              highlights={highlightsFor(PRO)}
               action={
                 /* **Nothing is for sale, so nothing takes money.**
 
                    One branch above the whole ladder rather than a condition
-                   inside each of its four money-moving arms, so switching
+                   inside each of its money-moving arms, so switching
                    selling back on is deleting this and nothing else. The
                    ladder below is untouched and still correct — it is simply
                    not reached while `PLANS_ON_SALE` is false. */
@@ -421,96 +257,65 @@ export function Plans({
                   <button
                     type="button"
                     onClick={() => {
-                      notePlanInterest(tier, period, "upgrade");
-                      setSoon(tier);
+                      notePlanInterest(PRO, period, "upgrade");
+                      setSoon(true);
                     }}
-                    className={`w-full cursor-pointer ${planButton(featured)}`}
+                    className={`w-full cursor-pointer ${planButton(true)}`}
                   >
-                    Get {TIER_NAMES[tier]}
+                    Get {TIER_NAMES[PRO]}
                   </button>
-                ) : /* **Every card answers for itself now.**
-
-                   It used to be one boolean: already paying meant "Keep
-                   writing" on all three, so a Draft customer looking at Studio
-                   was told there was nothing to do — the dearest plan reading
-                   as unavailable to the person most likely to buy it.
-
-                   Four answers instead. On the plan already held, the card
-                   confirms and points at `/billing`. Above or below it, a
-                   change. With nothing held, the checkout that was always
-                   there. And on a PayHere subscription, a sentence rather than
-                   a button, because that gateway has no call that swaps a plan
-                   and a control that always fails is worse than none. */
-                current && current.tier === tier ? (
+                ) : /* **The card answers for the writer looking at it.** On Pro
+                   already, it confirms and points at `/billing`, or offers the
+                   other cycle. With nothing held, the checkout. */
+                current ? (
                   /* **The plan they are on says so, whichever cycle is showing.**
 
-                     This compared the cycle too, so a Writer on monthly who
-                     flicked the toggle to annual saw "Switch to Writer" on
+                     This compared the cycle too, so a subscriber on monthly
+                     who flicked the toggle to annual saw "Switch to Pro" on
                      their own plan — which reads as though they are not on it.
                      The tier is the plan; the cycle is how it is paid for, and
                      conflating the two put the wrong words on the one card a
                      subscriber looks at first. */
                   current.period === period ? (
-                    <Link href="/billing" className={planButton(featured)}>
+                    <Link href="/billing" className={planButton(true)}>
                       Your plan
                     </Link>
                   ) : current.provider === "paddle" ? (
                     /* Same plan, other cycle. A real change, and named as the
                        cycle change it is rather than as a plan change. */
                     <ChangePlanButton
-                      tier={tier}
+                      tier={PRO}
                       period={period}
                       label={`Switch to ${period === "annual" ? "annual" : "monthly"}`}
-                      className={planButton(featured)}
+                      className={planButton(true)}
                     />
                   ) : (
-                    <Link href="/billing" className={planButton(featured)}>
+                    /* PayHere has no call that swaps a cycle, so the card points
+                       at the one place the writer can act. */
+                    <Link href="/billing" className={planButton(true)}>
                       Your plan
                     </Link>
                   )
-                ) : current && current.provider === "paddle" ? (
-                  <ChangePlanButton
-                    tier={tier}
-                    period={period}
-                    label={`${
-                      tierAtLeast(tier, current.tier) ? "Upgrade to" : "Switch to"
-                    } ${TIER_NAMES[tier]}`}
-                    className={planButton(featured)}
-                  />
-                ) : current ? (
-                  /* PayHere. Honest about what it cannot do, and pointed at the
-                     one place the writer can act. */
-                  <p
-                    className={`font-sans text-xs leading-relaxed ${
-                      featured ? "text-surface/75" : "text-muted"
-                    }`}
-                  >
-                    To move to {TIER_NAMES[tier]}, cancel your current plan from{" "}
-                    <Link href="/billing" className="underline">
-                      billing
-                    </Link>{" "}
-                    first — it runs to the end of the period you have paid for.
-                  </p>
                 ) : provider === "paddle" && paddle ? (
                   <PaddleUpgradeButton
-                    tier={tier}
+                    tier={PRO}
                     period={period}
                     onTransaction={setCheckoutTransaction}
-                    className={planButton(featured)}
+                    className={planButton(true)}
                   />
                 ) : provider === "payhere" ? (
                   <form action={checkout}>
                     {/* Both read from the controls at submit time rather than
                         from a second piece of state on the server. */}
-                    <input type="hidden" name="tier" value={tier} />
+                    <input type="hidden" name="tier" value={PRO} />
                     <input type="hidden" name="period" value={period} />
                     <button
                       type="submit"
                       disabled={pending}
                       className={`w-full cursor-pointer disabled:cursor-default
-                                  disabled:opacity-70 ${planButton(featured)}`}
+                                  disabled:opacity-70 ${planButton(true)}`}
                     >
-                      {pending ? "Starting checkout…" : `Get ${TIER_NAMES[tier]}`}
+                      {pending ? "Starting checkout…" : `Get ${TIER_NAMES[PRO]}`}
                     </button>
                     {state.error && (
                       // On the card's own ink, not text-red: the featured
@@ -518,9 +323,7 @@ export function Plans({
                       // disappears on it.
                       <p
                         role="alert"
-                        className={`mt-3 font-sans text-xs leading-relaxed ${
-                          featured ? "text-surface/75" : "text-muted"
-                        }`}
+                        className="mt-3 font-sans text-xs leading-relaxed text-surface/75"
                       >
                         {state.error}
                       </p>
@@ -529,23 +332,22 @@ export function Plans({
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setSoon(tier)}
-                    className={`w-full cursor-pointer ${planButton(featured)}`}
+                    onClick={() => setSoon(true)}
+                    className={`w-full cursor-pointer ${planButton(true)}`}
                   >
-                    Get {TIER_NAMES[tier]}
+                    Get {TIER_NAMES[PRO]}
                   </button>
                 )
               }
             />
-          ))}
         </div>
 
-        {/* **Every claim, in full, under the four cards that summarise them.**
+        {/* **Every claim, in full, under the cards that summarise them.**
             The cards are the pitch and this is the contract — skim across the
             top, read down when you are deciding. `spotlight` tints the column
             the featured card names, so the two say the same thing about which
             plan is being recommended. */}
-        <PlanTable spotlight="writer" />
+        <PlanTable spotlight="pro" />
 
         <p className="mx-auto mt-10 max-w-xl font-sans text-sm leading-relaxed text-muted">
           Your manuscripts are yours on every plan. They are written to this
@@ -556,17 +358,15 @@ export function Plans({
 
       {soon && (
         <ComingSoonDialog
-          title={PLANS_ON_SALE ? "Plans" : TIER_NAMES[soon]}
-          onClose={() => setSoon(null)}
+          title={PLANS_ON_SALE ? "Plans" : TIER_NAMES[PRO]}
+          onClose={() => setSoon(false)}
         >
           {PLANS_ON_SALE ? (
             <>
               There is no payment gateway configured on this copy of
-              OpenChapter, so there is nothing to buy and nothing is held back —
-              the assistant is unmetered here. Once billing is configured,{" "}
-              {TIER_NAMES.draft} unlocks unlimited books and the assistant runs
-              on a monthly credit balance. Every export format is free either
-              way.
+              OpenChapter, so there is nothing to buy and nothing is held back.
+              Once billing is configured, {TIER_NAMES[PRO]} unlocks unlimited
+              books and title checks. Every export format is free either way.
             </>
           ) : (
             /* **It says the press was noted, because it was.** A button that
@@ -576,30 +376,16 @@ export function Plans({
                back is also the honest version of "we heard you" — it shows
                exactly what we wrote down. */
             <>
-              {TIER_NAMES[soon]} is not on sale yet. We have noted that you
+              {TIER_NAMES[PRO]} is not on sale yet. We have noted that you
               wanted it — that is how we decide what to switch on first, and it
               is all we record about this press. Everything free stays free
-              meanwhile: five books, unlimited chapters and words, and every
-              export format.
+              meanwhile: {plural(TIER_LIMITS.free.books ?? 0, "book")}, unlimited
+              chapters and words, and every export format.
             </>
           )}
         </ComingSoonDialog>
       )}
 
-      {passSoon && (
-        <ComingSoonDialog
-          title="Starter Pass"
-          onClose={() => setPassSoon(false)}
-        >
-          The pass is not on sale yet — it needs a one-time price set up with
-          the payment gateway before it can be bought, and we would rather show
-          you what it will be than quietly leave it off the page.{" "}
-          {STARTER_PASS.credits.toLocaleString("en-US")} credits for{" "}
-          {displayPrice(STARTER_PASS.price)}, charged once, good for{" "}
-          {STARTER_PASS.days} days, one per writer. In the meantime{" "}
-          {TIER_NAMES.draft} is the cheapest way to the assistant.
-        </ComingSoonDialog>
-      )}
     </main>
   );
 }

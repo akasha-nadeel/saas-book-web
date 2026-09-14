@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogClose } from "@/components/ui/dialog";
-import { CREDIT_COST } from "@/lib/billing/credits";
 import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
 import { ALL_CHECKS } from "@/lib/consistency";
 import { FREE_LIMITS } from "@/lib/free-limits";
@@ -46,7 +45,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     items: [
       {
         name: "The editor",
-        desc: "One chapter at a time on a page the size of the book you are making. One bar across the top: home, a File menu, undo and redo, the word count, whether it has saved, and Import and Export at the right. One rail down the left opens the chapter list, search, the consistency check, notes, ideas, your series bible, bookmarks, the assistant, versions and the trash, one at a time.",
+        desc: "One chapter at a time on a page the size of the book you are making. One bar across the top: home, a File menu, undo and redo, the word count, whether it has saved, and Import and Export at the right. One rail down the left opens the chapter list, search, the consistency check, notes, ideas, your series bible, bookmarks, versions and the trash, one at a time.",
       },
       {
         name: "Colour themes",
@@ -86,24 +85,16 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Dictation",
-        desc: "The microphone uses your browser's own speech recognition, so nothing is uploaded by us. It works in Chrome and Edge.",
+        desc: "The microphone uses your browser's own speech recognition, so nothing is uploaded by us. It works in Chrome and Edge, and Chrome sends the audio to Google to turn it into text — the privacy page says so.",
       },
     ],
   },
   {
-    title: "The writing assistant",
+    title: "No AI",
     items: [
       {
-        name: "What it does",
-        desc: `It reads the chapter you are in and answers questions about it — what is not working in a scene, whether a passage is doing what you meant. On every paid plan, and on a free account holding credits.`,
-      },
-      {
-        name: "Quick, Careful and Deep",
-        desc: `Three models, one balance. Quick answers straight away and costs ${CREDIT_COST.quick} credits; Careful thinks first, for ${CREDIT_COST.careful}; Deep takes the longest and costs ${CREDIT_COST.deep}. ${TIER_NAMES.draft} includes ${TIER_LIMITS.draft.creditsPerMonth.toLocaleString("en-US")} credits a month, ${TIER_NAMES.writer} ${TIER_LIMITS.writer.creditsPerMonth.toLocaleString("en-US")} and ${TIER_NAMES.studio} ${TIER_LIMITS.studio.creditsPerMonth.toLocaleString("en-US")}. Spend them however you like. Unused credits do not carry over into the next month. Usage in the account menu shows what is left.`,
-      },
-      {
-        name: "Letting it write into the chapter",
-        desc: "Off by default. With it on, a reply that offers one passage is put into the chapter rather than handed to you as a button — the page scrolls to it and it stays lit until your next keystroke. It goes where your selection or cursor is, never somewhere the assistant picked, and if a reply offers more than one passage you choose between them as before. One undo takes the whole change back, and the chapter as it stood is kept in Versions first.",
+        name: "Nothing writes for you",
+        desc: "OpenChapter has no AI. There is no assistant, nothing is generated, and no part of your book is sent to a language model. Every word in it is yours.",
       },
     ],
   },
@@ -125,23 +116,15 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     items: [
       {
         name: TIER_NAMES.free,
-        desc: `Free, no card. ${TIER_LIMITS.free.books} books, unlimited chapters and words, importing, syncing, every export format, and ${FREE_LIMITS.titleCheck.free} title checks a day. No writing assistant.`,
+        desc: `Free, no card. ${TIER_LIMITS.free.books} ${TIER_LIMITS.free.books === 1 ? "book" : "books"}, unlimited chapters and words, importing, syncing, every export format, and ${FREE_LIMITS.titleCheck.free} title checks a day.`,
       },
       {
-        name: TIER_NAMES.draft,
-        desc: `Everything on Free, with unlimited books, unlimited title checks, and the writing assistant on ${TIER_LIMITS.draft.creditsPerMonth.toLocaleString("en-US")} credits a month.`,
-      },
-      {
-        name: TIER_NAMES.writer,
-        desc: `Everything in ${TIER_NAMES.draft}, with ${TIER_LIMITS.writer.creditsPerMonth.toLocaleString("en-US")} credits a month.`,
-      },
-      {
-        name: TIER_NAMES.studio,
-        desc: `Everything in ${TIER_NAMES.writer}, with ${TIER_LIMITS.studio.creditsPerMonth.toLocaleString("en-US")} — for a writer leaning on the assistant daily.`,
+        name: TIER_NAMES.pro,
+        desc: "Everything on Free, with unlimited books and unlimited title checks.",
       },
       {
         name: "Not on sale yet",
-        desc: "The paid plans cannot be bought at the moment. Pressing one tells us which plan you wanted, so we know what to open first — and everything free stays free meanwhile.",
+        desc: `${TIER_NAMES.pro} cannot be bought at the moment. Pressing it tells us you wanted it, so we know to open it — and everything free stays free meanwhile.`,
       },
       {
         name: "Cancelling",
@@ -158,7 +141,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "What leaves this machine",
-        desc: "The writing assistant sends the open chapter with your question. PDF export sends the book to our server to be laid out; Word and EPUB are built here. The title check sends only the words you typed. The privacy page names every one of these.",
+        desc: "PDF export sends the book to our server to be laid out; Word and EPUB are built here. The title check sends only the words you typed, and voice typing in Chrome sends your voice to Google. The privacy page names every one of these.",
       },
       {
         name: "Taking it with you",

@@ -771,8 +771,8 @@ const ORDER_STATIONS: Station[] = PHASES.filter(
  */
 const REFUSALS = [
   [
-    "We will not design your cover or edit your prose with AI",
-    "The assistant never changes your book on its own: it offers a passage, shows you exactly what would change, and waits for you to press. Nothing is rewritten behind your back and one undo puts your words back. The cheap way to build covers and editing is generative, and doing it would make liars of us in front of the one audience that checks. If those ever exist here, they come from real designers and real editors.",
+    "We will not put AI anywhere near your book",
+    "No assistant, no generated covers, no machine editing. Nothing is rewritten behind your back, because nothing in the app writes. The cheap way to build covers and editing is generative, and doing it would make liars of us in front of the one audience that checks. If those ever exist here, they come from real designers and real editors.",
     "We will check the cover you already have",
     "Dimensions, shape, weight and contrast against what a shop refuses, and a shelf of the covers already selling in your genre to set yours beside. Then a count of what is in your prose, with none of it changed.",
   ],
@@ -1191,9 +1191,9 @@ const FAQ: [question: string, answer: React.ReactNode][] = [
   [
     "Do you train AI on my manuscript?",
     <>
-      <Em>No.</Em> The assistant receives only the single chapter you hand it,
-      at the moment you ask, and{" "}
-      <Em>it is not used to train a model afterwards.</Em>
+      <Em>No.</Em> There is no AI in OpenChapter, so{" "}
+      <Em>nothing you write is ever sent to a model</Em>, to answer a question
+      or to train one.
     </>,
   ],
   [
@@ -1473,8 +1473,7 @@ export function LandingPage() {
                   And *do it* rather than *fix it*, which was the first draft:
                   "it" attaches to the nearest noun, and the nearest noun is
                   "your book" — so "we'll fix it" read as *we will edit your
-                  manuscript*, which is the thing the assistant is famously not
-                  allowed to do. Nobody *does* a book, so the verb pins the
+                  manuscript*, which is the thing this app refuses to do. Nobody *does* a book, so the verb pins the
                   reference to the upload instead.
 
                   `box-decoration-break: clone` is not optional — a marked span

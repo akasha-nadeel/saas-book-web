@@ -16,7 +16,7 @@ Tiptap marks, pagination, click-to-type and image-resize arithmetic (the last
 of these being where the zoom correction a drag needs is held still), the reading view's bound
 page list (`reader/bound-pages.ts`, which is how the export wizard's Preview and
 the file are held to one answer), caret scrolling,
-narration chunking, transcript paragraphing, publishing details and the ISBN
+publishing details and the ISBN
 check digit, the billing price/cycle arithmetic, PayHere's two MD5s and
 Paddle's status mapping, the
 account fallbacks and the `?next=` redirect guard, ambience, relative time,

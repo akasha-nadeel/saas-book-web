@@ -48,57 +48,30 @@ import { DialogClose } from "@/components/ui/dialog";
  * on both plans now, so the refusal it headlined cannot happen. Gone rather
  * than left as a dialog for a state the app has no way to reach.
  */
-export type UpgradeReason =
-  | "books"
-  | "restore"
-  | "assistant"
-  | "assistant-write";
+export type UpgradeReason = "books" | "restore";
 
 /**
  * Which plan each refusal is answered by.
  *
- * **The whole point of the map.** Every one of these used to sell the single
- * paid plan, because there was one. Selling the $14.98 plan to somebody who
- * wanted a sixth book reads as a paywall rather than an answer — the sixth book
- * is $5.98, and saying so is both cheaper for them and more likely to convert.
- *
- * So every refusal sells Draft, and the dialog's right-hand column is that
- * plan's own rows out of `ROWS`.
- *
- * **The two assistant reasons sold Writer until credits arrived**, when Draft
- * gained a grant and write mode with it. Draft is now the cheapest answer to
- * all four refusals — which is the point of the map rather than a collapse of
- * it: `SELLS` exists so the answer follows the plan table, and it will part
- * again the moment a tier is sold something Draft does not carry.
+ * Pro, since 2026-09-14 — it is the only paid plan. The map stays so the answer
+ * follows the plan table rather than being written into each headline, and so
+ * a second plan would have one place to be chosen in.
  */
 const SELLS: Record<UpgradeReason, PaidTier> = {
-  books: "draft",
-  restore: "draft",
-  assistant: "draft",
-  "assistant-write": "draft",
+  books: "pro",
+  restore: "pro",
 };
 
-/* **Each headline names the plan it is selling.** They said "Pro" while there
-   was one paid plan; with four, a writer refused the assistant and told about
-   book limits has been answered by the wrong door — and a Draft writer told
-   "Free carries five books" has been told something that is not about them. */
+/* **Each headline names the plan it is selling**, and the count it quotes is
+   read from `TIER_LIMITS`, which the book trigger mirrors. */
 const HEADLINES: Record<UpgradeReason, { lead: string; title: string }> = {
   books: {
     lead: "Your shelf is full.",
-    title: `Free carries ${plural(TIER_LIMITS.free.books ?? 0, "book")}. ${TIER_NAMES.draft} carries as many as you write.`,
+    title: `Free carries ${plural(TIER_LIMITS.free.books ?? 0, "book")}. ${TIER_NAMES.pro} carries as many as you write.`,
   },
   restore: {
     lead: "There is no room to put this one back.",
-    title: `Free carries ${plural(TIER_LIMITS.free.books ?? 0, "book")}. ${TIER_NAMES.draft} carries as many as you write.`,
-  },
-  assistant: {
-    lead: "The writing assistant runs on credits.",
-    title: `${TIER_NAMES.draft} includes ${TIER_LIMITS.draft.creditsPerMonth.toLocaleString("en-US")} a month. It reads the chapter you are in and answers about it, without the manuscript leaving your machine for anything else.`,
-  },
-  "assistant-write": {
-    lead: `The assistant can read your chapter. Writing into it starts at ${TIER_NAMES.draft}.`,
-    title:
-      "Offer a passage, see exactly what would change, and put it in with one press.",
+    title: `Free carries ${plural(TIER_LIMITS.free.books ?? 0, "book")}. ${TIER_NAMES.pro} carries as many as you write.`,
   },
 };
 
@@ -153,13 +126,6 @@ const icons = {
       <path d="M3 20v-4.5h4.5" />
     </Svg>
   ),
-  assistant: (
-    <Svg>
-      <path d="M21 12a8 8 0 0 1-8 8H4l1.7-3.4A8 8 0 1 1 21 12Z" />
-      <path d="M9 11h6" />
-      <path d="M9 14.5h3.5" />
-    </Svg>
-  ),
   word: (
     <Svg>
       <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" />
@@ -205,10 +171,6 @@ const ROW_ICON: Record<string, React.ReactNode> = {
   Export: icons.word,
   "Title check": icons.books,
   "Consistency check": icons.everything,
-  "Writing assistant": icons.assistant,
-  "Credits a month": icons.assistant,
-  "Replies a month": icons.assistant,
-  "Writes into your chapter": icons.assistant,
 };
 
 /**
@@ -216,8 +178,8 @@ const ROW_ICON: Record<string, React.ReactNode> = {
  *
  * **This is the whole reason for the change.** The dialog carried two
  * hand-written lists — its own words, its own order, its own claims — beside a
- * `plan-rows.ts` written expressly to stop that happening. They described two
- * plans in a four-plan product, and would have gone on disagreeing with
+ * `plan-rows.ts` written expressly to stop that happening. They described plans
+ * the product no longer sold, and would have gone on disagreeing with
  * `/upgrade` on the two screens a buyer reads back to back.
  *
  * Rows the plan does not include are dropped rather than crossed: a column
@@ -309,8 +271,7 @@ export function UpgradeDialog({
   reason: UpgradeReason;
   /**
    * What the writer is on now. The left column is their own plan rather than
-   * always Free — a Draft writer refused the assistant is not being shown what
-   * Free carries.
+   * always Free, so the dialog cannot describe a plan the writer is not on.
    *
    * Defaults to `free` so a caller that has not got a plan yet still renders
    * something true rather than nothing.

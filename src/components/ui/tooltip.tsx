@@ -55,9 +55,8 @@ export function Tooltip({
    *
    * **Off by default, which reverses the rail's setting on purpose.** The rails
    * label buttons with a word or two and have the whole window to spill into. A
-   * tooltip beside a 240px panel does not: *"Letting the assistant write into
-   * your chapter is part of Pro"* on one line is a card wider than the panel it
-   * belongs to.
+   * tooltip beside a 240px panel does not: a sentence-long label on one line
+   * is a card wider than the panel it belongs to.
    */
   nowrap?: boolean;
   /**

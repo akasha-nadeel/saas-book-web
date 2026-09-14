@@ -57,7 +57,7 @@ so these are designed at about 770px, the hero is capped at `max-w-4xl` and the
 export window at `max-w-5xl`. If a figure ever moves into a different slot, the
 thing to change is the slot, not one font size inside the drawing.
 
-**What is read rather than typed**: `LAUNCH_LIMITS` (books, assistant replies),
+**What is read rather than typed**: `LAUNCH_LIMITS` (books),
 `plans.ts` (both prices, the per-month figure and the saving), `IMPORT_FORMATS`,
 `MAX_SNAPSHOTS`, `DESTINATIONS`, `LEGAL_PAGES`, `REFUND_DAYS` and
 `CONTACT_EMAIL`. The limits matter most: the same `LAUNCH_LIMITS` is read by the

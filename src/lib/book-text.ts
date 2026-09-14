@@ -1,6 +1,5 @@
 import type { JSONContent } from "@tiptap/react";
 
-import { proseFrom } from "@/lib/comps/rank";
 import type { BookText } from "@/lib/consistency";
 import { toBlocks, type Block } from "@/lib/export/blocks";
 import {
@@ -49,6 +48,24 @@ import {
  * answers `null` for every chapter until `loadFromDisk()` resolves, so an
  * ungated call reports on a book of empty chapters.
  */
+/**
+ * A chapter's prose as plain text, with its paragraphs still in it.
+ *
+ * Through the export path's blocks rather than `chapterText()` from search.ts,
+ * which collapses all whitespace: that is right for a search index and wrong
+ * for any check that is about a paragraph.
+ *
+ * Images are dropped rather than described. A `data:` URL is a megabyte of
+ * base64 that spells nothing, and it is the writer's picture.
+ */
+export function proseFrom(blocks: readonly Block[]): string {
+  return blocks
+    .filter((block) => block.kind !== "image")
+    .map((block) => block.runs.map((run) => run.text).join("").trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 export function bookTextOf(book: Book): BookText[] {
   return readable(book).map((chapter) => {
     const raw = getBody(chapter.id);

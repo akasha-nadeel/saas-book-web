@@ -27,8 +27,7 @@
  *
  * **No `"use client"`, and that is not the same as being a Server Component.**
  * Nothing here holds state or an effect — a row that needs a handler takes one
- * from a caller that has already declared the directive. See
- * `assistant-reply.tsx`, which documents the same arrangement.
+ * from a caller that has already declared the directive.
  */
 
 /**

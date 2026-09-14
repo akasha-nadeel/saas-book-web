@@ -7,8 +7,8 @@ Read before touching `src/lib/import/`, `split.ts`, `metadata.ts`, `cover.ts`, o
 > Cross-references reading "above", "below" or "the note in the styling section" may now
 > point at a sibling file in `docs/` -- see the table in CLAUDE.md.
 
-- Import: `src/lib/import/` — docx, epub, md, txt, html, plus audio via the
-  transcriber. `index.ts` dispatches by extension and refuses `.doc`/`.pdf` *by
+- Import: `src/lib/import/` — docx, epub, md, txt, html. (Audio via a
+  transcriber went with the AI on 2026-09-14.) `index.ts` dispatches by extension and refuses `.doc`/`.pdf` *by
   name* with what to do instead; `split.ts` breaks a flat block stream into
   chapters.
 

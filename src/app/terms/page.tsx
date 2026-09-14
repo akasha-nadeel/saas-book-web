@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { CREDIT_COST } from "@/lib/billing/credits";
 import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
 import Link from "next/link";
 import { LegalPage, List, Note, Section, Term } from "@/components/legal/legal-shell";
 import { displayPrice, priceOf } from "@/lib/billing/plans";
 import { plural } from "@/lib/plural";
+import { FREE_LIMITS } from "@/lib/free-limits";
 import {
   CONTACT_EMAIL,
   COUNTRY,
@@ -16,7 +16,7 @@ import {
 export const metadata: Metadata = {
   title: "Terms · OpenChapter",
   description:
-    "The terms of using OpenChapter: your account, your book, the four plans, and what each side is responsible for.",
+    "The terms of using OpenChapter: your account, your book, the two plans, and what each side is responsible for.",
 };
 
 export default function TermsPage() {
@@ -37,8 +37,8 @@ export default function TermsPage() {
       <Section title="2. What the service is">
         <p>
           {TRADING_NAME} is a web application for authors writing books. It
-          helps you create and organize books, write chapter by chapter, use a
-          focused writing assistant, and export book files. It is software
+          helps you create and organize books, write chapter by chapter, check
+          them, and export book files. It has no AI features. It is software
           delivered over the web. There are no physical goods and nothing is
           shipped.
         </p>
@@ -58,7 +58,7 @@ export default function TermsPage() {
           ownership, no licence to publish it, and no share of what it earns.
         </p>
         <Note>
-          Nothing you write is used to train any model. Where a feature sends
+          Nothing you write is sent to an AI model or used to train one. Where a feature sends
           text to a third party, the{" "}
           <Link href="/privacy" className="text-lp-accent-text hover:underline">
             privacy policy
@@ -71,30 +71,21 @@ export default function TermsPage() {
         <p>
           The Free plan includes {plural(TIER_LIMITS.free.books ?? 0, "book")},
           unlimited chapters and words, autosave and sync where accounts are
-          configured, and Word, EPUB and PDF export. It does not include the
-          writing assistant.
+          configured, Word, EPUB and PDF export, and {FREE_LIMITS.titleCheck.free}{" "}
+          title checks a day.
         </p>
         <p>
-          Every paid plan adds unlimited books and the writing assistant, which
-          runs on credits: a reply costs {CREDIT_COST.quick},{" "}
-          {CREDIT_COST.careful} or {CREDIT_COST.deep} credits depending on which
-          model you ask.{" "}
-          {TIER_NAMES.draft} includes{" "}
-          {TIER_LIMITS.draft.creditsPerMonth.toLocaleString("en-US")} credits a
-          month, {TIER_NAMES.writer}{" "}
-          {TIER_LIMITS.writer.creditsPerMonth.toLocaleString("en-US")} and{" "}
-          {TIER_NAMES.studio}{" "}
-          {TIER_LIMITS.studio.creditsPerMonth.toLocaleString("en-US")}. Unused
-          monthly credits do not carry over. Every export format is included on
-          every plan, paid or not.
+          {TIER_NAMES.pro} adds unlimited books and unlimited title checks. Every
+          export format is included on every plan, paid or not.
         </p>
         <p>
-          {TRADING_NAME} paid plans run from{" "}
-          {displayPrice(priceOf("draft", "monthly"))} to{" "}
-          {displayPrice(priceOf("studio", "monthly"))} a month, or{" "}
-          {displayPrice(priceOf("draft", "annual"))} to{" "}
-          {displayPrice(priceOf("studio", "annual"))} a year; the{" "}
+          {TRADING_NAME} {TIER_NAMES.pro} costs{" "}
+          {displayPrice(priceOf("pro", "monthly"))} a month or{" "}
+          {displayPrice(priceOf("pro", "annual"))} a year; the{" "}
           <Link href="/upgrade" className="text-lp-accent-text hover:underline">
+            plans page
+          </Link>{" "}
+          carries both.          <Link href="/upgrade" className="text-lp-accent-text hover:underline">
             plans page
           </Link>{" "}
           carries each one. Both cycles renew automatically
@@ -118,7 +109,7 @@ export default function TermsPage() {
           items={[
             "Upload work you do not have the right to use.",
             "Use the service for anything unlawful.",
-            "Resell access, share one account between several writers, or run metered features on somebody else's behalf as a service.",
+            "Resell access, share one account between several writers, or run the service on somebody else's behalf.",
             "Attack the service, automate paid routes, or try to bypass plan checks.",
           ]}
         />
@@ -131,7 +122,7 @@ export default function TermsPage() {
       <Section title="7. Services we rely on">
         <p>
           The app uses other companies for hosting, database and sign-in,
-          payments, and the language model behind the writing assistant. What
+          payments, email, and the book catalogues the title check searches. What
           each one receives is listed in the privacy policy. We choose them and
           we are answerable for them, but we cannot promise the behaviour of a
           service we do not run.
