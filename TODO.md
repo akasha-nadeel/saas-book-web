@@ -1246,6 +1246,25 @@ anyone in.
 whole book nobody has selected), the assistant editing a chapter it is not open
 on, and anything that applies a change without showing it first.
 
+*Amended 2026-09-14, and this supersedes the two paragraphs above.* **AI is ruled
+out entirely, not just for covers and editing.** The owner decided OpenChapter is
+an AI-free app and says so publicly, so the writing assistant, its write mode,
+every model route (blurb critique and workshop, keyword suggestions and chat,
+categories, comps ranking and query translation, narration, transcription), the
+credit ledger and the Starter Pass were deleted — code, SQL, copy and the two
+SDK dependencies. The three paid plans, which differed only by credits, became
+one: **Pro, $5.99 a month or $49.99 a year, for unlimited books and unlimited
+title checks; Free keeps one book and two title checks a day.** Voice typing
+stays, because it is the browser's own speech feature rather than ours, and the
+FAQ and `/privacy` say where its audio goes. The decision, the competitor
+pricing research and what the owner still has to do in Paddle, Vercel and
+Supabase are in `docs/plans/2026-09-14-ai-free-pro-plan-design.md`.
+
+*Now ruled out under this entry:* any model call, AI SDK, assistant, generated
+text, AI covers, AI editing, AI narration or transcription. "No AI" is a claim
+on the landing page, the pricing cards, the FAQ, the Help dialog, `/terms` and
+`/privacy`, so re-proposing one of these is re-proposing the pitch.
+
 **No API exists for these, whatever anyone sells you.** Amazon has no public API
 for KDP sales *or* for keywords — which is why the money feature reads the
 spreadsheet KDP already lets you download, and why keyword research is not on
@@ -3228,8 +3247,12 @@ one."* That is the test to hold every tool to as it comes off
 ### Ideas to bank, roughly by how often the category asks for them
 
 1. **Worldbuilding that is not a form.** Every tool he rated 8.5 or above has
-   one — Codex, objects, a wiki. `bible.ts` is built and tested; it is on
-   `HIDDEN_BOOK_TOOL_PATHS`.
+   one — Codex, objects, a wiki. `bible.ts` is built and tested, and **it is
+   live** — the Story Bible is one of the eleven left-panel tabs in the editor
+   (`panel-tabs.ts`), not a gated route. This line used to say it was on
+   `HIDDEN_BOOK_TOOL_PATHS`; it is not, and the set holds fifteen entries none
+   of which is `bible`. What is missing is not the feature but its depth — see
+   the WriteO section below.
 2. **A visual board.** Scene cards dragged into columns. It is the whole of
    Milanote's 8, and the half-point Lattics lost for feeling unimmersive.
 3. **Atmosphere per book.** Cover art as a page header, a colour that says
@@ -3247,6 +3270,110 @@ one."* That is the test to hold every tool to as it comes off
 **Three of those six are things already written and switched off** (1, 4, and
 arguably 5), which makes them the cheapest items on any roadmap here. See
 `LAUNCH_POST_BACKLOG` for the order they were meant to come back in.
+
+### WriteO — the fastest-growing competitor, and the 22 things it has that we do not
+
+Added 2026-09-07, from a session spent inside the live app (signed in, every
+screen opened) plus its marketing site, blog, pricing and TikTok. **The feature
+list below is observed, not read off a marketing page.** The traffic reading is
+the writer's own Similarweb-style panel on `studio.writeo.app`: **May 2026 ≈ 0
+→ June ≈ 5K → July 37.4K monthly visits**, bounce 17.13%, 11.88 pages a visit,
+average visit 10:54. Those last three are what make it worth a section — on an
+*app* subdomain that is not drive-by traffic, it is people who signed up and
+stayed.
+
+**Why it grew, in the order the evidence supports it.** Their Product Hunt
+listing from 2025 says *"AI Powered Novel Management App"*; their TikTok in
+2026 says, in capitals, **"NO AI."** That is a deliberate reversal and it
+landed in the middle of BookTok's anti-AI moment. The account has ~7,400
+followers against ~215,000 likes, a ratio that only happens when videos escape
+the follower base. Underneath it, an SEO blog switched on **23 May 2026** —
+*"Scrivener Alternative Free"*, *"Best Free Writing Software for Fantasy
+Writers 2026"*, *"How to Write Romantasy"* — which is exactly the month the
+curve leaves zero. **This is inference from dated public artefacts, not their
+analytics**, and "0" in May may only mean the tracker had no data yet.
+
+**Their positioning is not ours to copy and that is the point of writing it
+down.** "NO AI" is their strongest hook, but it is a stance rather than a
+feature, and it is the opposite of the bet this app makes. It is a thing to
+have an answer for, not a thing to adopt. What *is* worth taking is everything
+below, none of which needs a model.
+
+#### The gap, by how loudly their users praise it
+
+Tier is pull, not effort. "Half-built" means we hold part of it already.
+
+| # | Feature | Why it is loved | Where we stand |
+|---|---|---|---|
+| 1 | **Relationship map** — drag-and-drop character graph, categories (family, romantic, conflict, alliance, hierarchy, supernatural, professional), intensity, **secret-relationship toggle**, evolves by chapter, exports as an image | Their most-shared feature, and visual, so it screenshots. Nothing else free has it | Missing entirely |
+| 2 | **Character profiles with custom fields** — your own sections (*secret, wound, power, goal, faction*), roles, portraits, per-character chapter and mention counts | Everyone keeps this in a messy doc; structured and beside the draft is the thing they say they wanted | **Half-built.** `bible.ts` has name, `aka[]` and one free-text `detail`. No custom fields, roles or avatars |
+| 3 | **Names highlighted in the prose** — type a name, it lights; hover opens the profile; sidebar lists who is in *this* chapter with counts. Plus "never guess identities" for shared names and a corrections list | Zero setup, instant payoff, no model. The "oh, nice" moment of their onboarding | **Half-built.** `mentionedIn()` already counts alias-aware, and reads **across a series**, which theirs does not. Missing the decoration and the hover card |
+| 4 | **Cover designer** — Canva-style canvas (templates, text, elements, shapes, backdrop, layers), bleed/trim/safe guides, genre element library (Love, Magic, Distress, Paper, Victorian scrollwork) | The most visual thing they own, and now their lead hook on video | Our covers tool is gated *and* is not a canvas |
+| 5 | **3D book mockup** — one view mode rendering the cover as a 3D book | Free advertising. Mockups are among the most-posted images in this audience | Missing. Small build, high marketing return |
+| 6 | **Book Designer** — live page spreads, whole-book typography, drop caps, front-matter toggles, chapters as Chapter/Section/Merged, **stays synced to the manuscript** | Closes the loop; no other writing app takes you to a print file | We have export and typesetting, no interactive designer |
+| 7 | **Print preflight for KDP / IngramSpark** — presets, bleed 0.125″, crop marks, and a live check: *"Inside margin 0.875″ (KDP needs 0.375″ at 3 pages)"* | Removes the most opaque part of self-publishing. Low glamour, high trust | Missing — but it is the exact shape `storeReadiness()` already has |
+| 8 | **Spine width calculator** — page count × paper stock, warning *"under ~1/16″ printers can't print text on it (needs ~100+ pages)"* | Nobody does this by hand; it is the commonest KDP cover rejection | Missing. Pure arithmetic |
+| 9 | **"Clean"** — smart quotes, dashes/ellipses, doubled and trailing spaces, empty paragraphs. Each with a count, a Fix, clickable to jump, all undoable | Fixes the exact mess everyone has after pasting from Word. Feels professional, no model touched a word | Missing. Best effort-to-love ratio on this list |
+| 10 | **Prose insights** — readability, longest sentence, most-used words (click one to find every use), **crutch words** (`that·8 then·4 very·1`), **adverb %** | An editor's pass with nothing generated | **Built but gated** — the prose tool covers most of it. Crutch words are new |
+| 11 | **Streaks, XP, Author Levels** — day streak, "Page Dreamer → 100 XP till Ink Apprentice", 365-day heatmap, public Rankings | A reason to open the app on a day you do not feel like writing. Writing is a habit problem before it is a tooling one | Progress tool is **built but gated**; XP, levels and rankings are new |
+| 12 | **The Living Shelf / "Your Writing Desk"** — a drawn shelf with a candle, spines that **thicken as you write**, empty slots reading *"the one you keep meaning to write…"*, a customisable desk | Writers are a romantic audience and want the ritual. A desk gets screenshotted; a dashboard gets forgotten. It is why sessions run ~11 minutes | Missing. Design work, not engineering — and the hardest thing here to copy |
+| 13 | **Moodboard** — freeform image/colour canvas, openable **from inside the editor** | Fantasy and romance writers already keep Pinterest boards; this removes a tab | Missing. Idea 2 in the list above is the same want |
+| 14 | **Scenes inside chapters, with POV** — each scene a focused space with its own POV and save state; "split at scene breaks" splits an existing chapter | POV tracking is a real craft need in multi-POV fiction and almost nothing free does it | Missing. Touches the editor's data model |
+| 15 | **Worlds** — locations, factions, lore as their own layer; scenes tag a location; novels link to a world | The loudest fantasy-writer complaint about generic tools | **Half-built.** `bible.ts` has a `place` kind; no linking, no world layer |
+| 16 | **Notes with structure** — status (Critical / To-do), tags, linked to specific **chapters and characters**, filterable | "Never lose an idea" — research stops living in phone notes | **Half-built.** We have Notes and Ideas without status, tags or links |
+| 17 | **Chapter status + three views** — status on each chapter, list / column / grid | Lets a plotter see the shape of the book at a glance | Missing |
+| 18 | **Volumes and subchapters** | Series writers and doorstoppers hit this wall everywhere else | Missing. A grouping layer on the chapter list |
+| 19 | **Personalised onboarding** — a signup quiz that changes the starter chapter (*"You told us you like to plan, so jot your beats first"*) | Feels like the app listened; drives their 11.88 pages a visit | Missing |
+| 20 | **"Your first wins"** — create novel → write first words → create character → map a relationship | Walks a new writer into the differentiator instead of leaving them on a blank page | Missing |
+| 21 | **Public feature-request board**, voting, in the main nav | Makes users feel like co-owners and buys enormous patience for bugs | Missing. We have a private suggestion box by design — see the feedback rule |
+| 22 | **"EARLY ACCESS v0.9.6.3" badge** in the nav | Reframes rough edges as *you are early* rather than *this is unfinished*, and gives a reason to tell friends now | Missing. Trivial |
+
+#### The four to build first
+
+Chosen on one rule: **deterministic, no model, and sitting beside code that
+already exists.** None of them needs a design system we do not have.
+
+1. **"Clean"** (#9) — a new pure module in `src/lib/` beside `search.ts` and
+   `typography.ts`, with its own test. Surfaces as a left-panel tab, so it is a
+   line in `panel-tabs.ts`. Fixes apply as **one transaction** so a single undo
+   reverts them, which is the rule the assistant's write mode already follows.
+   Counts rather than scores, so the no-invented-number rule is safe.
+2. **Spine calculator** (#8) — pure module read by `export/cover-save.ts` and
+   the paperback tool; page count already falls out of `page-breaks.ts`.
+3. **Print preflight** (#7) — extends `publishing.ts` on the `storeReadiness()`
+   pattern, which already reports what a shop refuses without vetoing the
+   export. Findings must flow through `findingsFrom` in `checkup.ts` so the
+   dashboard words them once — **and every new field needs its `DESTINATIONS`
+   entry**, or the finding lands as a dead end and that test fails.
+4. **Names highlighted in the prose** (#3) — a Tiptap decoration in
+   `src/lib/editor/`, built like `pagination.ts`: **decorations only, never
+   document content**, so undo, autosave and export all see the same text. The
+   hover card follows `BarMenu`'s placement and portal rules.
+
+2 and 3 together are what let the paperback tool make a claim it currently
+cannot. 1 is days. 4 is the only one of the four that is more than a week.
+
+#### What they get wrong, and what it confirms
+
+**Their money is behind the export button.** Designing is free and unlimited;
+the file is not. The dialog reads *"Your export pool is empty. Design as many
+chapters as you like for free. Upgrade to PRO or Lifetime for monthly export
+credits, or buy export credits directly."* PRO is $7.49/month **and** credits
+are separately consumable, so a subscriber who runs out mid-month pays twice.
+
+That is the rule recorded under **Billing** and answered on 2026-08-27, being
+broken by the fastest-growing app in the category — and it is the second time
+this document has watched a competitor do it (Storywriter Pro, 5.5, above).
+**It is the argument against ever reversing `freeExports` again**, and it is
+the sharpest thing we can say against them.
+
+Two smaller openings. Their cover tool has **no stock art and no AI art** — the
+backdrop is a colour, a gradient or your own image, and the templates are
+wireframes, not designs — so a writer arriving from a video promising it
+"designs your whole book" finds a layout tool and still needs artwork. And
+their characters and bible are **per-novel**; ours read across a series with
+transitive alias merging (`series.ts`), which is the one place we are already
+ahead on their flagship feature.
 
 ## Known rough edges
 
