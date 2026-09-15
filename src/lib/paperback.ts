@@ -22,11 +22,20 @@
  * that the template you were sent is the one you asked for.
  */
 
-/** Paper stocks, and how thick one page of each is, in inches. KDP's figures. */
+/**
+ * Paper stocks, and how thick one page of each is, in inches. KDP's figures.
+ *
+ * Checked against KDP's "Create a Paperback Cover" page on 2026-09-15. There
+ * are two colour stocks and they are not the same thickness: standard colour
+ * is printed on the white paper's weight, premium colour on a heavier one. This
+ * held a single "Colour" at the premium figure, which gave a standard-colour
+ * book a spine too wide by about a twentieth of an inch at 300 pages.
+ */
 export const PAPER = {
   white: { label: "White", perPage: 0.002252 },
   cream: { label: "Cream", perPage: 0.0025 },
-  colour: { label: "Colour", perPage: 0.002347 },
+  standardColour: { label: "Standard colour", perPage: 0.002252 },
+  premiumColour: { label: "Premium colour", perPage: 0.002347 },
 } as const;
 
 export type PaperStock = keyof typeof PAPER;
@@ -51,12 +60,28 @@ const GUTTER_TABLE: [number, number][] = [
 /** Bleed, on each edge that runs off the page. */
 export const BLEED = 0.125;
 
-/** The least KDP accepts on the outside edges of an interior page. */
+/** The least KDP accepts on the outside edges of an interior page with no bleed. */
 export const OUTSIDE_MARGIN_MIN = 0.25;
 
-/** The fewest and most pages KDP will bind. */
+/** The same edges when the interior has bleed. KDP's table, checked 2026-09-15. */
+export const OUTSIDE_MARGIN_BLEED_MIN = 0.375;
+
+/**
+ * The fewest and most pages KDP will bind.
+ *
+ * 828 is the ceiling of KDP's margin table; its trim-size table lowers it for
+ * some sizes and papers, so the problem below says "at most", not "exactly".
+ */
 export const MIN_PAGES = 24;
 export const MAX_PAGES = 828;
+
+/**
+ * The fewest pages a spine may carry text on.
+ *
+ * KDP's own rule: below 79 pages a cover with spine text is rejected. It
+ * replaces a guess drawn from how wide the spine looked on screen.
+ */
+export const SPINE_TEXT_MIN_PAGES = 79;
 
 export interface PaperbackSpec {
   pages: number;
@@ -65,6 +90,8 @@ export interface PaperbackSpec {
   spine: number;
   gutter: number;
   outsideMargin: number;
+  /** Whether KDP allows text on the spine at this page count. */
+  spineText: boolean;
   /** The full wrap: back cover, spine and front, plus bleed all round. */
   coverWidth: number;
   coverHeight: number;
@@ -94,7 +121,7 @@ export function paperbackSpec(
     );
   } else if (pages > MAX_PAGES) {
     problems.push(
-      `${pages} pages. The most that can be bound is ${MAX_PAGES}; past that a book has to become two volumes.`,
+      `${pages} pages. KDP binds at most ${MAX_PAGES}, and fewer at some trim sizes and papers; past that a book has to become two volumes.`,
     );
   }
 
@@ -108,6 +135,7 @@ export function paperbackSpec(
     spine,
     gutter,
     outsideMargin: OUTSIDE_MARGIN_MIN,
+    spineText: safePages >= SPINE_TEXT_MIN_PAGES,
     // Back and front side by side with the spine between, and bleed on all
     // four outer edges — so the width gains two bleeds and so does the height.
     coverWidth: trimWidth * 2 + spine + BLEED * 2,

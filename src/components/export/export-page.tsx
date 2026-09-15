@@ -848,6 +848,7 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
                       chapter: sampleTitle,
                       author: book.author,
                     }}
+                    bookId={bookId}
                     onPick={pick}
                     manuscript={manuscript}
                     onManuscript={setManuscript}
@@ -1066,6 +1067,7 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
       {done && (
         <ExportDoneDialog
           done={done}
+          bookId={bookId}
           onClose={() => setDone(null)}
         />
       )}
@@ -1350,12 +1352,15 @@ function TopBar({
 function FormatStep({
   output,
   book,
+  bookId,
   onPick,
   manuscript,
   onManuscript,
 }: {
   output: Format | null;
   book: PreviewBook;
+  /** For the writing record's link, which belongs to the book, not the preview. */
+  bookId: string;
   onPick: (value: Format) => void;
   manuscript: boolean;
   onManuscript: (on: boolean) => void;
@@ -1448,6 +1453,29 @@ function FormatStep({
           </Note>
         </div>
       )}
+
+      {/* **The writing record, beside the formats rather than among them**
+          (2026-09-15). It is a file a writer takes out of here too, but it is
+          not a copy of the book, so it is not a fourth card to choose between:
+          it is the thing to have ready for when somebody asks whether the book
+          is yours. Below the choice, so it never competes with it. */}
+      <section className="mt-2 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-line bg-panel px-5 py-4">
+        <div className="min-w-0 max-w-prose">
+          <p className="text-sm font-bold text-fg">Writing record</p>
+          <p className="mt-1 text-sm leading-relaxed text-muted">
+            A dated history of how this book was written, for if anyone asks
+            whether you used AI. Evidence, not proof.
+          </p>
+        </div>
+        <Link
+          href={`/book/${bookId}/provenance`}
+          className="shrink-0 rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-fg
+                     transition-colors hover:bg-raised focus-visible:outline-none
+                     focus-visible:ring-2 focus-visible:ring-accent/50"
+        >
+          Open writing record
+        </Link>
+      </section>
     </div>
   );
 }

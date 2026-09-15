@@ -171,6 +171,8 @@ type Area =
   | "overview"
   | "write"
   | "title-check"
+  | "ideas"
+  | "paperback"
   | "prepare"
   | "track"
   | "tools"
@@ -191,6 +193,8 @@ const AREAS: {
   live: boolean;
   icon: React.ReactNode;
   stage: boolean;
+  /** The editor rail's animated drawing, where it already draws this thing. */
+  mark?: MarkName;
 }[] = [
   {
     id: "overview",
@@ -226,6 +230,36 @@ const AREAS: {
     label: "Title check",
     live: true,
     icon: shelfIcons.search,
+    stage: true,
+  },
+  /*
+   * **Ideas and Paperback, added 2026-09-15**, ranked first by that day's
+   * research into what writers complain about. Each opens the same component
+   * the editor or the tool's own route mounts, framed for the dashboard: ideas
+   * from the editor's panel, paperback setup embedded from its tool screen.
+   * Labels are a word or two, the way every product sidebar keeps them
+   * scannable.
+   *
+   * The Story bible and Advance copies were beside them for a day and came out
+   * again when the owner reviewed them in the running app; both are hidden
+   * everywhere, with their code kept.
+   *
+   * Ideas takes the editor rail's own animated mark, which already draws a
+   * bulb; Paperback has none, so it keeps the still glyph.
+   */
+  {
+    id: "ideas",
+    label: "Ideas",
+    live: true,
+    icon: shelfIcons.ideas,
+    stage: true,
+    mark: "ideas",
+  },
+  {
+    id: "paperback",
+    label: "Paperback",
+    live: true,
+    icon: shelfIcons.paperback,
     stage: true,
   },
 ];
@@ -303,17 +337,25 @@ const AREA_BY_ID: Partial<Record<Area, (typeof AREAS)[number]>> =
  * `AREAS` is still the source of each area's label, icon and `live` flag; this
  * only decides sequence. `RAIL_VIEWS` is gone — it was the other half of the
  * old construction and said nothing this does not.
+ *
+ * **The order the owner chose on 2026-09-15**: the shelf's own lists straight
+ * under Write, because Favourites and Archived are Write seen through a filter;
+ * then a rule and the tools, which are not lists of books; then a rule and
+ * Trash, still the last row. There was a "Tools" heading over the tools for a
+ * day; the rules say "a different kind of row" on their own, so it went.
  */
-const RAIL: readonly ({ area: Area } | { view: ShelfView })[] = [
+type RailRow = { area: Area } | { view: ShelfView } | { divider: true };
+
+const RAIL: readonly RailRow[] = [
   { area: "overview" },
   { area: "write" },
-  /* Above the three lists rather than among them, and that placement is the
-     argument: Favourites, Archived and Trash are all filters over the shelf,
-     and this is not one. Sat below them it read as a fourth kind of book
-     list. */
-  { area: "title-check" },
   { view: "favourite" },
   { view: "archived" },
+  { divider: true },
+  { area: "title-check" },
+  { area: "ideas" },
+  { area: "paperback" },
+  { divider: true },
   { view: "trashed" },
 ];
 
@@ -732,7 +774,7 @@ export function Bookshelf({
                     {/* Logo shown by default, hidden on hover */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src="/oc-icon.png"
+                      src="/oc-icon.webp"
                       alt="OpenChapter"
                       className="h-7 w-7 object-contain transition-all duration-200 group-hover:scale-75 group-hover:opacity-0 dark:brightness-0 dark:invert"
                     />
@@ -805,8 +847,14 @@ export function Bookshelf({
                     alike on purpose — a writer reading this column is picking
                     a place, and which of them happens to be an area and which
                     a filter over one is our bookkeeping, not theirs. */}
-                {RAIL.map((row) =>
-                  "view" in row ? (
+                {RAIL.map((row, i) =>
+                  "divider" in row ? (
+                    <div
+                      key={`divider-${i}`}
+                      role="separator"
+                      className="mx-2 my-2 h-px bg-line"
+                    />
+                  ) : "view" in row ? (
                     <SideItem
                       key={row.view}
                       icon={VIEW_ICON[row.view]}
@@ -826,6 +874,7 @@ export function Bookshelf({
                     <SideItem
                       key={row.area}
                       icon={AREA_BY_ID[row.area]!.icon}
+                      mark={AREA_BY_ID[row.area]!.mark}
                       collapsed={sidebarCollapsed}
                       /* Write is the *active list*, not merely the area.
                          Asking `area === "write"` alone lit Write and Trash at
@@ -867,7 +916,8 @@ export function Bookshelf({
                 </>
               )}
 
-              {/* Getting help, then giving it back. */}
+              {/* Getting help, then giving it back. (They sat in the top bar
+                  beside New book for part of 2026-09-15 and came back here.) */}
               <div className="mt-3 border-t border-line pt-3 flex flex-col gap-0.5">
                 {/* **`HelpDialog` was reachable from nothing**, which is how it
                     went a fortnight out of date without anybody noticing: it
@@ -1169,6 +1219,12 @@ export function Bookshelf({
             )}
 
             {area === "title-check" && <TitleCheckArea />}
+
+            {area === "ideas" && <IdeasArea />}
+
+            {area === "paperback" && (
+              <PaperbackArea books={active} current={current} />
+            )}
 
             {area === "prepare" && (
               <Prepare books={active} onCover={setCovering} focus={focus} />
@@ -2240,7 +2296,7 @@ function Overview({
           into a third child that spans both tracks. */}
       <div className="flex min-w-0 flex-col gap-4">
         <SectionBanner
-          image="/overview-banner.jpg"
+          image="/overview-banner.webp"
           eyebrow="Write it, then leave with it"
           title="Your book, in the shops&rsquo; own formats"
           subtitle={overviewBannerLine()}
@@ -2861,7 +2917,7 @@ function ResumeSlot({
         aria-hidden
         className="absolute inset-0 -z-20 bg-cover"
         style={{
-          backgroundImage: "url('/resume-card-background.jpg')",
+          backgroundImage: "url('/resume-card-background.webp')",
           /* The same crop as the written card — see the note there. */
           /* Held right of centre, which slides the figure left in the frame.
              `cover` on a card this shape crops the sides, so the X is the pan.
@@ -3368,7 +3424,7 @@ function overviewBannerLine(): string {
 
 const VIEW_BANNERS: Record<ShelfView, SectionBannerProps> = {
   active: {
-    image: "/write-banner.jpg",
+    image: "/write-banner.webp",
     title: "The books you're writing",
     subtitle: "Open one to carry on, or start another.",
     ink: "light",
@@ -3380,7 +3436,7 @@ const VIEW_BANNERS: Record<ShelfView, SectionBannerProps> = {
     crop: "center 72%",
   },
   favourite: {
-    image: "/favourites-banner.jpg",
+    image: "/favourites-banner.webp",
     title: "The ones you keep going back to",
     /* Favouriting is a filter and not a move — the book is still on the shelf
        either way — and the sentence says so rather than implying a second
@@ -3392,7 +3448,7 @@ const VIEW_BANNERS: Record<ShelfView, SectionBannerProps> = {
     crop: "center 88%",
   },
   archived: {
-    image: "/archived-banner.jpg",
+    image: "/archived-banner.webp",
     title: "Put away, still yours",
     /* Deliberately not "frees up a slot". The free book limit has counted
        everything but the trash since 2026-08-26, so archiving does not make
@@ -3402,7 +3458,7 @@ const VIEW_BANNERS: Record<ShelfView, SectionBannerProps> = {
     ink: "dark",
   },
   trashed: {
-    image: "/trash-banner.jpg",
+    image: "/trash-banner.webp",
     title: "Nothing here is gone yet",
     /* Deliberately not "restore one whenever you like": restoring *from the
        trash* is still gated on the free plan when the shelf is full. */
@@ -4768,6 +4824,253 @@ function TitleCheckArea() {
  * fifteen are the same ones a book card's ⋯ menu opens, out of one list in
  * `lib/book-tools.ts`.
  */
+/**
+ * Which book a per-book area is working on, and the way to change it.
+ *
+ * **Out of `Tools`, now that a second area needs it** (2026-09-15): Tools and
+ * paperback setup. One card, so "Working on" reads the same wherever a writer
+ * meets it, and the picker lists books the same way everywhere.
+ */
+function WorkingOn({
+  books,
+  book,
+  onChoose,
+}: {
+  books: Book[];
+  book: Book;
+  onChoose: (id: string) => void;
+}) {
+  return (
+    <section
+      className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl
+                        border border-line bg-panel px-5 py-4"
+    >
+      {/* The "Working on" chip. Free to take the dialog — this cover was
+          never wrapped in anything. */}
+      <span className="w-10 shrink-0">
+        <CoverOf book={book} editable />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-bold tracking-widest text-muted uppercase">
+          Working on
+        </p>
+        <p className="mt-0.5 truncate text-lg font-bold text-fg">
+          {book.title}
+        </p>
+      </div>
+
+      {/* One picker instead of repeating every tool for every book. With
+          seven books and fifteen tools the old shape would now be a hundred
+          and five controls. */}
+      {books.length > 1 && (
+        <Menu
+          label="Choose a book"
+          align="end"
+          width={260}
+          triggerClassName="flex items-center gap-1.5 rounded-lg border border-line
+                            bg-surface px-3.5 py-2 text-sm font-semibold text-fg"
+          trigger={
+            <>
+              Change book
+              {shelfIcons.chevron}
+            </>
+          }
+        >
+          {(close) => (
+            <>
+              <MenuLabel>Your books</MenuLabel>
+              {books.map((b) => (
+                <MenuButton
+                  key={b.id}
+                  /* The cover fills the slot on every row, so the blank
+                     spacer that used to keep the unchecked rows in line with
+                     the checked one is no longer needed — the alignment
+                     comes from the covers themselves. */
+                  icon={<BookThumb book={b} width="w-6" />}
+                  badge={b.id === book.id ? shelfIcons.check : undefined}
+                  onClick={() => {
+                    onChoose(b.id);
+                    close();
+                  }}
+                >
+                  {b.title}
+                </MenuButton>
+              ))}
+            </>
+          )}
+        </Menu>
+      )}
+    </section>
+  );
+}
+
+/**
+ * The frame the per-book tool areas share: what the tool is for, which book it
+ * is on, and the tool itself for that book.
+ *
+ * The book is resolved rather than copied into state, for the reason `Tools`
+ * gives: a rename or a deletion cannot leave the area holding a stale book.
+ * The tool is keyed on the book, so a half-typed page count belongs to the
+ * book it was typed for and does not follow a change of book.
+ */
+function BookToolArea({
+  books,
+  current,
+  what,
+  empty,
+  children,
+}: {
+  books: Book[];
+  current: Book | null;
+  /** One or two sentences: what this tool does, said once above the book. */
+  what: string;
+  /** The empty state's own line, for a shelf with no book on it. */
+  empty: string;
+  children: (book: Book) => ReactNode;
+}) {
+  const [chosenId, setChosen] = useState<string | null>(null);
+  const book = books.find((b) => b.id === chosenId) ?? current;
+
+  if (!book) {
+    return (
+      <EmptyState title="No book to open this on" primary={IMPORT} secondary={START}>
+        {empty}
+      </EmptyState>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <p className="max-w-prose text-muted">{what}</p>
+      <WorkingOn books={books} book={book} onChoose={setChosen} />
+      <Fragment key={book.id}>{children(book)}</Fragment>
+    </div>
+  );
+}
+
+/*
+ * The screens these areas mount, each in its own chunk, for the reason
+ * `TitleCheck` above is: a writer opening the dashboard to look at their shelf
+ * should not download the tools to do it.
+ */
+const IdeasPanel = dynamic(
+  () => import("@/components/editor/ideas-panel").then((m) => m.IdeasPanel),
+  { ssr: false, loading: ToolPending },
+);
+const PaperbackPage = dynamic(
+  () =>
+    import("@/components/paperback/paperback-page").then((m) => m.PaperbackPage),
+  { ssr: false, loading: ToolPending },
+);
+
+/**
+ * **The dashboard's own override for an embedded tool screen**, the one
+ * `TitleCheckArea` explains: `toolShell` makes every tool its own scroller,
+ * and here the dashboard already scrolls, so the tool's one root `<div>` is
+ * let grow to its content.
+ */
+const EMBEDDED_TOOL =
+  "[&>div]:h-auto [&>div]:overflow-visible [&>div]:overscroll-auto";
+
+/**
+ * Ideas — the ones that are not the book being written.
+ *
+ * Across every book, so there is no book to pick: the parking lot is the
+ * writer's, not a manuscript's.
+ */
+function IdeasArea() {
+  return (
+    <div className="flex flex-col gap-5">
+      {/* **Light ink with the scrim.** Under the type band the picture
+          measures 0.11 mean luminance at this crop, so `#f6f6f8` clears 6:1
+          on average — but the band crosses the sunlit window on the left, and
+          the scrim is what holds it there. The reader sits from about 22% to
+          76% of the frame's height; 40% keeps the book and her hands in the
+          slice a band this wide shows. */}
+      <SectionBanner
+        image="/ideas-banner.webp"
+        ink="light"
+        scrim
+        crop="center 40%"
+        title="Park it and get back to the book"
+        subtitle="The next idea waits here while you finish this one."
+      />
+      <p className="max-w-prose text-muted">
+        Ideas for other books, parked so they stop pulling you away from this
+        one. Start a book from one when it turns out to be real. Kept in this
+        browser, and not synced.
+      </p>
+      {/* Full width, like the banner above it and the tool areas beside it.
+          It was `max-w-2xl`, which left the right half of the area empty;
+          the deck keeps its measure because that is a line length, not a
+          layout. */}
+      <section className="overflow-hidden rounded-2xl border border-line bg-panel">
+        <IdeasPanel />
+      </section>
+    </div>
+  );
+}
+
+/**
+ * Paperback setup — the numbers a printed book needs, from its page count.
+ *
+ * **Part of Pro since 2026-09-16.** A free writer gets the banner and the
+ * gate's card, and no book picker: choosing a book only to meet the same lock
+ * on every one is a control that does nothing. `PaperbackPage` gates as well,
+ * for the tool's own route.
+ */
+function PaperbackArea({
+  books,
+  current,
+}: {
+  books: Book[];
+  current: Book | null;
+}) {
+  const entitled = useEntitled();
+  const what =
+    "Spine width, inside margin and the full cover size for a book's page count, from Amazon KDP's published figures.";
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* **Light ink with the scrim, and the scrim is required here.** The
+          left of this picture is a wall of coloured spines at 0.26 mean
+          luminance under the type band, which puts `#f6f6f8` near 3:1 on its
+          own; the scrim's 0.72-to-0.5 veil is what lifts it past 4.5:1. The
+          hand and the basket sit from about 40% to 100% of the height, so
+          55% holds the hand at the spines and the top of the basket. */}
+      <SectionBanner
+        image="/paperback-banner.webp"
+        ink="light"
+        scrim
+        crop="center 55%"
+        title="Know the numbers before the printer does"
+        subtitle="Spine, gutter and cover size from your page count."
+      />
+      {entitled ? (
+        <BookToolArea
+          books={books}
+          current={current}
+          what={what}
+          empty="Paperback setup works from a book's trim size and page count. Start one or bring one in first."
+        >
+          {(book) => (
+            <div className={EMBEDDED_TOOL}>
+              <PaperbackPage bookId={book.id} embedded />
+            </div>
+          )}
+        </BookToolArea>
+      ) : (
+        <ProGate
+          title="Paperback setup"
+          what={`${what} The wrap is drawn to scale — back, spine and front — so you can see its shape before you send it.`}
+        >
+          {null}
+        </ProGate>
+      )}
+    </div>
+  );
+}
+
 function Tools({
   books,
   current,
@@ -4798,66 +5101,7 @@ function Tools({
 
   return (
     <div className="flex flex-col gap-5">
-      <section
-        className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl
-                          border border-line bg-panel px-5 py-4"
-      >
-        {/* The "Working on" chip. Free to take the dialog — this cover was
-            never wrapped in anything. */}
-        <span className="w-10 shrink-0">
-          <CoverOf book={book} editable />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold tracking-widest text-muted uppercase">
-            Working on
-          </p>
-          <p className="mt-0.5 truncate text-lg font-bold text-fg">
-            {book.title}
-          </p>
-        </div>
-
-        {/* One picker instead of repeating every tool for every book. With
-            seven books and fifteen tools the old shape would now be a hundred
-            and five controls. */}
-        {books.length > 1 && (
-          <Menu
-            label="Choose a book"
-            align="end"
-            width={260}
-            triggerClassName="flex items-center gap-1.5 rounded-lg border border-line
-                              bg-surface px-3.5 py-2 text-sm font-semibold text-fg"
-            trigger={
-              <>
-                Change book
-                {shelfIcons.chevron}
-              </>
-            }
-          >
-            {(close) => (
-              <>
-                <MenuLabel>Your books</MenuLabel>
-                {books.map((b) => (
-                  <MenuButton
-                    key={b.id}
-                    /* The cover fills the slot on every row, so the blank
-                       spacer that used to keep the unchecked rows in line with
-                       the checked one is no longer needed — the alignment
-                       comes from the covers themselves. */
-                    icon={<BookThumb book={b} width="w-6" />}
-                    badge={b.id === book.id ? shelfIcons.check : undefined}
-                    onClick={() => {
-                      setChosen(b.id);
-                      close();
-                    }}
-                  >
-                    {b.title}
-                  </MenuButton>
-                ))}
-              </>
-            )}
-          </Menu>
-        )}
-      </section>
+      <WorkingOn books={books} book={book} onChoose={setChosen} />
 
       <section className="rounded-2xl border border-line bg-panel p-5">
         <h2 className="font-bold text-fg">Everything that works on a book</h2>

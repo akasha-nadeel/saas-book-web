@@ -25,10 +25,21 @@
  *   listings to build is running a business.
  * - **Per book, by occupancy** — advance readers and collaborator seats. Both
  *   count what is *currently* there, so removing one gives the place back.
- * Everything else stays unbounded on both plans: books, words, chapters,
- * **imports**, every export format, sync, the pre-upload check and the roadmap,
- * structure, progress, the writing record, the series read of the story bible
- * and typing in the keyword boxes yourself.
+ * - **Held, by occupancy across the library** — parked ideas (2026-09-16).
+ *   The same arithmetic as advance readers, but an idea belongs to the writer
+ *   rather than to a book, so its sentences cannot say "on this book".
+ *   Forgetting one, or starting a book from one, makes room.
+ * - **Part of a feature** — since 2026-09-15, two screens give Free one half
+ *   and Pro the other: the writing record's window (`FREE_RECORD_DAYS`) and six
+ *   of the eleven consistency checks (`FREE_CHECKS` in `consistency-ids.ts`).
+ *   Nothing a writer typed is ever hidden by these; the log goes on recording,
+ *   so upgrading unlocks what already exists. (The story bible's series view
+ *   was a third for a day, until the bible itself went back behind the gate.)
+ *
+ * Everything else stays unbounded on both plans: words, chapters, **imports**,
+ * every export format, sync, the pre-upload check and the roadmap, structure,
+ * progress and typing in the keyword boxes yourself. Paperback setup is not a
+ * limit at all since 2026-09-16 — it is a Pro screen behind `ProGate`.
  *
  * **There was a fourth shape — "in total, for the life of the account" — and
  * it went with the AI on 2026-09-14.** It existed for work that cost a model
@@ -56,8 +67,11 @@ export type DailyLimit = "comps" | "covers" | "titleCheck";
 /** The ones that work on one manuscript, counted in distinct books. */
 export type BookLimit = "blurb" | "prose" | "track";
 
-/** Counted by what is on one book right now, like seats. */
-export type ItemLimit = "arcReaders";
+/**
+ * Counted by what is there right now, like seats: advance readers on one book,
+ * parked ideas across the library.
+ */
+export type ItemLimit = "arcReaders" | "ideas";
 
 export type Limited =
   | DailyLimit
@@ -96,23 +110,45 @@ export const FREE_LIMITS: Record<Limited, { free: number; pro: number | null }> 
   comps: { free: 3, pro: null },
   covers: { free: 3, pro: null },
   /*
-   * **One, and the title check is the exception to the three above
-   * (2026-09-14).** When the plans became Free and Pro it became one of the
-   * two things Pro buys, beside unlimited books, so its free allowance is set
-   * by pricing rather than by cost — the same keyless catalogues, the same free
-   * cache. It was two for the first day and the owner cut it to one: a check a
-   * day shows the tool is real, and a second thought is what Pro sells. The
-   * pricing page says so because `plan-rows.ts` and `plan-highlights.ts` read
-   * this number, and the words below agree with a limit of one through
-   * `workOne`.
+   * **Three, set by the owner on 2026-09-16**, back in line with the two
+   * above. It is one of the things Pro buys, so its free allowance is a
+   * pricing decision rather than a cost — the same keyless catalogues, the
+   * same free cache. It was two, then one (2026-09-14); one turned out to be a
+   * check with no room for a second thought, and three is one arrival, one
+   * correction and one second thought, as above. The pricing page says so
+   * because `plan-rows.ts` and `plan-highlights.ts` read this number.
+   * `workOne` stays, so a daily limit of one would still read in the singular.
    */
-  titleCheck: { free: 1, pro: null },
+  titleCheck: { free: 3, pro: null },
   blurb: { free: 5, pro: null },
   prose: { free: 6, pro: null },
   track: { free: 2, pro: null },
   arcReaders: { free: 10, pro: null },
+  /*
+   * **Five parked at a time, set by the owner on 2026-09-16.** Occupancy, not a
+   * spend: it is handed the length of the list, so forgetting an idea or
+   * starting a book from one makes room. A writer already holding more keeps
+   * every one of them and simply cannot park another — nothing typed is hidden.
+   * Ideas live in this browser and do not sync, so each browser counts its
+   * own five — a browser gate in the plainest sense, like every other here.
+   */
+  ideas: { free: 5, pro: null },
   collaborators: { free: 2, pro: 10 },
 };
+
+/**
+ * How many days of the writing record a free copy covers, today included.
+ *
+ * **Thirty, set 2026-09-15**, and a window rather than a count: the day log
+ * records every day for everybody, and this cuts the free *copy* to the last
+ * thirty. A novel takes months, so a writer who actually has to answer an
+ * accusation wants the whole trail, which is what Pro reads. Thirty days still
+ * shows a writer the record exists and what it is worth. Reedsy Studio draws
+ * its free history at the same line.
+ *
+ * Read by the writing record screen and the pricing rows; stated nowhere else.
+ */
+export const FREE_RECORD_DAYS = 30;
 
 /**
  * Seats, under the name the rest of the app already calls them by.
@@ -308,7 +344,12 @@ export function seatAllowance(people: number, pro: boolean): Allowance {
 // The words
 // ---------------------------------------------------------------------------
 
-type Shape = "daily" | "book" | "item" | "seat";
+/**
+ * `item` is occupancy on one book (advance readers); `held` is occupancy across
+ * the whole library (parked ideas), which is why it has its own sentences — an
+ * idea is not on any book.
+ */
+type Shape = "daily" | "book" | "item" | "held" | "seat";
 
 /**
  * Whether this limit comes back tomorrow.
@@ -335,6 +376,7 @@ const SHAPE: Record<Limited, Shape> = {
   prose: "book",
   track: "book",
   arcReaders: "item",
+  ideas: "held",
   collaborators: "seat",
 };
 
@@ -374,6 +416,7 @@ const WORDS: Record<
   prose: { one: "book", many: "books", short: "books", shortOne: "book", work: "the prose report" },
   track: { one: "book", many: "books", short: "books", shortOne: "book", work: "money tracking" },
   arcReaders: { one: "reader", many: "readers", short: "readers", shortOne: "reader", work: "advance readers" },
+  ideas: { one: "idea", many: "ideas", short: "ideas", shortOne: "idea", work: "parked ideas" },
   collaborators: { one: "person", many: "people", short: "seats", shortOne: "seat", work: "people" },
 };
 
@@ -415,6 +458,9 @@ export function leftLine(allowance: Allowance): string | null {
       return `${left} more ${label(action, left)} today on the free plan.`;
     case "book":
       return `The free plan covers ${words.work} on ${left} more ${label(action, left)}.`;
+    case "held":
+      // Across the library, so "on this book" would be false.
+      return `Room for ${left} more ${label(action, left)} on the free plan.`;
     default:
       // Occupancy reads the other way round. Nobody thinks of a book as having
       // spent people or readers; the question being asked is how many more fit.
@@ -463,6 +509,11 @@ export function spentLine(allowance: Allowance): string | null {
       return `The free plan covers ${words.work} on ${limit} books, and you are already using all ${limit}.`;
     case "item":
       return `A free book holds ${limit} ${words.many}, and this list is full.`;
+    case "held":
+      // **It says how to make room**, the way a daily line says it comes back:
+      // occupancy is the one other shape that returns, and it returns on the
+      // writer's own press rather than on a date.
+      return `The free plan holds ${limit} ${words.work} at a time, and all ${limit} are taken. Forget one, or start a book from one, to make room.`;
     default:
       // A book is not "used up", and saying so would blame the owner for having
       // co-writers. Seats are also the one limit Pro raises rather than lifts, so
@@ -493,6 +544,8 @@ export function reachedHeadline(action: Limited): string {
       return `The free plan covers ${words.work} on ${limit} books`;
     case "item":
       return `A free book holds ${limit} ${words.many}`;
+    case "held":
+      return `The free plan holds ${limit} ${words.work} at a time`;
     default:
       return `A free book holds ${limit} people`;
   }

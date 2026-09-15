@@ -288,3 +288,27 @@ it is on the shelf below. A failure and a clean result look identical in the
 data; only the source flags tell them apart.
 
 
+
+**The side panel's order, and the frame its tool areas share** (2026-09-15).
+The rail is `RAIL` in `bookshelf.tsx`, read top to bottom, in the order the
+owner chose: Overview, Write, Favourites, Archived, a rule, Title check, Ideas,
+Paperback, a rule, Trash. The rules are rows of their own (`{ divider: true }`)
+and say "a different kind of row" without a heading; there was a "Tools"
+heading for a day and it came out. The book lists sit under Write because they
+are Write seen through a filter, and Trash stays the last row.
+
+**How it works, Support, Send feedback and Pricing sit at the foot of the side
+panel**, under a rule, and in `MobileDashboardNavigation` on a phone. For part of
+2026-09-15 they were in the top bar left of New book; the owner moved them back
+the same day, so the top bar holds only the heading and New book.
+
+Paperback works on one book, and shares two pieces with `Tools`:
+**`WorkingOn`**, the cover-and-title card with the Change book menu (lifted out
+of `Tools`), and **`BookToolArea`**, which resolves the book (the picked one,
+else `current`), draws the tool's one-line purpose above the card, shows
+`EmptyState` when there is no book, and **keys the tool on the book id**, so a
+half-typed page count does not follow a change of book. It mounts the real
+`PaperbackPage` with `embedded` as a `dynamic` chunk, inside the same child
+override `TitleCheckArea` explains. Ideas mounts the editor's `IdeasPanel` and
+has no picker, since ideas belong to the writer rather than a book. The Story
+bible and Advance copies had areas here for a day and were taken back out.

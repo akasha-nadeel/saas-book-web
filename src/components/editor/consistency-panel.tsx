@@ -23,12 +23,20 @@ import Link from "next/link";
 import { CheckPicker } from "@/components/consistency/check-picker";
 import { checksIn } from "@/lib/consistency-checks";
 import { FindingCard } from "@/components/consistency/finding-card";
+import {
+  ProChecksNote,
+  useCheckPlan,
+} from "@/components/consistency/pro-checks";
 import { RunBar, ranLine } from "@/components/consistency/run-bar";
+import { UpgradeDialog } from "@/components/upgrade/upgrade-dialog";
 import { namesOf } from "@/lib/bible";
 import { bookTextOf, readable } from "@/lib/book-text";
 import {
   ALL_CHECKS,
   consistencyReport,
+  forPlan,
+  PRO_CHECKS,
+  reportForPlan,
   withDismissal,
   withoutDismissal,
   type CheckId,
@@ -107,6 +115,14 @@ export function ConsistencyPanel({ bookId }: { bookId: string }) {
 
   const toRead = useMemo(() => (book ? readable(book).length : 0), [book]);
 
+  /* Five checks on Free, eleven on Pro — see `pro-checks.tsx`. */
+  const { free, locked } = useCheckPlan();
+  const [upsell, setUpsell] = useState(false);
+  const shown = useMemo(
+    () => (report ? reportForPlan(report, free) : null),
+    [report, free],
+  );
+
   /*
    * Whether the book has been written in since this report was made.
    *
@@ -142,7 +158,10 @@ export function ConsistencyPanel({ bookId }: { bookId: string }) {
   };
 
   const run = () => {
-    if (!book || picked.size === 0) return;
+    const chosen = [...picked].filter((id) => !locked.has(id));
+    if (!book || chosen.length === 0) return;
+    /* On Free the Pro checks run too, for the count; they are never shown. */
+    const checks = free ? [...new Set([...chosen, ...PRO_CHECKS])] : chosen;
     setRunning(true);
     // Paint the pressed state before the reading starts. A few hundred
     // milliseconds of dead button is worse than the same wait, admitted.
@@ -156,11 +175,11 @@ export function ConsistencyPanel({ bookId }: { bookId: string }) {
      * that check out of `ran` rather than reporting it as having found nothing.
      */
     requestAnimationFrame(async () => {
-      const words = picked.has("typos") ? await loadTypoWords() : null;
+      const words = checks.includes("typos") ? await loadTypoWords() : null;
       const known = bible.map((entry) => namesOf(entry));
       const next = consistencyReport(bookTextOf(book), {
         known,
-        only: [...picked],
+        only: checks,
         ...(words ? { words } : {}),
       });
       // A fresh report is a fresh list, so the old scroll offset means nothing.
@@ -168,7 +187,7 @@ export function ConsistencyPanel({ bookId }: { bookId: string }) {
         report: next,
         signature: signatureOf(book),
         scroll: 0,
-        picked: [...picked],
+        picked: chosen,
         showing: true,
       });
       setReport(next);
@@ -191,12 +210,12 @@ export function ConsistencyPanel({ bookId }: { bookId: string }) {
 
   /* The quiet ones sink rather than vanish — see `consistency-page.tsx`. */
   const ordered = useMemo(() => {
-    const findings = report?.findings ?? [];
+    const findings = shown?.findings ?? [];
     return [
       ...findings.filter((f) => !setAside.has(f.key)),
       ...findings.filter((f) => setAside.has(f.key)),
     ];
-  }, [report, setAside]);
+  }, [shown, setAside]);
 
   const live = ordered.filter((f) => !setAside.has(f.key)).length;
 
@@ -234,9 +253,14 @@ export function ConsistencyPanel({ bookId }: { bookId: string }) {
         }}
         className="scroll-slim min-h-0 flex-1 overflow-y-auto p-3"
       >
-        {!showing || !report ? (
+        {!showing || !report || !shown ? (
           <>
+            {upsell && (
+              <UpgradeDialog reason="checks" onClose={() => setUpsell(false)} />
+            )}
             <CheckPicker
+              locked={locked}
+              onLocked={() => setUpsell(true)}
               picked={picked}
               onToggle={(id) =>
                 setPicked((was) => {
@@ -246,12 +270,15 @@ export function ConsistencyPanel({ bookId }: { bookId: string }) {
                   return next;
                 })
               }
-              onAll={() => setPicked(new Set(ALL_CHECKS))}
+              onAll={() =>
+                setPicked(new Set(ALL_CHECKS.filter((id) => !locked.has(id))))
+              }
               onNone={() => setPicked(new Set())}
               onGroup={(group, on) =>
                 setPicked((was) => {
                   const next = new Set(was);
                   for (const check of checksIn(group)) {
+                    if (locked.has(check.id)) continue;
                     if (on) next.add(check.id);
                     else next.delete(check.id);
                   }
@@ -274,11 +301,13 @@ export function ConsistencyPanel({ bookId }: { bookId: string }) {
         ) : (
           <>
             <RunBar
-              report={report}
+              report={shown}
               running={running}
               stale={stale}
               warning={
-                picked.has("typos") && !report.ran.includes("typos")
+                picked.has("typos") &&
+                !locked.has("typos") &&
+                !report.ran.includes("typos")
                   ? "The word list could not be loaded, so the near-miss check did not run."
                   : undefined
               }
@@ -294,9 +323,9 @@ export function ConsistencyPanel({ bookId }: { bookId: string }) {
               /* Never a tick, never "clean" — and never the literal six, which
                  is a sentence about a run that may not have happened. */
               <p className="mt-3 text-sm leading-relaxed text-muted">
-                {report.ran.length === 0
+                {shown.ran.length === 0
                   ? "No check was picked, so nothing was looked for. This is not a result about the book."
-                  : `Nothing came back. That is ${ranLine(report)} finding nothing, not a verdict on the book.`}
+                  : `Nothing came back. That is ${ranLine(shown)} finding nothing, not a verdict on the book.`}
               </p>
             ) : (
               <>
@@ -318,6 +347,8 @@ export function ConsistencyPanel({ bookId }: { bookId: string }) {
                 </ul>
               </>
             )}
+
+            {free && <ProChecksNote view={forPlan(report, true)} />}
           </>
         )}
       </div>

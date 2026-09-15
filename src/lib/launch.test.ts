@@ -81,17 +81,17 @@ it("holds nothing back where no gateway is configured", () => {
 /**
  * **The free book count is stated three times and they must agree**:
  * `LAUNCH_LIMITS.freeBooks`, `TIER_LIMITS.free.books`, and the trigger in
- * `20260914000000_ai_free_pro_plan.sql`, which is the one that actually
+ * `20260915000000_free_three_books.sql`, which is the one that actually
  * refuses. SQL cannot import TypeScript, so the test reads the migration — the
  * browser offering a book Postgres then refuses is the drift this catches.
  */
-it("holds one book on the free plan, in TypeScript and in SQL", async () => {
+it("holds three books on the free plan, in TypeScript and in SQL", async () => {
   const { TIER_LIMITS } = await import("@/lib/billing/tiers");
-  expect(LAUNCH_LIMITS.freeBooks).toBe(1);
+  expect(LAUNCH_LIMITS.freeBooks).toBe(3);
   expect(TIER_LIMITS.free.books).toBe(LAUNCH_LIMITS.freeBooks);
 
   const sql = readFileSync(
-    "supabase/migrations/20260914000000_ai_free_pro_plan.sql",
+    "supabase/migrations/20260915000000_free_three_books.sql",
     "utf8",
   );
   const limit = sql.match(/if v_count >= (\d+) then/);

@@ -19,6 +19,8 @@ export type AreaId =
   | "overview"
   | "write"
   | "title-check"
+  | "ideas"
+  | "paperback"
   | "prepare"
   | "track"
   | "tools"
@@ -28,6 +30,8 @@ export const AREA_LABELS: Record<AreaId, string> = {
   overview: "Overview",
   write: "Write",
   "title-check": "Title check",
+  ideas: "Ideas",
+  paperback: "Paperback",
   prepare: "Prepare",
   track: "Track",
   tools: "Tools",

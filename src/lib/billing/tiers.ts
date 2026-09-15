@@ -38,12 +38,12 @@ export const PAID_TIERS: readonly PaidTier[] = ["pro"];
 /**
  * What each plan gives.
  *
- * **Books are the one difference the server enforces.** Everything else —
- * imports, sync, all three export formats, the consistency check, unlimited
- * words and chapters — is on both plans, and that is not an oversight to be
- * monetised later. *Export must never move behind the plan.* The daily title
- * check allowance is the other difference, and it lives in `free-limits.ts`
- * with the rest of the browser's meters.
+ * **Books are the one difference the server enforces.** Imports, sync, all
+ * three export formats and unlimited words and chapters are on both plans, and
+ * *export must never move behind the plan.* The other differences (the daily
+ * title check, the writing record's window and six of the consistency checks,
+ * since 2026-09-15) are browser gates, and they live in `free-limits.ts` and
+ * `consistency-ids.ts` rather than here.
  *
  * `books: null` means unlimited. It is `null` rather than `Infinity` because
  * this value is serialised to the browser through `/api/billing/subscription`
@@ -51,7 +51,7 @@ export const PAID_TIERS: readonly PaidTier[] = ["pro"];
  */
 export const TIER_LIMITS = {
   free: {
-    books: 1 as number | null,
+    books: 3 as number | null,
   },
   pro: {
     books: null as number | null,

@@ -70,12 +70,12 @@ it("gives every tier a limit set and a name", () => {
 });
 
 /**
- * Free is the only tier that counts books, and it holds one. `null` rather than
- * `Infinity` because this value is serialised to the browser and JSON has no
- * infinity. The trigger in `20260914000000_ai_free_pro_plan.sql` holds the
+ * Free is the only tier that counts books, and it holds three. `null` rather
+ * than `Infinity` because this value is serialised to the browser and JSON has
+ * no infinity. The trigger in `20260915000000_free_three_books.sql` holds the
  * same number.
  */
 it("counts books on the free plan and nowhere else", () => {
-  expect(bookLimit("free")).toBe(1);
+  expect(bookLimit("free")).toBe(3);
   for (const tier of PAID_TIERS) expect(bookLimit(tier)).toBeNull();
 });

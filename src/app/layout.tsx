@@ -5,6 +5,7 @@ import {
   Inter,
   Plus_Jakarta_Sans,
   Poppins,
+  Roboto,
 } from "next/font/google";
 import "./globals.css";
 import { LibrarySync } from "@/components/library-sync";
@@ -83,6 +84,20 @@ const jakarta = Plus_Jakarta_Sans({
   display: "swap",
 });
 
+/**
+ * The pricing cards' face, and only theirs (2026-09-16) — the reference design
+ * they copy is set in Roboto. **`preload: false`**, so the files are fetched by
+ * the two pages that draw the cards (`/upgrade` and the landing page) rather
+ * than preloaded on every route the root layout serves.
+ */
+const roboto = Roboto({
+  variable: "--font-roboto",
+  subsets: ["latin"],
+  weight: ["400", "500", "700", "900"],
+  display: "swap",
+  preload: false,
+});
+
 /** The format codes in the landing page's in/out lists (`.epub`, `.docx`). */
 const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
@@ -126,7 +141,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${fraunces.variable} ${inter.variable} ${poppins.variable} ${jakarta.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${inter.variable} ${poppins.variable} ${jakarta.variable} ${plexMono.variable} ${roboto.variable} h-full antialiased`}
     >
       {/* Only the shell. The chapter sidebar lives in the book layout, so the
           shelf can render full-width without one. */}

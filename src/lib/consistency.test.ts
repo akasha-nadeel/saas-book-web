@@ -4,7 +4,12 @@ import {
   ALL_CHECKS,
   ambiguousPair,
   consistencyReport,
+  FREE_CHECKS,
+  forPlan,
+  isProCheck,
+  PRO_CHECKS,
   REAL_BREAK,
+  reportForPlan,
   driftKey,
   looksLikeDrift,
   withinOneEdit,
@@ -1466,5 +1471,65 @@ describe("the six gaps", () => {
         { only: ["numbers"] },
       ).findings,
     ).toHaveLength(1);
+  });
+});
+
+/**
+ * The free/Pro split (2026-09-15). The split itself is a pricing decision; what
+ * is tested is that it stays a split — every check on exactly one side — and
+ * that a free view never shows a Pro finding or passes a check that did not
+ * run off as one that found nothing.
+ */
+describe("the free and Pro checks", () => {
+  it("puts every check on exactly one side", () => {
+    expect(FREE_CHECKS).toHaveLength(5);
+    expect(new Set(FREE_CHECKS).size).toBe(FREE_CHECKS.length);
+    for (const id of FREE_CHECKS) expect(ALL_CHECKS).toContain(id);
+    expect([...FREE_CHECKS, ...PRO_CHECKS].sort()).toEqual([...ALL_CHECKS].sort());
+    for (const id of PRO_CHECKS) expect(isProCheck(id)).toBe(true);
+  });
+
+  /** The demonstration in Help and the tool guide has to work on Free. */
+  it("keeps a name spelled two ways free", () => {
+    expect(isProCheck("names")).toBe(false);
+  });
+
+  const finding = (check: CheckId) => ({
+    key: check,
+    check,
+    label: check,
+    note: "",
+    variants: [],
+  });
+
+  const report = {
+    chapters: 3,
+    words: 1000,
+    ran: ALL_CHECKS.filter((id) => id !== "typos"),
+    usedBible: false,
+    findings: [finding("names"), finding("spelling"), finding("hyphens")],
+  };
+
+  it("shows a free writer only the free findings, and counts the rest", () => {
+    const view = forPlan(report, true);
+    expect(view.shown.map((f) => f.check)).toEqual(["names"]);
+    expect(view.proFound).toBe(2);
+  });
+
+  it("shows a Pro writer everything", () => {
+    expect(forPlan(report, false).shown).toHaveLength(3);
+  });
+
+  it("describes a free run as the checks the writer could pick", () => {
+    const view = reportForPlan(report, true);
+    expect(view.ran.every((id) => !isProCheck(id))).toBe(true);
+    expect(view.findings.map((f) => f.check)).toEqual(["names"]);
+    expect(reportForPlan(report, false)).toBe(report);
+  });
+
+  it("reports a Pro check that did not run", () => {
+    const view = forPlan(report, true);
+    expect(view.proRan).not.toContain("typos");
+    expect(view.proRan).toHaveLength(PRO_CHECKS.length - 1);
   });
 });

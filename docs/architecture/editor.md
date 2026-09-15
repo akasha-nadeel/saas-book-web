@@ -542,7 +542,14 @@ express a page nobody has named yet, and it was the Add-page menu's
 "Something else…"; a row rather than a header button, because it is the end of
 the list it adds to rather than a peer of "Hide pages".
 
-**The question is put once per book, on the way in.**
+**The editor's popup below was deleted on 2026-09-15**, and what follows is the
+record of what it was. The owner removed it because the Front matter and Back
+matter cards already hold a switch for every page, so the popup asked a second
+time, over the manuscript, a question those cards answer. `/book/new` still puts
+the question once, in its front and back steps; `shouldAskMatter` and
+`prefs.matterAsked` stay in the store.
+
+**The question was put once per book, on the way in.**
 `matter-setup-dialog.tsx`, mounted by the panel because both screens that draw
 those cards mount it, shown when `shouldAskMatter(book)` — no matter pages at
 all, and not asked before. It exists because the cards have nowhere to explain

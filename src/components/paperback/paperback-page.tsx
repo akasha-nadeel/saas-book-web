@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
+import { GatedTool, useEntitled } from "@/components/upgrade/pro-gate";
 import { bookWordCount, findBook } from "@/lib/library-store";
 import { PAGE_SIZES } from "@/lib/page-setup";
 import {
@@ -11,11 +12,14 @@ import {
   estimatePages,
   inches,
   mm,
+  OUTSIDE_MARGIN_BLEED_MIN,
   PAPER,
   paperbackSpec,
+  SPINE_TEXT_MIN_PAGES,
   type PaperbackSpec,
   type PaperStock,
 } from "@/lib/paperback";
+import { toolMeasure, toolShell, type ToolPageProps } from "@/lib/tool-page";
 import { useHydrated, useShelf } from "@/lib/use-library";
 
 /**
@@ -44,16 +48,28 @@ import { useHydrated, useShelf } from "@/lib/use-library";
  * printer's file is the one place being approximately right is worth nothing.
  * What this is for is knowing the numbers before you get there, and checking
  * that the template you were sent is the one you asked for.
+ *
+ * **Part of Pro since 2026-09-16**, by the owner's decision. The gate is here
+ * rather than only in the dashboard, so the tool's own route and the book
+ * card's menu answer the same way; it keeps the header, so a writer who
+ * arrived here can see where they are and what the screen is for.
  */
-export function PaperbackPage({ bookId }: { bookId: string }) {
+const PAPERBACK_WHAT =
+  "Spine width, inside margin and the full cover size for a book's page count and trim, worked out from Amazon KDP's published figures and drawn to scale.";
+
+export function PaperbackPage({ bookId, embedded, heading }: ToolPageProps) {
   const hydrated = useHydrated();
+  const entitled = useEntitled();
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
 
   const [pages, setPages] = useState<string>("");
   const [stock, setStock] = useState<PaperStock>("white");
 
-  if (!hydrated) return <LoadingScreen />;
+  // The app's spinner is for a whole window; inside the dashboard it would
+  // cover the area it is standing in.
+  if (!hydrated)
+    return embedded ? <div className={toolShell(embedded)} /> : <LoadingScreen />;
 
   if (!book) {
     return (
@@ -68,6 +84,19 @@ export function PaperbackPage({ bookId }: { bookId: string }) {
     );
   }
 
+  if (!entitled) {
+    return (
+      <GatedTool
+        book={book}
+        tool="Paperback setup"
+        what={PAPERBACK_WHAT}
+        deck="Spine width, inside margin and the full cover wrap — four numbers that all depend on the page count."
+        embedded={embedded}
+        heading={heading}
+      />
+    );
+  }
+
   const size = PAGE_SIZES[book.page?.size ?? "6x9"];
   const words = bookWordCount(book);
   const estimated = estimatePages(words);
@@ -76,13 +105,19 @@ export function PaperbackPage({ bookId }: { bookId: string }) {
   const spec = paperbackSpec(using, size.width, size.height, stock);
 
   return (
-    <div className="h-[var(--oc-layout-height)] overflow-y-auto bg-surface">
-      <ToolHeader book={book} tool="Paperback setup">
-        Spine width, inside margin and the full cover wrap — four numbers that
-        all depend on the page count, which is why this takes people an evening.
-      </ToolHeader>
+    <div className={toolShell(embedded)}>
+      {!embedded && (
+        <ToolHeader book={book} tool="Paperback setup">
+          Spine width, inside margin and the full cover wrap — four numbers that
+          all depend on the page count, which is why this takes people an
+          evening.
+        </ToolHeader>
+      )}
 
-      <div className="mx-auto max-w-7xl px-(--oc-page-gutter) pt-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:pt-6">
+      <div
+        className={`${toolMeasure(embedded)} pt-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:pt-6`}
+      >
+        {heading}
         {/* ---- The two things it needs ---------------------------------- */}
         <section className="grid gap-4 rounded-xl border border-line bg-panel p-5 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5">
@@ -191,7 +226,8 @@ export function PaperbackPage({ bookId }: { bookId: string }) {
 
             <p className="max-w-prose mt-4 text-sm text-muted">
               Trim size is {size.label}, from this book&rsquo;s page setup.
-              Outside margins need at least {spec.outsideMargin}″.
+              Outside margins need at least {spec.outsideMargin}″, or{" "}
+              {OUTSIDE_MARGIN_BLEED_MIN}″ if the pages inside have bleed.
             </p>
           </section>
         </div>
@@ -208,9 +244,8 @@ export function PaperbackPage({ bookId }: { bookId: string }) {
         <p className="mt-6 text-xs text-muted">
           The PDF this app exports is a clean interior file at your trim size
           with fonts embedded, page numbers, and a running head. It has no
-          bleed, no crop marks and no CMYK — the browser writes the file, and
-          those are not things it can put in one. If your printer asks for them,
-          that step still needs another tool.
+          bleed, no crop marks and no CMYK. If your printer asks for them, that
+          step still needs another tool.
         </p>
       </div>
     </div>
@@ -263,8 +298,8 @@ function CoverWrap({
             style={{ width: pct(spine) }}
             className="grid shrink-0 place-items-center border-x border-white/70 bg-accent/25"
           >
-            {/* Only when there is room. Under about a tenth of the width the
-                word cannot be set without spilling over the folds. */}
+            {/* Only when there is room to draw it. Whether KDP allows text on
+                the spine is a separate question, answered in the caption. */}
             {spineShare > 0.055 && (
               <span className="text-[10px] font-bold tracking-wide text-accent [writing-mode:vertical-rl]">
                 Spine
@@ -278,9 +313,9 @@ function CoverWrap({
       <p className="mt-2 max-w-xl text-xs text-muted">
         Dashed edge: {BLEED}″ of bleed, trimmed off — keep nothing you need to
         read inside it. The spine is {inches(spine)}″ ({mm(spine)} mm)
-        {spineShare > 0.055
+        {spec.spineText
           ? ""
-          : ", too narrow at this page count to carry text"}
+          : `, and KDP allows no text on a spine under ${SPINE_TEXT_MIN_PAGES} pages`}
         , and the whole wrap is {inches(W)}″ × {inches(H)}″.
       </p>
     </>

@@ -31,6 +31,9 @@ import {
 import { IMPORT_FORMATS } from "@/lib/import";
 import { MAX_SNAPSHOTS } from "@/lib/history";
 import { LAUNCH_LIMITS } from "@/lib/launch";
+import { PRO_CHECKS } from "@/lib/consistency-ids";
+import { TIER_NAMES } from "@/lib/billing/tiers";
+import { FREE_LIMITS, FREE_RECORD_DAYS } from "@/lib/free-limits";
 import { CONTACT_EMAIL, LEGAL_PAGES, REFUND_DAYS } from "@/lib/legal";
 import { plural } from "@/lib/plural";
 import { PricingCards } from "@/components/landing/pricing-cards";
@@ -565,8 +568,12 @@ const FAQ: [question: string, answer: ReactNode][] = [
       are, you keep writing in all of them, and every export format goes on
       working. What changes is that you cannot start a new book while you
       hold more than the free plan&rsquo;s{" "}
-      {plural(LAUNCH_LIMITS.freeBooks, "book")}, and title checks go back to a
-      daily allowance.
+      {plural(LAUNCH_LIMITS.freeBooks, "book")}, title checks go back to a
+      daily allowance, you cannot park a new idea while you hold more than{" "}
+      {FREE_LIMITS.ideas.free}, and what only {TIER_NAMES.pro} shows (the{" "}
+      {plural(PRO_CHECKS.length, "extra consistency check")}, the writing record
+      before the last {FREE_RECORD_DAYS} days, paperback setup) closes again.
+      Nothing you wrote is deleted.
     </>,
   ],
   [

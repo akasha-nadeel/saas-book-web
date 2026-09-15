@@ -27,9 +27,16 @@
  * Shared by the full screen and the rail's panel; the columns come from
  * `@container` rather than from a prop, so the panel gets one and the page gets
  * three with nothing passed.
+ *
+ * **On Free, six cards are locked** (2026-09-15). They stay in their groups
+ * with their names and examples, carrying a small plan label, so a writer can
+ * see what the check would look for; pressing one calls `onLocked` and the
+ * caller opens the upgrade dialog on that press. "All" and each group's "All"
+ * tick only what can be ticked.
  */
 
 import { ALL_CHECKS, type CheckId } from "@/lib/consistency";
+import { TIER_NAMES } from "@/lib/billing/tiers";
 import {
   CHECK_GROUPS,
   checksIn,
@@ -70,7 +77,13 @@ export function CheckPicker({
   running,
   toRead,
   onBack,
+  locked = NO_LOCKS,
+  onLocked,
 }: {
+  /** Checks this writer's plan does not include. Empty on Pro. */
+  locked?: ReadonlySet<CheckId>;
+  /** A locked card was pressed. */
+  onLocked?: (id: CheckId) => void;
   picked: ReadonlySet<CheckId>;
   onToggle: (id: CheckId) => void;
   onAll: () => void;
@@ -84,7 +97,10 @@ export function CheckPicker({
   /** Present only when there is a report to go back to. */
   onBack?: () => void;
 }) {
-  const count = picked.size;
+  // A check picked before the plan was known is not counted once it is locked;
+  // the caller leaves it out of the run for the same reason.
+  const count = [...picked].filter((id) => !locked.has(id)).length;
+  const available = ALL_CHECKS.length - locked.size;
   const noHover = useNoHover();
 
   return (
@@ -103,7 +119,8 @@ export function CheckPicker({
 
       <div className="flex flex-col gap-5">
         {CHECK_GROUPS.map((group) => {
-          const inside = checksIn(group.id);
+          const all = checksIn(group.id);
+          const inside = all.filter((check) => !locked.has(check.id));
           const on = inside.filter((check) => picked.has(check.id)).length;
           return (
             <section key={group.id}>
@@ -113,26 +130,34 @@ export function CheckPicker({
                 </h3>
                 {/* One control, not two. It says what pressing it does, so a
                     half-ticked group reads as "there is more to turn on". */}
-                <button
-                  type="button"
-                  onClick={() => onGroup(group.id, on < inside.length)}
-                  className="shrink-0 text-[11px] font-semibold text-muted hover:text-fg"
-                >
-                  {on < inside.length ? "All" : "None"}
-                </button>
+                {inside.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onGroup(group.id, on < inside.length)}
+                    className="shrink-0 text-[11px] font-semibold text-muted hover:text-fg"
+                  >
+                    {on < inside.length ? "All" : "None"}
+                  </button>
+                )}
               </div>
               <div className="grid grid-cols-1 gap-2.5 @sm:grid-cols-2 @3xl:grid-cols-3">
-                {inside.map((check) => (
-                  <CheckCard
-                    key={check.id}
-                    on={picked.has(check.id)}
-                    name={check.name}
-                    hint={check.hint}
-                    hue={check.hue}
-                    onChange={() => onToggle(check.id)}
-                    showHint={noHover}
-                  />
-                ))}
+                {all.map((check) => {
+                  const isLocked = locked.has(check.id);
+                  return (
+                    <CheckCard
+                      key={check.id}
+                      on={!isLocked && picked.has(check.id)}
+                      locked={isLocked}
+                      name={check.name}
+                      hint={check.hint}
+                      hue={check.hue}
+                      onChange={() =>
+                        isLocked ? onLocked?.(check.id) : onToggle(check.id)
+                      }
+                      showHint={noHover}
+                    />
+                  );
+                })}
               </div>
             </section>
           );
@@ -142,7 +167,7 @@ export function CheckPicker({
       <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
         <div className="flex items-center gap-3 text-[11px] font-semibold text-muted">
           <button type="button" onClick={onAll} className="hover:text-fg">
-            All {ALL_CHECKS.length}
+            All {available}
           </button>
           <span aria-hidden="true" className="text-line">
             ·
@@ -204,6 +229,7 @@ export function CheckPicker({
  */
 function CheckCard({
   on,
+  locked,
   name,
   hint,
   hue,
@@ -211,6 +237,8 @@ function CheckCard({
   showHint,
 }: {
   on: boolean;
+  /** Not on this writer's plan: drawn unpicked, with the plan's name on it. */
+  locked: boolean;
   name: string;
   hint: string;
   hue: string;
@@ -283,7 +311,7 @@ function CheckCard({
         </svg>
       </span>
 
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="block text-[13px] leading-snug font-semibold text-fg">
           {name}
         </span>
@@ -294,7 +322,17 @@ function CheckCard({
         )}
       </span>
 
+      {locked && (
+        <span
+          className="shrink-0 rounded-full border border-line px-1.5 py-0.5 text-[10px] font-bold text-muted uppercase"
+        >
+          {TIER_NAMES.pro}
+        </span>
+      )}
+
       {!showHint && <Tooltip label={hint} side="top" />}
     </button>
   );
 }
+
+const NO_LOCKS: ReadonlySet<CheckId> = new Set();

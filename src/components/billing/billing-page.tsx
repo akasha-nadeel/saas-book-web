@@ -453,6 +453,15 @@ export function BillingPage({
                   {plural(FREE_LIMITS.titleCheck.free, "title check")} a day
                   instead of unlimited.
                 </li>
+                <li>
+                  Room for {plural(FREE_LIMITS.ideas.free, "parked idea")} at a
+                  time: every idea you have stays, but a new one waits until you
+                  are under that.
+                </li>
+                <li>
+                  Paperback setup closes. Your books and their page setup are
+                  not touched.
+                </li>
                 {/* Export is on both plans, so cancelling takes nothing
                     away there — and a writer deciding whether to cancel is
                     exactly who needs told that their book still comes out. */}

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { highlightsFor, NO_AI } from "./plan-highlights";
-import { ROWS } from "./plan-rows";
+import { NOT_INCLUDED, ROWS } from "./plan-rows";
 import { TIER_ORDER } from "./tiers";
 
 /**
@@ -11,13 +11,16 @@ import { TIER_ORDER } from "./tiers";
  */
 
 /*
- * A row added to the table has to reach both cards, in the table's order, or
- * a reader of the card is told less than a reader of the table.
+ * A row added to the table has to reach every card whose plan includes it, in
+ * the table's order, or a reader of the card is told less than a reader of the
+ * table. A row the plan does not include stays off that card — the card is a
+ * list of what you get (paperback setup on Free, since 2026-09-16).
  */
-it("gives every card one line per table row, in table order", () => {
-  const labels = ROWS.map((row) => row.label);
-
+it("gives every card one line per table row its plan includes, in table order", () => {
   for (const tier of TIER_ORDER) {
+    const labels = ROWS.filter((row) => row.values[tier] !== NOT_INCLUDED).map(
+      (row) => row.label,
+    );
     const rows = highlightsFor(tier)
       .map((line) => line.row)
       .filter((row): row is string => row !== undefined);

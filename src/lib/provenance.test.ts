@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Block } from "./export/blocks";
 import {
+  activitySince,
   bookTimeline,
   canonicalText,
   chapterCanonicalText,
@@ -11,6 +12,8 @@ import {
   RECORD_FORMAT,
   toHex,
   utcOffset,
+  versionsSince,
+  windowStart,
   writingRecord,
   type RecordChapter,
 } from "./provenance";
@@ -279,6 +282,31 @@ describe("toHex", () => {
   });
 });
 
+describe("the record window", () => {
+  // Midday local time, so the test does not depend on the machine's zone.
+  const now = new Date(2026, 8, 15, 12).getTime();
+
+  it("counts today as the first of its days", () => {
+    expect(windowStart(1, now)).toBe("2026-09-15");
+    expect(windowStart(30, now)).toBe("2026-08-17");
+  });
+
+  it("keeps only the days on or after the edge", () => {
+    expect(
+      activitySince(
+        { "2026-08-16": 500, "2026-08-17": 300, "2026-09-01": 900 },
+        "2026-08-17",
+      ),
+    ).toEqual({ "2026-08-17": 300, "2026-09-01": 900 });
+  });
+
+  it("keeps only the drafts saved on or after the edge", () => {
+    const early = { at: new Date(2026, 7, 16, 23).getTime(), words: 10 };
+    const late = { at: new Date(2026, 7, 17, 1).getTime(), words: 20 };
+    expect(versionsSince([early, late], "2026-08-17")).toEqual([late]);
+  });
+});
+
 describe("formatRecord", () => {
   const record = writingRecord({ "2026-01-01": 1200, "2026-01-05": -300 });
   const noDrafts = bookTimeline([]);
@@ -312,6 +340,29 @@ describe("formatRecord", () => {
     expect(text).toContain("WRITING RECORD — The Crossing");
     expect(text).toContain("A. Writer");
     expect(text).toContain("2026-01-06");
+  });
+
+  /**
+   * The file is what gets forwarded. A thirty-day copy that did not say so
+   * would tell whoever reads it that the book was written in a month.
+   */
+  it("says when it covers only part of the history", () => {
+    const text = report({ window: { from: "2026-01-01" } });
+    expect(text).toContain("THIS COPY");
+    expect(text).toContain("covers 2026-01-01 to 2026-01-06 only");
+    expect(report()).not.toContain("THIS COPY");
+  });
+
+  it("tells a withheld fingerprint apart from a refused one", () => {
+    const withheld = report({
+      fingerprint: null,
+      fingerprintWithheld: true,
+    });
+    expect(withheld).toContain("FINGERPRINT");
+    expect(withheld).toContain("Not included in this copy.");
+    expect(withheld).not.toContain("HOW TO CHECK IT");
+    // A refused one prints no fingerprint section at all, as before.
+    expect(report({ fingerprint: null })).not.toContain("Not included");
   });
 
   it("names the recipe its numbers were taken with", () => {

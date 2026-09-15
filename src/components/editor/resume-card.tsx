@@ -130,9 +130,9 @@ export function ResumeCard({
         aria-hidden
         className="absolute inset-0 -z-20 bg-cover"
         style={{
-          backgroundImage: "url('/resume-card-background.jpg')",
+          backgroundImage: "url('/resume-card-background.webp')",
           /* **78%, so the figure stands in the frame rather than being cut off
-             at the neck.** The picture is 2752×1536 and the figure runs from
+             at the neck.** The picture is 2200×1228 and the figure runs from
              about 58% to 85% of its height; `cover` on a card this wide and
              this short crops a band out of the middle, and at 48% that band
              stopped at the top of his head. Down here the whole of him lands

@@ -12,6 +12,7 @@ import {
   type PlanTier,
 } from "@/lib/billing/tiers";
 import { DialogClose } from "@/components/ui/dialog";
+import { ALL_CHECKS, FREE_CHECKS } from "@/lib/consistency-ids";
 
 /**
  * What the free plan runs out of, said as two columns rather than one red line.
@@ -48,7 +49,7 @@ import { DialogClose } from "@/components/ui/dialog";
  * on both plans now, so the refusal it headlined cannot happen. Gone rather
  * than left as a dialog for a state the app has no way to reach.
  */
-export type UpgradeReason = "books" | "restore";
+export type UpgradeReason = "books" | "restore" | "checks";
 
 /**
  * Which plan each refusal is answered by.
@@ -60,6 +61,7 @@ export type UpgradeReason = "books" | "restore";
 const SELLS: Record<UpgradeReason, PaidTier> = {
   books: "pro",
   restore: "pro",
+  checks: "pro",
 };
 
 /* **Each headline names the plan it is selling**, and the count it quotes is
@@ -72,6 +74,12 @@ const HEADLINES: Record<UpgradeReason, { lead: string; title: string }> = {
   restore: {
     lead: "There is no room to put this one back.",
     title: `Free carries ${plural(TIER_LIMITS.free.books ?? 0, "book")}. ${TIER_NAMES.pro} carries as many as you write.`,
+  },
+  /* Pressed inside a tool rather than at the edge of the shelf (2026-09-15): a
+     Pro card in the consistency check. It hides nothing the writer typed. */
+  checks: {
+    lead: `${ALL_CHECKS.length - FREE_CHECKS.length} more checks, across the whole book.`,
+    title: `${TIER_NAMES.free} runs ${FREE_CHECKS.length} of the consistency checks. ${TIER_NAMES.pro} runs all ${ALL_CHECKS.length}.`,
   },
 };
 
@@ -154,6 +162,21 @@ const icons = {
       <path d="m8.5 12.2 2.4 2.4 4.6-5" />
     </Svg>
   ),
+  /* The dashboard rail's own two marks (`shelfIcons.ideas`, `.paperback`),
+     copied rather than imported so this dialog does not pull the shelf's icon
+     module into every screen that can open it. */
+  ideas: (
+    <Svg>
+      <path d="M9 18h6M10 21h4" />
+      <path d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.2h5c0-.9.4-1.7 1.1-2.2A6 6 0 0 0 12 3Z" />
+    </Svg>
+  ),
+  ruler: (
+    <Svg>
+      <path d="m3.5 15.5 12-12 5 5-12 12Z" />
+      <path d="m7 12 1.8 1.8M10 9l1.8 1.8M13 6l1.8 1.8" />
+    </Svg>
+  ),
 };
 
 /**
@@ -171,6 +194,8 @@ const ROW_ICON: Record<string, React.ReactNode> = {
   Export: icons.word,
   "Title check": icons.books,
   "Consistency check": icons.everything,
+  Ideas: icons.ideas,
+  "Paperback setup": icons.ruler,
 };
 
 /**

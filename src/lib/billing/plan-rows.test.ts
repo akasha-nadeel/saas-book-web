@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { KEEP_DAYS } from "@/lib/activity";
 import { NOT_INCLUDED, ROWS } from "./plan-rows";
 import { TIER_ORDER } from "./tiers";
 
@@ -70,17 +71,41 @@ it("opens on the row that separates Free from Pro", () => {
 });
 
 /**
- * **Pro is the whole of what is sold, and these are the two rows that say
- * what it buys.** Everything else must read the same on both plans.
+ * **Pro is the whole of what is sold, and these are the rows that say what it
+ * buys** (six since 2026-09-16). Everything else must read the same on both
+ * plans. **Paperback setup is the one feature Free does not have at all** — the
+ * owner's decision on 2026-09-16 — so it is the only row allowed to say "Not
+ * included", and Pro may never say it.
  */
-it("differs between the plans on books and title checks only", () => {
+it("differs between the plans only on the rows Pro sells", () => {
   const differing = ROWS.filter((row) => row.values.free !== row.values.pro).map(
     (row) => row.label,
   );
-  expect(differing.sort()).toEqual(["Books", "Title check"]);
-  for (const row of ROWS) {
-    for (const tier of TIER_ORDER) expect(row.values[tier]).not.toBe(NOT_INCLUDED);
-  }
+  expect(differing.sort()).toEqual([
+    "Books",
+    "Consistency check",
+    "Ideas",
+    "Paperback setup",
+    "Title check",
+    "Writing record",
+  ]);
+
+  const closedToFree = ROWS.filter((row) => row.values.free === NOT_INCLUDED).map(
+    (row) => row.label,
+  );
+  expect(closedToFree).toEqual(["Paperback setup"]);
+  for (const row of ROWS) expect(row.values.pro).not.toBe(NOT_INCLUDED);
+});
+
+/**
+ * The Writing record row promises Pro twelve months, which is only true while
+ * the day log keeps a year. Move `KEEP_DAYS` and this fails until the row's
+ * words move with it.
+ */
+it("promises no more of the writing record than the log keeps", () => {
+  const row = ROWS.find((r) => r.label === "Writing record");
+  expect(row?.values.pro).toBe("Last 12 months");
+  expect(KEEP_DAYS).toBe(365);
 });
 
 /**

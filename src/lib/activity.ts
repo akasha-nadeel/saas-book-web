@@ -63,13 +63,24 @@ export function record(
 }
 
 /**
+ * How many days of the log are kept. The pricing rows promise Pro "the last 12
+ * months" of the writing record on the strength of this number, and
+ * `plan-rows.test.ts` fails if it moves without them.
+ */
+export const KEEP_DAYS = 365;
+
+/**
  * Only what is worth keeping.
  *
  * A year is enough to answer every question this feature asks, and it keeps the
  * whole log at a few kilobytes — which matters, because this app already lives
  * close to the origin's storage ceiling.
  */
-export function trim(activity: Activity, days = 365, now = Date.now()): Activity {
+export function trim(
+  activity: Activity,
+  days = KEEP_DAYS,
+  now = Date.now(),
+): Activity {
   const cutoff = now - days * 86_400_000;
   const out: Activity = {};
   for (const [key, value] of Object.entries(activity)) {

@@ -1,6 +1,6 @@
 /**
- * One plan, drawn as a card: a mark, the name, the figure, who it is for, what
- * you get, and a button.
+ * One plan, drawn as a card: the name, who it is for, the price, a button, and
+ * the features.
  *
  * **No `"use client"`, deliberately.** Nothing here holds state or listens for
  * anything — the period toggle, the checkout and the provider branching all
@@ -10,231 +10,210 @@
  * hand-written lists of claims about one product is how a pricing page ends up
  * disagreeing with itself.
  *
- * ## What changed on 2026-09-04, and why
+ * ## The reference design (2026-09-16)
  *
- * **The card stopped being the comparison.** It used to carry all ten rows of
- * `ROWS` with a tick and a value badge against each, which is a table with
- * rounded corners — most of the lines identical across the columns, and the
- * one line a buyer is choosing between buried among them. So the card led with
- * a handful out of `plan-highlights.ts` and `PlanTable` underneath carried
- * every claim in full. **Since 2026-09-14 the card lists every row again**, as
- * plain lines rather than ticks and badges, and the table stays for reading
- * across.
+ * **Drawn to a reference the owner supplied, measure for measure**: a white
+ * card with a thin indigo outline beside an indigo card with a gold tab, the
+ * name large and left-aligned, a struck price over a very large one, a
+ * full-width button, a rule, "Features:" and a list behind gold bolts. The
+ * reference's "Contact for Inquiry" button is left out at the owner's request.
  *
- * **Centred, and the figure is the largest thing on it.** A price list is
- * scanned across before it is read down, so the four figures have to land at
- * one height in one size — which is what the reserved blocks below are for.
- * Ragged prose is fine; four prices on four baselines reads as carelessness on
- * the one row where it costs a sale.
+ * **Its palette is its own** — `price-*` in `globals.css`, the seventh entry on
+ * the closed list, with a night version — and so is its face, Roboto
+ * (`font-pricing`). The earlier card was built on the app's own tokens so it
+ * could not read as a second product; the owner chose the reference over that.
  *
- * **Everything is a token.** The design this follows carries its own palette;
- * this does not, because the app's is a closed list and a seventh exception on
- * a page the writer reaches from inside the app would be a second product. The
- * shape is the design's, the colour is the app's, and it holds in both themes.
+ * **What the reference shows and this does not say.** Three departures, each
+ * because the reference's version would be a claim the code cannot back:
+ *
+ * - The struck price is the real monthly price, shown only on the annual cycle
+ *   over the real per-month annual figure. Free has nothing to strike, and
+ *   neither does Pro on the monthly cycle — the line keeps its height either way
+ *   so the two prices stay on one baseline.
+ * - One small line under the price says how the figure is billed. A per-month
+ *   price with no word of the annual total is how a checkout surprises
+ *   somebody.
+ * - The tab says "Recommended", not "Popular": nobody has bought Pro yet.
  */
 
 import type { Highlight } from "@/lib/billing/plan-highlights";
 
-/**
- * Which of the two skins a card wears.
- *
- * **The featured card changes fill at night, and only at night.** By day it is
- * the brand blue with white ink. At night the accent is a bright periwinkle
- * (#8ab4ff), and white type on that is about 2:1 — so in dark mode the card
- * takes the upgrade gradient (`--color-upgrade-from` / `-to`, the app's one
- * licensed gradient, stated identically in every theme block) and every word
- * on it goes white, which clears 5:1 against both ends. `dark:` answers to
- * `[data-theme="dark"]`, so the three dark tints get it too.
- */
+/** The white card or the indigo one. */
 export type CardTone = "plain" | "featured";
+
+/**
+ * How far the gold tab stands above the card's top edge.
+ *
+ * The plain card takes the same space above it from `sm`, where the two sit in
+ * one row, so both names and both prices still share a line.
+ */
+const TAB = "1.85rem";
 
 export function PlanCard({
   tone = "plain",
   badge,
-  mark,
   name,
-  bestFor,
+  subtitle,
+  was,
   price,
+  per,
   note,
   highlights,
   action,
 }: {
   tone?: CardTone;
-  /** The tab that straddles the card's top edge. Only on the featured one. */
+  /** The gold tab over the card's top edge. Only on the featured one. */
   badge?: string;
-  mark: React.ReactNode;
   name: string;
-  /** Who the plan is for, in one sentence, on a tint of its own. */
-  bestFor: string;
+  /** Who the plan is for, in one sentence. */
+  subtitle: string;
+  /** The struck price, when there is a true one to strike. */
+  was?: string;
   price: string;
-  /** Shown under the price — which cycle this figure is. */
+  /** Beside the price — "/month". */
+  per: string;
+  /** Under the price — how this figure is billed. */
   note?: string;
   highlights: Highlight[];
   action: React.ReactNode;
 }) {
   const featured = tone === "featured";
+  const pale = featured ? "text-white/55" : "text-price-pale";
 
   return (
-    <section
-      className={`relative flex h-full flex-col gap-3 rounded-lg px-5 pt-8 pb-5
-                  text-center shadow-lg ${
-                    featured
-                      ? // No outline on the filled card. It is already the
-                        // loudest thing here, and a line around a block of
-                        // colour only muddies its edge.
-                        `bg-accent text-accent-ink dark:bg-linear-to-br
-                         dark:from-upgrade-from dark:to-upgrade-to dark:text-white`
-                      : "border border-line bg-panel text-fg"
-                  }`}
+    <div
+      className="relative flex h-full flex-col"
+      style={{ paddingTop: badge ? TAB : undefined }}
     >
       {badge && (
-        /* Straddles the top edge rather than sitting inside the card, so it
-           reads as a label *on* the plan rather than as its first line. The
-           ring is the page's own ground, which is what cuts the border cleanly
-           where the tab crosses it. */
-        <span
-          className={`absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2
-                      rounded-full px-3 py-1 font-sans text-[0.625rem]
-                      font-bold tracking-[0.12em] whitespace-nowrap uppercase
-                      ring-2 ring-surface ${
-                        featured
-                          ? "bg-accent-ink text-accent dark:bg-white dark:text-upgrade-ink"
-                          : "bg-accent text-accent-ink"
-                      }`}
+        /* **Behind the card, not on it.** The gold block is the card's width
+           and runs down under its top edge, so the card's own rounded corners
+           show gold in the notches — which is what makes the tab read as part
+           of the card rather than a sticker placed over it. */
+        <div
+          className="absolute inset-x-0 top-0 h-20 rounded-t-[2.2rem] bg-price-gold"
+          aria-hidden="true"
+        />
+      )}
+      {badge && (
+        <p
+          className="absolute inset-x-0 top-0 z-10 flex items-center justify-center font-pricing text-[0.9375rem] font-medium text-white"
+          style={{ height: TAB }}
         >
           {badge}
-        </span>
+        </p>
       )}
 
-      {/* One mark a card, on a chip of the accent. Tinted rather than filled:
-          at 42px a filled disc competes with the figure directly under it. */}
-      <span
-        className={`mx-auto grid h-11 w-11 place-items-center rounded-full ${
+      <section
+        className={`relative flex flex-1 flex-col rounded-2xl px-5 pt-7 pb-7 text-left font-pricing ${
+          badge ? "" : "sm:mt-[1.85rem]"
+        } ${
           featured
-            ? "bg-accent-ink/15 text-accent-ink dark:bg-white/15 dark:text-white"
-            : "bg-accent/12 text-accent"
+            ? "bg-price-brand text-white"
+            : "border-[1.5px] border-price-card-line bg-price-card text-price-ink"
         }`}
       >
-        {mark}
-      </span>
+        <h2 className="text-[1.75rem] leading-tight font-bold">{name}</h2>
+        {/* Two lines reserved, so a one-line sentence on one card does not
+            lift that card's price above the other's. */}
+        <p className={`mt-1 min-h-[2rem] text-[0.75rem] leading-[1.35] ${pale}`}>
+          {subtitle}
+        </p>
 
-      {/* Set in caps with wide tracking. A plan name is a label rather than a
-          word being read, and caps at this width sit better over a very large
-          figure than a mixed-case line does. */}
-      <h2 className="font-sans text-[0.9375rem] font-bold tracking-[0.13em] uppercase">
-        {name}
-      </h2>
-
-      <p className="flex items-baseline justify-center gap-1 font-display text-[2.5rem] leading-none font-bold tracking-tight tabular-nums">
-        {price}
-      </p>
-
-      {/* Reserved whether or not it is filled, so the four buttons stay on one
-          line as the period switches. */}
-      <p
-        className={`h-5 font-sans text-sm font-medium ${
-          featured ? "text-accent-ink/75 dark:text-white/75" : "text-muted"
-        }`}
-      >
-        {note}
-      </p>
-
-      {/* The positioning line, on a tint rather than loose in the card. It is
-          the one sentence saying who the plan is *for*, and a ground of its own
-          is what stops it being read as the first bullet. The reserved height
-          keeps the four tinted blocks on one line across the row — ragged
-          boxes look like a mistake in a way ragged prose does not. */}
-      <p
-        className={`flex min-h-[4.125rem] items-center justify-center rounded-md
-                    px-3.5 py-3 font-sans text-sm leading-snug ${
-                      featured
-                        ? "bg-accent-ink/12 text-accent-ink dark:bg-white/12 dark:text-white"
-                        : "bg-accent/10 text-fg"
-                    }`}
-      >
-        {bestFor}
-      </p>
-
-      <div className="mt-1 text-left">
-        {/* Gives the list a head, so the card reads price → promise → contents
-            rather than as one undifferentiated column. */}
+        {/* Always this tall, filled or not — see the header. */}
         <p
-          className={`pb-1.5 font-sans text-[0.625rem] font-semibold tracking-[0.11em] uppercase ${
-            featured ? "text-accent-ink/70 dark:text-white/70" : "text-faint"
+          className={`mt-5 h-7 text-[1.375rem] leading-7 ${
+            featured ? "text-white/85" : "text-price-old"
           }`}
         >
-          What you get
+          {was && (
+            <del
+              className={`decoration-2 ${
+                featured ? "decoration-price-gold" : "decoration-price-brand"
+              }`}
+            >
+              <span className="sr-only">Monthly price </span>
+              {was}
+            </del>
+          )}
         </p>
-        {/* No rules between the rows. On short items the hairlines were doing
-            no separating that the leading does not already do, and they made
-            the list look like a table. */}
-        <ul className="flex flex-col">
+
+        <p className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-[3.75rem] leading-none font-black tracking-tight tabular-nums sm:text-[4.5rem]">
+            {price}
+          </span>
+          <span className={`text-[1.125rem] ${pale}`}>{per}</span>
+        </p>
+        <p className={`mt-1.5 h-5 text-[0.8125rem] ${pale}`}>{note}</p>
+
+        <div className="mt-7 px-1.5">{action}</div>
+
+        <hr
+          className={`mt-6 h-px border-0 ${
+            featured ? "bg-white/15" : "bg-price-rule"
+          }`}
+        />
+
+        <h3 className="mt-5 text-[1.375rem] font-medium">Features:</h3>
+
+        <ul className="mt-5 flex flex-col gap-1.5">
           {highlights.map((line) => (
             <li
               key={`${line.lead ?? ""}${line.text}`}
-              className={`py-1.5 font-sans text-sm leading-snug ${
-                featured ? "text-accent-ink/90 dark:text-white/90" : "text-fg/85"
+              /* Stronger than the reference's pale grey, at the owner's
+                 request — these are the lines a reader is comparing. */
+              className={`flex items-start gap-3 text-[0.9375rem] leading-[1.4] ${
+                featured ? "text-white/85" : "text-price-list"
               }`}
             >
-              {line.lead && (
-                <b
-                  className={`font-semibold tabular-nums ${
-                    featured ? "text-accent-ink dark:text-white" : "text-fg"
-                  }`}
-                >
-                  {line.lead}{" "}
-                </b>
-              )}
-              {line.text}
+              <BoltIcon />
+              {/* One style for the whole line, as the reference sets it: the
+                  figure and the words are not split into two weights. */}
+              <span>{line.lead ? `${line.lead} ${line.text}` : line.text}</span>
             </li>
           ))}
         </ul>
-      </div>
-
-      {/* `mt-auto` is what puts the four buttons on one line whatever the lists
-          above them did. */}
-      <div className="mt-auto pt-3">{action}</div>
-    </section>
+      </section>
+    </div>
   );
 }
 
-/* The two card marks. Same alphabet as the rest of the app: a 20-grid at 1.5
-   weight, taking `currentColor` so the chip decides the hue. */
-
-export function StackIcon({ className }: { className?: string }) {
+/** The gold bolt in front of each feature. Filled, as the reference draws it. */
+function BoltIcon() {
   return (
     <svg
       aria-hidden="true"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className ?? "h-[21px] w-[21px]"}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className="mt-[0.2rem] h-3.5 w-3.5 shrink-0 text-price-gold"
     >
-      <path d="M10 2.5 17.5 6 10 9.5 2.5 6Z" />
-      <path d="M2.5 10 10 13.5 17.5 10" />
-      <path d="M2.5 14 10 17.5 17.5 14" />
+      <path d="M13.5 1.5 4 13.5h6.5L9.5 22.5 20 10h-6.6l.1-8.5Z" />
     </svg>
   );
 }
 
-export function NibIcon({ className }: { className?: string }) {
+/**
+ * The three small marks scattered over the section in the reference — a gold
+ * ring, an indigo plus and a gold dash at the right edge.
+ *
+ * Decoration and nothing else: hidden from screen readers, never in the way of
+ * a press, and placed inside the section's own box so it cannot widen the page.
+ */
+export function PricingDecor() {
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className ?? "h-[21px] w-[21px]"}
-    >
-      <path d="M10 2.5 15.5 8v6.5A1.5 1.5 0 0 1 14 16H6a1.5 1.5 0 0 1-1.5-1.5V8Z" />
-      <path d="M10 9.5v4" />
-      <circle cx="10" cy="7.5" r="1.1" />
-    </svg>
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+      <span className="absolute top-14 left-[9%] h-[1.1rem] w-[1.1rem] rounded-full border-[3px] border-price-gold" />
+      <svg
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        className="absolute top-8 left-[28%] h-4 w-4 text-price-brand/70"
+      >
+        <path d="M8 2v12M2 8h12" />
+      </svg>
+      <span className="absolute top-[64%] right-0 h-[3px] w-5 rounded-l-full bg-price-gold" />
+    </div>
   );
 }

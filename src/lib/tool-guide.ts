@@ -5,7 +5,9 @@
  * only what users can reach — `tool-guide.test.ts` walks `ALL_TOOLS` in both
  * directions so neither list can drift from the other.
  *
- * Three as of 2026-09-03: the title check, the consistency check and Export.
+ * Five as of 2026-09-15: the title check, the consistency check, paperback
+ * setup, the writing record and Export. (Advance copies had a guide for a day
+ * and lost it when its tool went back behind the gate.)
  * Comp titles was the fourth and went back behind the launch gate; its guide
  * went with it, because a guide for a tool the product does not list fails
  * the test in the other direction.
@@ -64,6 +66,53 @@ export const TOOL_GUIDES: ToolGuide[] = [
         term: "Straight quotation marks among curly ones",
         detail:
           "Text typed here takes typographic quotes, while text brought in from elsewhere keeps whatever it arrived with, so one manuscript can print two ways. This says where each kind is.",
+      },
+    ],
+  },
+  /* The two below arrived with their tools on 2026-09-15. */
+  {
+    path: "paperback",
+    headline: "The numbers a printed book needs, before the printer rejects it",
+    claim: "Spine width, inside margin and cover size",
+    lead: " — worked out from your page count and trim.",
+    points: [
+      {
+        term: "The spine follows the page count",
+        detail:
+          "Every page adds its thickness, and cream paper is thicker than white. Type in the page count from your PDF, pick the paper, and the spine and the full cover width follow.",
+      },
+      {
+        term: "The inside margin grows with the book",
+        detail:
+          "A thick book does not open flat, so the margin at the spine has to widen as the page count rises. The figures are the ones Amazon KDP publishes.",
+      },
+      {
+        term: "Check it against the shop's template",
+        detail:
+          "KDP makes an exact template once it knows your page count. This is for knowing the numbers before you get there, and for checking the template you were sent.",
+      },
+    ],
+  },
+  {
+    path: "provenance",
+    headline: "A record of your book being written, for when somebody asks",
+    claim: "The days you wrote and the drafts that were saved",
+    lead: " — gathered into a document you can send.",
+    points: [
+      {
+        term: "Evidence, not proof",
+        detail:
+          "No test settles whether a book was written by a person, and the detectors sold for it misfire on plain prose. A dated trail of the work is what people reach for instead, and this is that trail.",
+      },
+      {
+        term: "It says what it cannot show",
+        detail:
+          "The record lives in your browser and starts when you started writing here. The document says both, so nobody reading it is told more than it establishes.",
+      },
+      {
+        term: "Nothing is sent anywhere",
+        detail:
+          "The record and its fingerprint are made on your machine. Where the document goes after that is your decision.",
       },
     ],
   },

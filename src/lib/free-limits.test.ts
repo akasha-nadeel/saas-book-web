@@ -153,6 +153,47 @@ describe("itemAllowance", () => {
   });
 });
 
+describe("parked ideas", () => {
+  it("parks five on the free plan and refuses the sixth", () => {
+    expect(FREE_LIMITS.ideas.free).toBe(5);
+    expect(itemAllowance("ideas", 4, false).blocked).toBe(false);
+    expect(itemAllowance("ideas", 5, false).blocked).toBe(true);
+  });
+
+  /* Occupancy: forgetting an idea, or starting a book from one, makes room. */
+  it("gives the place back when an idea goes", () => {
+    expect(itemAllowance("ideas", 4, false).left).toBe(1);
+  });
+
+  it("keeps every idea a lapsed writer already has", () => {
+    expect(itemAllowance("ideas", 40, false).left).toBe(0);
+    expect(itemAllowance("ideas", 40, true).limit).toBeNull();
+  });
+
+  /*
+   * An idea is not on a book, and the limit does not come back on a date — so
+   * none of the other shapes' words may leak into these sentences.
+   */
+  it("speaks of the library, not a book or a day", () => {
+    const lines = [
+      leftLine(itemAllowance("ideas", 3, false)) ?? "",
+      spentLine(itemAllowance("ideas", 5, false)) ?? "",
+      leftBadge(itemAllowance("ideas", 4, false)) ?? "",
+    ];
+    expect(lines[0]).toBe("Room for 2 more ideas on the free plan.");
+    expect(lines[1]).toBe(
+      "The free plan holds 5 parked ideas at a time, and all 5 are taken. Forget one, or start a book from one, to make room.",
+    );
+    expect(lines[2]).toBe("1 idea left");
+    for (const line of lines) {
+      expect(line).not.toContain("book holds");
+      expect(line).not.toContain("on this book");
+      expect(line).not.toContain("today");
+      expect(line).not.toContain("tomorrow");
+    }
+  });
+});
+
 describe("warnAt", () => {
   /*
    * Three of these limits are 2 or 3. At a flat `WARN_WHEN_LEFT` a writer who
@@ -266,6 +307,7 @@ describe("the lines", () => {
       bookAllowance("prose", 0, false, false),
       bookAllowance("track", 0, false, false),
       itemAllowance("arcReaders", 0, false),
+      itemAllowance("ideas", 0, false),
     ];
     for (const allowance of fresh) expect(leftLine(allowance)).toBeNull();
   });
@@ -313,14 +355,22 @@ describe("the lines", () => {
 
   /*
    * **A daily limit of one is singular all the way through.** The title check
-   * went to one on 2026-09-14, and the sentence built for three read "runs 1
-   * title checks a day, and today's are used".
+   * was one from 2026-09-14 to 2026-09-16, and the sentence built for three
+   * read "runs 1 title checks a day, and today's are used". No limit is one
+   * today, so the allowance is built by hand — the wording is what is guarded.
    */
   it("agrees with a daily limit of one", () => {
-    expect(FREE_LIMITS.titleCheck.free).toBe(1);
-    const spent = { day: TODAY, counts: { titleCheck: 1 } };
-    expect(spentLine(dailyAllowance("titleCheck", spent, false, TODAY))).toBe(
+    const one = { action: "titleCheck", used: 1, limit: 1, left: 0, blocked: true } as const;
+    expect(spentLine(one)).toBe(
       "The free plan runs 1 title check a day, and today's is used. It starts again tomorrow.",
+    );
+  });
+
+  it("gives the title check three a day", () => {
+    expect(FREE_LIMITS.titleCheck.free).toBe(3);
+    const spent = { day: TODAY, counts: { titleCheck: 3 } };
+    expect(spentLine(dailyAllowance("titleCheck", spent, false, TODAY))).toBe(
+      "The free plan runs 3 title checks a day, and today's are used. It starts again tomorrow.",
     );
   });
 
@@ -371,7 +421,10 @@ describe("the dialog headline", () => {
       `The free plan runs ${FREE_LIMITS.comps.free} comp searches a day`,
     );
     expect(reachedHeadline("titleCheck")).toBe(
-      "The free plan runs 1 title check a day",
+      "The free plan runs 3 title checks a day",
+    );
+    expect(reachedHeadline("ideas")).toBe(
+      `The free plan holds ${FREE_LIMITS.ideas.free} parked ideas at a time`,
     );
     expect(reachedHeadline("prose")).toBe(
       `The free plan covers the prose report on ${FREE_LIMITS.prose.free} books`,

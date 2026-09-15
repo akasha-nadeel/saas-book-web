@@ -21,14 +21,22 @@ import Link from "next/link";
 import { CheckPicker } from "@/components/consistency/check-picker";
 import { checksIn } from "@/lib/consistency-checks";
 import { FindingCard } from "@/components/consistency/finding-card";
+import {
+  ProChecksNote,
+  useCheckPlan,
+} from "@/components/consistency/pro-checks";
 import { RunBar, ranLine } from "@/components/consistency/run-bar";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
+import { UpgradeDialog } from "@/components/upgrade/upgrade-dialog";
 import { namesOf } from "@/lib/bible";
 import { bookTextOf, readable } from "@/lib/book-text";
 import {
   ALL_CHECKS,
   consistencyReport,
+  forPlan,
+  PRO_CHECKS,
+  reportForPlan,
   withDismissal,
   withoutDismissal,
   type CheckId,
@@ -63,11 +71,26 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
   /** Whether the findings are on screen, or the picker is. */
   const [showing, setShowing] = useState(false);
 
+  /* Five checks on Free, eleven on Pro — see `pro-checks.tsx`. */
+  const { free, locked } = useCheckPlan();
+  const [upsell, setUpsell] = useState(false);
+  /* What the screen describes: on Free, the checks the writer could pick. */
+  const shown = useMemo(
+    () => (report ? reportForPlan(report, free) : null),
+    [report, free],
+  );
+
   // Counted before the press, so the button can say what it is about to read.
   const toRead = useMemo(() => (book ? readable(book).length : 0), [book]);
 
   const run = () => {
-    if (!book || picked.size === 0) return;
+    const chosen = [...picked].filter((id) => !locked.has(id));
+    if (!book || chosen.length === 0) return;
+    /*
+     * On Free the Pro checks run as well, so the count under the findings is
+     * read off this book rather than made up. They are never shown.
+     */
+    const checks = free ? [...new Set([...chosen, ...PRO_CHECKS])] : chosen;
     setRunning(true);
     /*
      * **The pressed state has to paint before the work starts.**
@@ -87,12 +110,12 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
      * that check out of `ran` rather than reporting it as having found nothing.
      */
     requestAnimationFrame(async () => {
-      const words = picked.has("typos") ? await loadTypoWords() : null;
+      const words = checks.includes("typos") ? await loadTypoWords() : null;
       const known = bible.map((entry) => namesOf(entry));
       setReport(
         consistencyReport(bookTextOf(book), {
           known,
-          only: [...picked],
+          only: checks,
           ...(words ? { words } : {}),
         }),
       );
@@ -123,12 +146,12 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
    * at the foot of the screen holding a second list with a second control.
    */
   const ordered = useMemo(() => {
-    const findings = report?.findings ?? [];
+    const findings = shown?.findings ?? [];
     return [
       ...findings.filter((f) => !setAside.has(f.key)),
       ...findings.filter((f) => setAside.has(f.key)),
     ];
-  }, [report, setAside]);
+  }, [shown, setAside]);
 
   const live = ordered.filter((f) => !setAside.has(f.key)).length;
 
@@ -194,7 +217,12 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
               . Pick what to look for. There are {ALL_CHECKS.length}, and
               running one on its own is how you work through a book.
             </p>
+            {upsell && (
+              <UpgradeDialog reason="checks" onClose={() => setUpsell(false)} />
+            )}
             <CheckPicker
+              locked={locked}
+              onLocked={() => setUpsell(true)}
               picked={picked}
               onToggle={(id) =>
                 setPicked((was) => {
@@ -204,12 +232,15 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
                   return next;
                 })
               }
-              onAll={() => setPicked(new Set(ALL_CHECKS))}
+              onAll={() =>
+                setPicked(new Set(ALL_CHECKS.filter((id) => !locked.has(id))))
+              }
               onNone={() => setPicked(new Set())}
               onGroup={(group, on) =>
                 setPicked((was) => {
                   const next = new Set(was);
                   for (const check of checksIn(group)) {
+                    if (locked.has(check.id)) continue;
                     if (on) next.add(check.id);
                     else next.delete(check.id);
                   }
@@ -223,13 +254,16 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
             />
           </section>
         ) : (
-          report && (
+          report &&
+          shown && (
             <>
               <RunBar
-                report={report}
+                report={shown}
                 running={running}
                 warning={
-                  picked.has("typos") && !report.ran.includes("typos")
+                  picked.has("typos") &&
+                  !locked.has("typos") &&
+                  !report.ran.includes("typos")
                     ? "The word list could not be loaded, so the near-miss check did not run."
                     : undefined
                 }
@@ -239,7 +273,7 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
               />
 
               {ordered.length === 0 ? (
-                <Nothing report={report} />
+                <Nothing report={shown} />
               ) : (
                 <>
                   <p className="mt-5 mb-2 px-1 text-[11px] font-semibold tracking-wide text-muted uppercase">
@@ -260,6 +294,8 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
                   </ul>
                 </>
               )}
+
+              {free && <ProChecksNote view={forPlan(report, true)} />}
             </>
           )
         )}

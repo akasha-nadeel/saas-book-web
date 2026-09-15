@@ -22,7 +22,7 @@ import {
 import { TIER_LIMITS, TIER_NAMES, type PaidTier } from "@/lib/billing/tiers";
 import { PLANS_ON_SALE } from "@/lib/launch";
 import { notePlanInterest } from "@/lib/plan-interest";
-import { NibIcon, PlanCard, StackIcon } from "@/components/upgrade/plan-card";
+import { PlanCard, PricingDecor } from "@/components/upgrade/plan-card";
 import { plural } from "@/lib/plural";
 
 /**
@@ -193,11 +193,10 @@ export function Plans({
         >
           Every format is free, on every plan — take your book and go whenever
           you like. {TIER_NAMES.pro} is for more than{" "}
-          {plural(TIER_LIMITS.free.books ?? 0, "book")} and title checks without
-          a daily limit. No AI on either plan: every word is yours.
+          {plural(TIER_LIMITS.free.books ?? 0, "book")}, every consistency check,
+          your whole writing record and paperback setup. No AI on either plan:
+          every word is yours.
         </p>
-
-        <PeriodToggle period={period} onChange={setPeriod} />
 
         {cancelled && (
           // PayHere's cancel_url lands back here. Said out loud, because a
@@ -212,12 +211,22 @@ export function Plans({
           </p>
         )}
 
-        <div className="mx-auto mt-10 grid max-w-3xl gap-3.5 sm:grid-cols-2 sm:items-stretch">
+        {/* **The section the reference draws**: its own pale ground, the
+            switch over the paid column, and the two cards. Its palette and
+            face are `price-*` and `font-pricing` — see `plan-card.tsx`. */}
+        <div className="relative mx-auto mt-8 max-w-[52rem] overflow-hidden rounded-3xl bg-price-ground px-4 pt-7 pb-10 text-left sm:px-10">
+          <PricingDecor />
+
+          <div className="relative mx-auto flex max-w-[45rem] justify-center sm:justify-end sm:pr-8">
+            <PeriodToggle period={period} onChange={setPeriod} />
+          </div>
+
+        <div className="relative mx-auto mt-5 grid max-w-[45rem] gap-5 sm:grid-cols-2 sm:items-stretch">
           <PlanCard
-            mark={<StackIcon />}
             name={TIER_NAMES.free}
-            bestFor={BEST_FOR.free}
+            subtitle={BEST_FOR.free}
             price="$0"
+            per="/month"
             note="No card needed"
             highlights={highlightsFor("free")}
             action={
@@ -235,10 +244,18 @@ export function Plans({
 
           <PlanCard
               tone="featured"
-              mark={<NibIcon />}
+              badge="Recommended"
               name={TIER_NAMES[PRO]}
-              bestFor={BEST_FOR[PRO]}
+              subtitle={BEST_FOR[PRO]}
+              /* The real monthly price, struck only over the real per-month
+                 annual figure. On the monthly cycle there is nothing to strike. */
+              was={
+                period === "annual"
+                  ? displayPrice(priceOf(PRO, "monthly"))
+                  : undefined
+              }
               price={displayPrice(perMonthOf(PRO, period))}
+              per="/month"
               note={
                 period === "annual"
                   ? `${displayPrice(priceOf(PRO, "annual"))} billed annually`
@@ -319,11 +336,11 @@ export function Plans({
                     </button>
                     {state.error && (
                       // On the card's own ink, not text-red: the featured
-                      // ground is bg-fg, and a red that reads on paper
-                      // disappears on it.
+                      // ground is the indigo `price-brand`, and a red that
+                      // reads on paper disappears on it.
                       <p
                         role="alert"
-                        className="mt-3 font-sans text-xs leading-relaxed text-accent-ink/75 dark:text-white/75"
+                        className="mt-3 font-sans text-xs leading-relaxed text-white/75"
                       >
                         {state.error}
                       </p>
@@ -340,6 +357,7 @@ export function Plans({
                 )
               }
             />
+        </div>
         </div>
 
         {/* **Every claim, in full, under the cards that summarise them.**
@@ -366,7 +384,8 @@ export function Plans({
               There is no payment gateway configured on this copy of
               OpenChapter, so there is nothing to buy and nothing is held back.
               Once billing is configured, {TIER_NAMES[PRO]} unlocks unlimited
-              books and title checks. Every export format is free either way.
+              books, title checks and parked ideas, and paperback setup. Every
+              export format is free either way.
             </>
           ) : (
             /* **It says the press was noted, because it was.** A button that

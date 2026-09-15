@@ -4,8 +4,8 @@ import Link from "next/link";
  * The picture band at the head of a section.
  *
  * **A photograph with the words on it, not a card with a picture beside it.**
- * Every one of these is 2752×1536 — the same shape and the same job as
- * `resume-card-background.jpg` — so the picture is the ground and the type
+ * Every one of these is a 2200×1228 WebP — the same shape and the same job as
+ * `resume-card-background.webp` — so the picture is the ground and the type
  * sits on it, the way `ResumeCard` is built.
  *
  * **This was `OverviewBanner` and became a component on its third use.** There

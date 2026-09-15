@@ -3376,6 +3376,71 @@ their characters and bible are **per-novel**; ours read across a series with
 transitive alias merging (`series.ts`), which is the one place we are already
 ahead on their flagship feature.
 
+## Switched on 2026-09-15 — four hidden tools, and the plans redrawn
+
+**What came off the launch gate, and why these four.** Research that day ranked
+the built-but-hidden features against what writers actually complain about:
+
+- **Written Word Media's 2025 survey** (1,346 authors): marketing is the hardest
+  part for well over 80%, and 44% earn $100 a month or less. The 2026 mid-year
+  survey (582) has 30% with falling sales and starting authors blaming the flood
+  of AI books. None of the hidden tools does marketing; advance copies is the
+  nearest.
+- **Reddit post counts**, titles only, so rough: r/selfpublish in the past month
+  had marketing 24 posts / 589 comments, covers 22 / 505, **ARC 20 / 383**,
+  **paperback and formatting 10 / 101**, blurbs 8 / 72. r/writing in the past
+  year (the search caps at 100): finishing 87 / 4,887, motivation 93 / 2,315,
+  outlining and structure 64 / 1,550, stuck in the middle 30 / 485, **tracking
+  characters and continuity 17 / 411**.
+- **Suspicion of AI** is the new fear: threads on leaving typos in to avoid it
+  (122 comments), detectors disagreeing from 0% to 100% on one manuscript (104),
+  em-dash paranoia (83). The advice everywhere is a dated record of drafts,
+  which is exactly what `provenance.ts` builds. r/selfpublish seems to hold AI
+  posts back, so the count undercounts this one.
+
+So: **the writing record** (on the Export screen and in the export-done
+dialog), **the story bible and ideas** (back in the editor rail, and in the
+dashboard's side panel), **advance copies** and **paperback setup** (in the
+dashboard's side panel). Paperback's figures were re-checked against KDP's own
+pages the same day: the gutter table held, "Colour" paper was really the
+*premium* colour weight (standard colour is thinner, and is now its own stock),
+and spine text is allowed only from 79 pages, which replaced a guess drawn from
+how wide the spine looked.
+
+**The plans, redrawn with the owner.** Free goes from one book to three, and Pro
+sells depth rather than access: the series bible, all eleven consistency checks
+(Free runs five and is told how many things the other six found), twelve months
+of the writing record with its fingerprint (Free reads thirty days), unlimited
+advance readers and title checks. The split follows the trade — Grammarly keeps
+plain mistakes free and sells consistency, PerfectIt sells only consistency at
+$70 a year, Reedsy Studio charges for history and outlining over a free core.
+The reasoning is in `docs/architecture/billing.md`; the numbers are in
+`free-limits.ts` and `consistency-ids.ts`.
+
+**Pulled back the same day, after the owner used them.** Once the switch-on was
+running, the owner took three of the four back out and trimmed the chrome:
+
+- **Advance copies** and **the story bible** are hidden everywhere again —
+  `arc` is back on `HIDDEN_BOOK_TOOL_PATHS`, both are back in
+  `LAUNCH_POST_BACKLOG`, and the two screens were restored to how they stood
+  before the day's changes. Their Pro rows (unlimited advance readers, the
+  series bible) went with them, so Pro sells four things: unlimited books and
+  title checks, all eleven consistency checks, and twelve months of the writing
+  record.
+- **Ideas** stays, but in the dashboard's side panel only — not the editor rail.
+- **The editor's front/back-matter popup is gone.** The Front matter and Back
+  matter cards already hold a switch for every page, so it asked twice.
+  `/book/new` still asks once.
+- **The side panel** lost its "Tools" heading and runs Overview, Write,
+  Favourites, Archived, rule, Title check, Ideas, Paperback, rule, Trash.
+  **How it works, Support, Send feedback and Pricing** were tried in the top
+  bar, left of New book, and moved back to the panel's foot the same day.
+
+*Left:* the migration `20260915000000_free_three_books.sql` has to be applied
+before the deploy. Structure stays hidden, with a design already agreed for it
+(Final Draft's story map: the book as one bar, chapters placed on it by word
+count, each beat listing the chapters inside it).
+
 ## Known rough edges
 
 - [ ] **`/tools` has no screenshots yet, and the space for them is reserved.**

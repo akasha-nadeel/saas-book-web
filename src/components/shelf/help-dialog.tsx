@@ -4,8 +4,9 @@ import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogClose } from "@/components/ui/dialog";
 import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
-import { ALL_CHECKS } from "@/lib/consistency";
-import { FREE_LIMITS } from "@/lib/free-limits";
+import { ALL_CHECKS, FREE_CHECKS, PRO_CHECKS } from "@/lib/consistency-ids";
+import { CHECK_LOOK } from "@/lib/consistency-checks";
+import { FREE_LIMITS, FREE_RECORD_DAYS } from "@/lib/free-limits";
 import { MAX_SNAPSHOTS } from "@/lib/history";
 import { IMPORT_FORMATS } from "@/lib/import";
 import { TINTS } from "@/lib/library-store";
@@ -46,7 +47,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     items: [
       {
         name: "The editor",
-        desc: "One chapter at a time on a page the size of the book you are making. One bar across the top: home, a File menu, undo and redo, the word count, whether it has saved, and Import and Export at the right. One rail down the left opens the chapter list, search, the consistency check, notes, ideas, your series bible, bookmarks, versions and the trash, one at a time.",
+        desc: "One chapter at a time on a page the size of the book you are making. One bar across the top: home, a File menu, undo and redo, the word count, whether it has saved, and Import and Export at the right. One rail down the left opens the chapter list, search, the consistency check, notes, versions and the trash, one at a time.",
       },
       {
         name: "Colour themes",
@@ -81,8 +82,12 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "A note lives beside the chapter it is about, not in a separate file you forget to open.",
       },
       {
+        name: "Ideas",
+        desc: `Somewhere to park an idea for a different book: type it and press Enter. Start a book from one when it turns out to be real. In the dashboard's side panel. Kept in this browser, and not synced. ${TIER_NAMES.free} parks ${FREE_LIMITS.ideas.free} at a time — forget one or start a book from it to make room — and ${TIER_NAMES.pro} has no limit.`,
+      },
+      {
         name: "The consistency check",
-        desc: `Reads the whole book at once for the ${ALL_CHECKS.length} things a writer cannot catch by re-reading their own draft: a name spelled two ways, British and American spellings side by side, a word written two ways, straight quotation marks among curly ones, a quotation mark left open, a word typed twice, a compound that gains and loses its hyphen, a number written as a word in one place and in digits in another, a term capitalised only sometimes, scene breaks marked more than one way, and a word used once that is one letter from a word you use often — a mistyped invented name, which no spelling checker can catch because it has never heard of the word either. Tick the ones you want and run those.`,
+        desc: `Reads the whole book at once for the ${ALL_CHECKS.length} things a writer cannot catch by re-reading their own draft: a name spelled two ways, British and American spellings side by side, a word written two ways, straight quotation marks among curly ones, a quotation mark left open, a word typed twice, a compound that gains and loses its hyphen, a number written as a word in one place and in digits in another, a term capitalised only sometimes, scene breaks marked more than one way, and a word used once that is one letter from a word you use often — a mistyped invented name, which no spelling checker can catch because it has never heard of the word either. Tick the ones you want and run those. ${TIER_NAMES.free} runs ${FREE_CHECKS.length} of them — ${FREE_CHECKS.map((id) => CHECK_LOOK[id].name.toLowerCase()).join(", ")} — and says how many things the other ${PRO_CHECKS.length} found.`,
       },
       {
         name: "Dictation",
@@ -110,6 +115,14 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         name: "The title check",
         desc: "Searches millions of published books for the title you are considering, and shows what a reader would find instead of yours. Titles cannot be copyrighted, so this reports rather than advises.",
       },
+      {
+        name: "The writing record",
+        desc: `A dated record of the days you wrote and the drafts that were saved, gathered into a plain-text document you can send if anyone says you used AI. It is evidence, not proof, and the document says so. On the Export screen. ${TIER_NAMES.free} covers the last ${FREE_RECORD_DAYS} days; ${TIER_NAMES.pro} covers the twelve months the app keeps and adds a fingerprint of the text. Every day is kept either way, in this browser.`,
+      },
+      {
+        name: "Paperback setup",
+        desc: `Spine width, inside margin and the full cover size for your page count and trim, from Amazon KDP's published figures. In the dashboard's side panel, and part of ${TIER_NAMES.pro}. Check the numbers against the template KDP makes for you; the PDF this app exports has no bleed or crop marks.`,
+      },
     ],
   },
   {
@@ -117,11 +130,11 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     items: [
       {
         name: TIER_NAMES.free,
-        desc: `Free, no card. ${plural(TIER_LIMITS.free.books ?? 0, "book")}, unlimited chapters and words, importing, syncing, every export format, and ${plural(FREE_LIMITS.titleCheck.free, "title check")} a day.`,
+        desc: `Free, no card. ${plural(TIER_LIMITS.free.books ?? 0, "book")}, unlimited chapters and words, importing, syncing, every export format, ${plural(FREE_LIMITS.titleCheck.free, "title check")} a day, ${plural(FREE_LIMITS.ideas.free, "parked idea")} at a time, ${FREE_CHECKS.length} consistency checks and the last ${FREE_RECORD_DAYS} days of the writing record.`,
       },
       {
         name: TIER_NAMES.pro,
-        desc: "Everything on Free, with unlimited books and unlimited title checks.",
+        desc: `Everything on Free, with unlimited books, title checks and parked ideas, all ${ALL_CHECKS.length} consistency checks, twelve months of the writing record with its fingerprint, and paperback setup.`,
       },
       {
         name: "Not on sale yet",

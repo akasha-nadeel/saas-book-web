@@ -8,6 +8,7 @@ import {
   mm,
   PAPER,
   paperbackSpec,
+  SPINE_TEXT_MIN_PAGES,
 } from "./paperback";
 
 describe("gutterFor", () => {
@@ -64,6 +65,24 @@ describe("paperbackSpec", () => {
     expect(paperbackSpec(900, 5.5, 8.5).problems[0]).toContain(
       String(MAX_PAGES),
     );
+  });
+
+  /**
+   * KDP's figures, checked 2026-09-15. Standard colour is printed at the white
+   * paper's weight and premium colour on a heavier one; one "Colour" at the
+   * premium figure gave every standard-colour book a spine too wide.
+   */
+  it("keeps the two colour papers apart", () => {
+    expect(PAPER.standardColour.perPage).toBe(PAPER.white.perPage);
+    expect(PAPER.premiumColour.perPage).toBeGreaterThan(
+      PAPER.standardColour.perPage,
+    );
+  });
+
+  /** KDP rejects a cover with spine text below 79 pages. */
+  it("allows spine text only from KDP's minimum", () => {
+    expect(paperbackSpec(SPINE_TEXT_MIN_PAGES - 1, 6, 9).spineText).toBe(false);
+    expect(paperbackSpec(SPINE_TEXT_MIN_PAGES, 6, 9).spineText).toBe(true);
   });
 
   it("says when there is no page count at all", () => {

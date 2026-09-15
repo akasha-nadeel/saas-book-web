@@ -39,7 +39,7 @@ description of what a writer can open. Check `src/lib/launch.ts` before
 assuming a screen or a route is live.
 
 - **`src/lib/launch.ts` is the one statement of what the MVP sells** — prices,
-  free/Pro limits, and `HIDDEN_BOOK_TOOL_PATHS`, the fifteen segments the proxy
+  free/Pro limits, and `HIDDEN_BOOK_TOOL_PATHS`, the thirteen segments the proxy
   redirects home. `/tools` and `/invite/*` go home with them. Its sibling
   `launch-server.ts` is the API half: `launchFeatureEnabled()` gates a route and
   `hiddenLaunchApiResponse()` answers **404** rather than 501 or 402.
@@ -56,10 +56,14 @@ assuming a screen or a route is live.
   segment out of `HIDDEN_BOOK_TOOL_PATHS`** — the env var will not do it.
 - **What is live**: the shelf, `/book/new`, `/book/import`, the editor,
   `/book/[bookId]/export`, `/book/[bookId]/consistency`,
-  `/book/[bookId]/title-check`, upgrade/billing and the legal
-  pages — and `/api/comps`, which was un-gated on 2026-09-02 because it is the
-  route the title check runs on.
-  **What is gated**: `/api/comps/subjects` and the fourteen other tool screens.
+  `/book/[bookId]/title-check`, and since 2026-09-15
+  `/book/[bookId]/paperback` and `/book/[bookId]/provenance` (the writing
+  record), plus Ideas in the dashboard's side panel, upgrade/billing and the
+  legal pages — and `/api/comps`, which was un-gated on 2026-09-02 because it is
+  the route the title check runs on.
+  **What is gated**: `/api/comps/subjects` and the twelve other tool screens.
+  Advance copies, the Story bible panel and the editor's Ideas tab were live
+  for a day on 2026-09-15 and the owner took them back out.
 - **`launch.ts` holds three more decisions this file used not to name.**
   `onFreePlan(plan)` is the one
   three-part test for *known to be metered* — `!loading && billing && !pro` —
@@ -143,8 +147,8 @@ do not treat its absence of a subject as a gap to fill unless somebody asks.
   browser; no dependencies, no network, not part of the build. Its palette is
   copied from `globals.css`, so it goes stale when the tokens move.
 
-The suite is 107 files / 2,034 tests and takes about a minute and a half
-(measured 2026-09-14 after the pricing-card change, all green, run on its own); jsdom prints `HTMLCanvasElement's getContext()` warnings
+The suite is 107 files / 2,048 tests and takes about a minute and a half
+(measured 2026-09-15 after the Free/Pro redraw, all green, run on its own); jsdom prints `HTMLCanvasElement's getContext()` warnings
 from the image recoder and `Not implemented: navigation to another Document`
 from the routing tests — both are expected, not failures.
 
@@ -317,20 +321,37 @@ wrong with this book, worst first, each carrying the control that fixes it).
 
 **The tool catalogue is declared once** in `src/lib/book-tools.ts` (path, name,
 one-line description, grouped). Nothing in that list is a preview: a tool that
-is not finished does not go in it. **It holds three entries in three groups** —
-the Title check (`LOOK_OUTWARD`), the Consistency check (`READ_IT_BACK`) and
-Export (`GET_IT_OUT`) — because the list is what the dashboard, the book card's
+is not finished does not go in it. **It holds five entries in three groups** —
+the Title check (`LOOK_OUTWARD`), the Consistency check (`READ_IT_BACK`), and
+Export, Paperback setup and the Writing record (`GET_IT_OUT`) — because the
+list is what the dashboard, the book card's
 ⋯ sheet and the landing page all read, and the MVP may only name what is
 reachable. (`1daca70` cut it to Export alone; the consistency check was added
 on 2026-08-27 as the second live tool, and is the only one of the seventeen
 written *for* the MVP rather than un-gated into it; the title check was
-un-gated on 2026-09-02 as the third.) **`GET_IT_OUT` is exported by name as
+un-gated on 2026-09-02 as the third; paperback setup and the writing record on
+2026-09-15, ranked first by that day's research into what writers complain
+about — advance copies came in with them and went back behind the gate the
+same day.) **`GET_IT_OUT` is exported by name as
 well as through `TOOL_GROUPS`**, because Overview shows that one group on its
 own and a lookup by title would have made the block vanish silently the day
 somebody renamed it. `src/lib/tool-guide.ts` carries one guide per entry. The
-fourteen older tool *screens* are all still in the tree under
+twelve older tool *screens* still hidden are all in the tree under
 `src/app/book/[bookId]/` and `src/components/`; bringing one back is an entry
 here, an entry there, and a line off `HIDDEN_BOOK_TOOL_PATHS`.
+
+**The dashboard's side panel, in the owner's order** (2026-09-15): Overview,
+Write, Favourites, Archived, a rule, Title check, Ideas, Paperback, a rule,
+Trash. No group heading — the rules separate the book lists from the tools, and
+Trash stays last. `RAIL` holds `{ divider: true }` rows for them. Paperback
+uses the shared frame `BookToolArea` and book picker `WorkingOn` (out of
+`Tools`, where it was first written), mounting `PaperbackPage` with `embedded`
+as a `dynamic` chunk inside the same child override `TitleCheckArea` uses;
+Ideas mounts the editor's `IdeasPanel`. The writing record is reached from the
+Export screen's Format step and the export-done dialog rather than from the
+rail. **How it works, Support, Send feedback and Pricing sit at the foot of the
+side panel**, under a rule; they were tried in the top bar beside New book for
+part of 2026-09-15 and the owner moved them back.
 **Each tool is the same three pieces** — a pure, tested module in `src/lib/`;
 a thin
 `src/app/book/[bookId]/<tool>/page.tsx` that awaits `params`; a client component
@@ -510,9 +531,13 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   — **it never reorders a page the book has**, because `bindBook` sorts front
   matter by `matterSectionIndex` and leaves the back in stored order, so a
   sorted card would disagree with the file.
-- The matter question is put once per book (`shouldAskMatter`), Skip is a real
-  answer, nothing is created until a press, and `matter-picks.ts` keeps the
-  dialog and `/book/new` saying the same thing.
+- The matter question is put once, in `/book/new`'s front and back steps; Skip
+  is a real answer and nothing is created until a press. **The editor's own
+  popup asking it (`matter-setup-dialog.tsx`) was deleted on 2026-09-15** —
+  the Front matter and Back matter cards already hold a switch for every page,
+  so it asked a second time over the manuscript. `shouldAskMatter` and
+  `rememberMatterAsked` stay in the store, tested; nothing in the editor reads
+  the first any more.
 - The bible reads across a **derived** series (matching `publishing.series`);
   merging is **exact** — same name or alias, case-insensitively, nothing fuzzier.
 - **`no-indent.ts` is a mark, not a setting**, and pairs with `click-to-type.ts`:
@@ -730,13 +755,15 @@ local-only, with the account menu saying why. Every entry point checks
   absent** — PostgREST refuses the whole select for one unknown column, so the
   entire library download would fail for everybody.
 - **Schema changes belong in `supabase/migrations/`**, not only in the
-  dashboard. There are **fifteen**. The first seven were confirmed applied live
-  on 2026-08-20; the eighth through the fifteenth
+  dashboard. There are **sixteen**. The first seven were confirmed applied live
+  on 2026-08-20; the eighth through the sixteenth
   (`20260822071735_launch_mvp_entitlements.sql` through
-  `20260914000000_ai_free_pro_plan.sql`) have not been confirmed here, so check
+  `20260915000000_free_three_books.sql`) have not been confirmed here, so check
   before blaming a route. **The fifteenth must be applied before the code that
   ships with it**: the app reads `subscriptions.plan` as `free | pro` only, so a
-  row still saying `writer` reads as Free. It has happened:
+  row still saying `writer` reads as Free. **So must the sixteenth**: the app
+  offers a second and third free book as soon as it ships, and the old trigger
+  refuses them. It has happened:
   `20260801000000_feedback.sql` sat unapplied from the day it was written, and
   the feedback dialog failed for every writer until it went in. Check rather
   than assume: `select to_regclass('public.<table>')`.
@@ -828,13 +855,34 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   by assistant credits, so removing the AI left three identical products; the
   migration folds every retired row into `pro`, and `asTier` refuses the old
   names rather than mapping them.
-- **Pro buys exactly two things**: unlimited books (Free holds **one**) and
-  unlimited title checks (Free runs **one a day**, `FREE_LIMITS.titleCheck`).
-  **Both pricing cards list every row of the comparison table**, in table
-  order (`plan-highlights.ts`); `plan-highlights.test.ts` fails if a row
-  reaches the table and not the cards.
+- **Pro buys six things since 2026-09-16**, and `plan-rows.test.ts` pins the
+  list: unlimited books (Free holds **three**); unlimited title checks (Free
+  runs **three a day**, `FREE_LIMITS.titleCheck`); unlimited parked ideas (Free
+  parks **five at a time**, `FREE_LIMITS.ideas` — occupancy, so forgetting one
+  makes room); all **11** consistency checks (Free runs **5**, `FREE_CHECKS` in
+  `consistency-ids.ts`, and is told how many things the other six found); the
+  writing record's **twelve months** with its fingerprint (Free reads the last
+  **30 days**, `FREE_RECORD_DAYS`, and the file says so); and **paperback
+  setup, which Free does not get at all** — `PaperbackPage` and the dashboard's
+  Paperback area both open `ProGate`, and it is the one row allowed to say "Not
+  included". **Only the book count is enforced by the server**; the rest are
+  browser gates through `onFreePlan` / `useLimitGate` / `useEntitled`, which the
+  owner chose knowingly. Nothing a writer typed is hidden by any of them — the
+  log keeps recording, parked ideas past five stay — so upgrading opens what
+  already exists. (The story bible's series view and unlimited advance readers
+  were Pro rows for a day, until both tools went back behind the gate.)
+  **Both pricing cards list every row of the comparison table their plan
+  includes**, in table order (`plan-highlights.ts`); `plan-highlights.test.ts`
+  fails if a row reaches the table and not the cards.
   Everything else — imports, sync, all three export formats, unlimited words and
-  chapters, the consistency check, voice typing — is on both plans.
+  chapters, voice typing — is on both plans.
+- **The pricing cards are drawn to a reference design** (2026-09-16):
+  `plan-card.tsx`, `plan-button.ts` and `period-toggle.tsx` wear their own
+  `price-*` palette (day and night) and Roboto (`font-pricing`, loaded with
+  `preload: false`), the seventh entry on the closed list in `docs/styling.md`.
+  The struck price is the real monthly price, shown only on the annual cycle;
+  the tab says "Recommended", not "Popular"; the subtitle keeps the reference's
+  pale grey by the owner's choice, and the feature lines were raised.
 - **Prices live once in `plans.ts`: Pro is $5.99 a month or $49.99 a year** —
   30% off, the top of the band `plans.test.ts` allows, with the per-month figure
   divided from the total rather than typed. Priced backwards from a floor of $5
@@ -897,7 +945,7 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   a browser count. `new-book-form.tsx` mirrors it in the UI; the trigger is what
   enforces it. **The number is stated three times and they must move together**:
   `LAUNCH_LIMITS.freeBooks`, `TIER_LIMITS.free.books`, and the trigger body,
-  whose current value (**one**) is set by the fifteenth migration.
+  whose current value (**three**) is set by the sixteenth migration.
   `launch.test.ts` reads that migration and fails if the SQL and the TypeScript
   disagree. `requirePro`, `requireTier`, the credit ledger (`ai_credits`,
   `claim_credits`, `refund_credits`), `ai_usage` and the assistant reply
@@ -932,20 +980,21 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   before the answer arrived told a writer with unlimited books there was no
   room. It is `!plan.loading && plan.billing && …` in both places now. Not
   knowing yet is not a reason to refuse, and the server is the real enforcement.
-- **`free-limits.ts` is the earlier metering policy and most of it is asleep** —
-  every tool it gates is one the launch MVP hides, so the seats row is the only
-  one on a live path (`ShareDialog` still opens from the editor and the
+- **`free-limits.ts` is the earlier metering policy and much of it is asleep** —
+  most tools it gates are ones the launch MVP hides. The seats row is on a live
+  path (`ShareDialog` still opens from the editor and the
   Collaborators area, while **`/invite/[token]` redirects home**, which is worth
   knowing before debugging an invite that cannot be accepted). It stays because
   it is the design to return to, and its shapes are still the house rule for
   anything metered in the browser. **The title check row is live**, and it is
-  one of the two things Pro sells:
+  one of the things Pro sells; `FREE_RECORD_DAYS` sits beside it:
 
   | Shape | Tools | Free |
   |---|---|---|
-  | **Per day** | comps, covers, title check | 3 / 3 / 1 a day |
+  | **Per day** | comps, covers, title check | 3 / 3 / 3 a day |
   | **Per book** | blurb, prose report, track | 5 / 6 / 2 books |
   | **By occupancy** | ARC readers, seats | 10 a book / 2 a book |
+  | **Held, across the library** | parked ideas | 5 at a time |
 
   There was a fourth, **in total, for good**, for work that cost a model call
   per press; it went with the AI. `onThisBook` means a book already counted is
@@ -1107,12 +1156,14 @@ The seventeen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
 `title-check` · `structure`, `prose`, `progress`, `provenance` · `money`,
 `track`, `arc` · and `consistency`, the seventeenth, written for the MVP rather
 than un-gated into it — grouped the way `book-tools.ts` groups them. **Under the
-launch flag the proxy redirects all of them home but `export`, `consistency`
-and `title-check`**, along with `/book/[bookId]/read`, `/tools` and
-`/invite/[token]`; `HIDDEN_BOOK_TOOL_PATHS` in `launch.ts` is the list, and it
-holds **fifteen** entries — the fourteen hidden tools plus `read`. **Read the
-set rather than this sentence**: `comps` came off it on 2026-09-02 and went
-back on 2026-09-03, so the count is the thing that moves most often here.
+launch flag the proxy redirects all of them home but `export`, `consistency`,
+`title-check`, `paperback` and `provenance`**, along with
+`/book/[bookId]/read`, `/tools` and `/invite/[token]`; `HIDDEN_BOOK_TOOL_PATHS`
+in `launch.ts` is the list, and it holds **thirteen** entries — the twelve
+hidden tools plus `read`. **Read the set rather than this sentence**: `comps`
+came off it on 2026-09-02 and went back on 2026-09-03, and `arc` came off and
+went back on the same day, 2026-09-15, so the count is the thing that moves
+most often here.
 
 **API routes:** `/api/comps` · `/api/comps/subjects` · `/api/export/pdf` ·
 `/api/plan-interest` ·

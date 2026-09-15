@@ -9,11 +9,24 @@ import {
   titleFromIdea,
   type Idea,
 } from "@/lib/ideas";
-import { createBook, saveIdeasRaw } from "@/lib/library-store";
+import {
+  booksAgainstPlan,
+  createBook,
+  saveIdeasRaw,
+} from "@/lib/library-store";
+import { LAUNCH_LIMITS, onFreePlan } from "@/lib/launch";
 import { relativeTime } from "@/lib/relative-time";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListGroup, RowAction, SectionHeader } from "@/components/ui/list";
-import { useIdeas } from "@/lib/use-library";
+import {
+  LeftPill,
+  LimitDialog,
+  LimitNote,
+  useLimitGate,
+} from "@/components/upgrade/free-limit";
+import { UpgradeDialog } from "@/components/upgrade/upgrade-dialog";
+import { useIdeas, useShelf } from "@/lib/use-library";
+import { usePlan } from "@/lib/use-plan";
 
 /**
  * The idea parking lot, in the editor's own rail.
@@ -35,6 +48,26 @@ export function IdeasPanel({ bookId }: { bookId?: string }) {
   const [text, setText] = useState("");
   const router = useRouter();
 
+  /*
+   * **Starting a book from an idea is a new book, and the free plan counts
+   * books.** This called `createBook` straight away, which walked past the
+   * limit `new-book-form.tsx` keeps: the book appeared here and Postgres then
+   * refused to take it. Same test as that form, through `onFreePlan`, and the
+   * same dialog, opened on the press.
+   */
+  const shelf = useShelf();
+  const plan = usePlan();
+  const [full, setFull] = useState(false);
+  const shelfFull =
+    onFreePlan(plan) && booksAgainstPlan(shelf).length >= LAUNCH_LIMITS.freeBooks;
+
+  /*
+   * **Free parks five at a time; Pro has no ceiling** (2026-09-16). Occupancy,
+   * like advance readers: handed the list's length, so forgetting an idea or
+   * starting a book from one makes room, and nothing already parked is hidden.
+   */
+  const gate = useLimitGate({ action: "ideas", items: ideas.length });
+
   function commit(next: Idea[]) {
     saveIdeasRaw(JSON.stringify(next));
   }
@@ -42,6 +75,9 @@ export function IdeasPanel({ bookId }: { bookId?: string }) {
   function capture() {
     const clean = text.trim();
     if (!clean) return;
+    // Refused before anything is written, and the words stay in the box — a
+    // writer told there is no room has not lost the idea they just typed.
+    if (!gate.spend()) return;
     commit(
       addIdea(ideas, clean, {
         id: crypto.randomUUID(),
@@ -54,6 +90,10 @@ export function IdeasPanel({ bookId }: { bookId?: string }) {
 
   return (
     <div className="flex h-full flex-col">
+      {full && <UpgradeDialog reason="books" onClose={() => setFull(false)} />}
+      {gate.dialogOpen && (
+        <LimitDialog action="ideas" onClose={gate.closeDialog} />
+      )}
       <form
         className="border-b border-line p-3"
         onSubmit={(e) => {
@@ -87,16 +127,23 @@ export function IdeasPanel({ bookId }: { bookId?: string }) {
           <span className="font-sans text-[11px] text-muted">
             Enter to park it
           </span>
-          <button
-            type="submit"
-            disabled={!text.trim()}
-            className="rounded-[10px] bg-accent px-3 py-1.5 font-sans text-[13px]
-                       font-semibold text-accent-ink transition-opacity
-                       hover:opacity-90 disabled:opacity-40"
-          >
-            Park it
-          </button>
+          <span className="flex items-center gap-2">
+            <LeftPill allowance={gate.allowance} />
+            <button
+              type="submit"
+              disabled={!text.trim()}
+              className="rounded-[10px] bg-accent px-3 py-1.5 font-sans text-[13px]
+                         font-semibold text-accent-ink transition-opacity
+                         hover:opacity-90 disabled:opacity-40"
+            >
+              Park it
+            </button>
+          </span>
         </div>
+        {/* The stacked note rather than the wide banner: this panel is also
+            the editor rail's, about three hundred pixels across. It stands
+            while the lot is full, as every occupancy limit's notice does. */}
+        <LimitNote allowance={gate.allowance} className="mt-3" />
       </form>
 
       <div className="scroll-slim min-h-0 flex-1 overflow-y-auto p-3">
@@ -130,6 +177,10 @@ export function IdeasPanel({ bookId }: { bookId?: string }) {
                     <span className="ml-auto flex items-center gap-1.5">
                       <RowAction
                         onClick={() => {
+                          if (shelfFull) {
+                            setFull(true);
+                            return;
+                          }
                           const { bookId: made } = createBook(
                             titleFromIdea(idea.text),
                           );

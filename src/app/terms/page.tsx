@@ -4,7 +4,8 @@ import Link from "next/link";
 import { LegalPage, List, Note, Section, Term } from "@/components/legal/legal-shell";
 import { displayPrice, priceOf } from "@/lib/billing/plans";
 import { plural } from "@/lib/plural";
-import { FREE_LIMITS } from "@/lib/free-limits";
+import { FREE_LIMITS, FREE_RECORD_DAYS } from "@/lib/free-limits";
+import { ALL_CHECKS, FREE_CHECKS } from "@/lib/consistency-ids";
 import {
   CONTACT_EMAIL,
   COUNTRY,
@@ -71,12 +72,17 @@ export default function TermsPage() {
         <p>
           The Free plan includes {plural(TIER_LIMITS.free.books ?? 0, "book")},
           unlimited chapters and words, autosave and sync where accounts are
-          configured, Word, EPUB and PDF export, and{" "}
-          {plural(FREE_LIMITS.titleCheck.free, "title check")} a day.
+          configured, Word, EPUB and PDF export,{" "}
+          {plural(FREE_LIMITS.titleCheck.free, "title check")} a day,{" "}
+          {plural(FREE_LIMITS.ideas.free, "parked idea")} at a time,{" "}
+          {FREE_CHECKS.length} of the {ALL_CHECKS.length} consistency checks,
+          and the last {FREE_RECORD_DAYS} days of the writing record.
         </p>
         <p>
-          {TIER_NAMES.pro} adds unlimited books and unlimited title checks. Every
-          export format is included on every plan, paid or not.
+          {TIER_NAMES.pro} adds unlimited books, title checks and parked ideas,
+          all {ALL_CHECKS.length} consistency checks, the writing record for the
+          twelve months the app keeps, and paperback setup. Every export format
+          is included on every plan, paid or not.
         </p>
         <p>
           {TRADING_NAME} {TIER_NAMES.pro} costs{" "}

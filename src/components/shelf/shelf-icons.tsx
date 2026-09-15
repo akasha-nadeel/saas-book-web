@@ -259,6 +259,23 @@ export const shelfIcons = {
       <path d="m4 12.5 5 5L20 6.5" />
     </Svg>
   ),
+  /* The tools the side panel opens beside the title check (2026-09-15). The
+     rail's animated `RailMark` stands in for ideas, whose drawing the editor
+     already has; these are the still fallbacks. */
+  /* A bulb, the idea every notebook app draws. */
+  ideas: (
+    <Svg>
+      <path d="M9 18h6M10 21h4" />
+      <path d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.2h5c0-.9.4-1.7 1.1-2.2A6 6 0 0 0 12 3Z" />
+    </Svg>
+  ),
+  /* A ruler: the measurements a paperback needs. */
+  paperback: (
+    <Svg>
+      <path d="m3.5 15.5 12-12 5 5-12 12Z" />
+      <path d="m7 12 1.8 1.8M10 9l1.8 1.8M13 6l1.8 1.8" />
+    </Svg>
+  ),
   archive: (
     <Svg>
       <rect x="3" y="3" width="18" height="5" rx="1.5" />

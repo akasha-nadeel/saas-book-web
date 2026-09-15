@@ -149,6 +149,7 @@ export function useLimitGate(ask: LimitAsk): {
   // render; the fields are what `spend` actually depends on.
   const action = ask.action;
   const bookId = "bookId" in ask ? ask.bookId : null;
+  const counted = "items" in ask;
 
   const spend = useCallback(() => {
     if (allowance.blocked) {
@@ -161,14 +162,16 @@ export function useLimitGate(ask: LimitAsk): {
     // screen may call this on every action without working out whether this
     // press is the first. An item limit records nothing at all — the caller's
     // own append *is* the item, and counting it here as well would double it.
+    // Asked by the shape of the ask rather than by name, so a second item
+    // limit (parked ideas was the second) cannot be spent as a daily one.
 
     if (bookId !== null) markToolBook(action as BookLimit, bookId);
-    else if (action !== "arcReaders") {
+    else if (!counted) {
       spendDailyUse(action as DailyLimit);
     }
 
     return true;
-  }, [allowance.blocked, action, bookId]);
+  }, [allowance.blocked, action, bookId, counted]);
 
   return {
     allowance,
@@ -422,7 +425,8 @@ export function LimitNote({
  * What Pro lifts, in the order somebody standing at this wall cares about.
  *
  * **Only what Pro actually sells** (2026-09-14): unlimited title checks and
- * unlimited books. This list used to name the blurb, the prose report, money
+ * unlimited books, and since 2026-09-16 paperback setup and unlimited parked
+ * ideas (the last one leads only when it is the limit that was reached). This list used to name the blurb, the prose report, money
  * tracking and the assistant — tools the launch gate hides and a model that no
  * longer exists — on the one dialog a live screen (the title check) opens. A
  * limit dialog promising things the product cannot open is a claim the code
@@ -434,7 +438,8 @@ export function LimitNote({
 const WHAT_PRO_ADDS = [
   "Title checks with no daily limit",
   "As many books as you write",
-  "Everything on Free stays — every export format, sync, the consistency check",
+  "Paperback setup on every book",
+  "Everything on Free stays — every export format, sync, and the writing tools",
 ];
 
 /**
@@ -454,6 +459,7 @@ const REACHED_LINE: Record<Limited, string> = {
   prose: "The blurb, prose report and money tracking on every book",
   track: "The blurb, prose report and money tracking on every book",
   arcReaders: "Advance reader lists with no ceiling",
+  ideas: "As many parked ideas as you like",
   collaborators: `Up to ${SEATS_PER_BOOK.pro} people on a book instead of ${SEATS_PER_BOOK.free}`,
 };
 

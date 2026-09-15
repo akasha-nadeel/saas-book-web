@@ -20,11 +20,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  NibIcon,
-  PlanCard,
-  StackIcon,
-} from "@/components/upgrade/plan-card";
+import { PlanCard, PricingDecor } from "@/components/upgrade/plan-card";
 import { PlanTable } from "@/components/upgrade/plan-table";
 import { PeriodToggle } from "@/components/upgrade/period-toggle";
 import {
@@ -49,16 +45,23 @@ export function PricingCards() {
 
   return (
     <>
-      <PeriodToggle period={period} onChange={setPeriod} />
+      {/* The same section `/upgrade` draws, to the same reference: its own
+          ground, the switch over the paid column, and the two cards. This
+          page is pinned to the dark scheme, so it shows the night values of
+          `price-*`. */}
+      <div className="relative mx-auto mt-10 max-w-[52rem] overflow-hidden rounded-3xl bg-price-ground px-4 pt-7 pb-10 text-left sm:px-10">
+        <PricingDecor />
 
-      {/* `items-stretch` and `mt-auto` on each action are together what put the
-          two buttons on one line under lists of different lengths. */}
-      <div className="mx-auto mt-10 grid max-w-3xl gap-3.5 sm:grid-cols-2 sm:items-stretch">
+        <div className="relative mx-auto flex max-w-[45rem] justify-center sm:justify-end sm:pr-8">
+          <PeriodToggle period={period} onChange={setPeriod} />
+        </div>
+
+      <div className="relative mx-auto mt-5 grid max-w-[45rem] gap-5 sm:grid-cols-2 sm:items-stretch">
         <PlanCard
-          mark={<StackIcon />}
           name={TIER_NAMES.free}
-          bestFor={BEST_FOR.free}
+          subtitle={BEST_FOR.free}
           price="$0"
+          per="/month"
           note="No card needed"
           highlights={highlightsFor("free")}
           action={
@@ -70,10 +73,16 @@ export function PricingCards() {
 
         <PlanCard
           tone="featured"
-          mark={<NibIcon />}
+          badge="Recommended"
           name={TIER_NAMES.pro}
-          bestFor={BEST_FOR.pro}
+          subtitle={BEST_FOR.pro}
+          was={
+            period === "annual"
+              ? displayPrice(priceOf("pro", "monthly"))
+              : undefined
+          }
           price={displayPrice(perMonthOf("pro", period))}
+          per="/month"
           note={
             period === "annual"
               ? `${displayPrice(priceOf("pro", "annual"))} billed annually`
@@ -97,6 +106,7 @@ export function PricingCards() {
             </Link>
           }
         />
+      </div>
       </div>
 
       {/* The contract under the pitch, and the same component `/upgrade`

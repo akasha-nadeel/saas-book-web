@@ -15,15 +15,12 @@ import {
   canWriteBook,
   createChapter,
   createMatterPage,
-  createMatterPages,
   deleteChapter,
   isSharedBook,
   orderedChapters,
-  rememberMatterAsked,
   renameChapter,
   setChapterMatter,
   setChapterUnnumbered,
-  shouldAskMatter,
   toggleBookmark,
   type Book,
   type ChapterMatter,
@@ -38,7 +35,6 @@ import {
   menuIcons,
   type RowMenuItem,
 } from "@/components/sidebar/row-menu";
-import { MatterSetupDialog } from "@/components/editor/matter-setup-dialog";
 import { SectionImportButton } from "@/components/editor/section-import";
 import { ConfirmDialog, PromptDialog } from "@/components/ui/dialog";
 
@@ -416,21 +412,13 @@ export function BookPanel({
     : null;
   const openPart = openChapter ? chapterMatterOf(openChapter) : null;
 
-  /**
-   * Whether to put the front/back-matter question, asked once per book.
-   *
-   * **Latched on mount rather than read each render**, which is what makes it a
-   * question rather than a flicker: `shouldAskMatter` goes false the instant
-   * the first page is created, so a live read would tear the dialog away
-   * mid-answer. Held here rather than in the two screens above because both
-   * mount this panel and the answer belongs to the cards it draws.
-   *
-   * The lazy initialiser reads storage during the first render, which is safe
-   * for the same reason `useSyncExternalStore` snapshots are: it is a read, and
-   * the server render never runs it — the panel is a client component that only
-   * paints once the library has been read.
+  /*
+   * **No front/back-matter popup here any more (2026-09-15).** It asked once per
+   * book, over the manuscript, which pages to create — while the Front matter
+   * and Back matter cards below already hold a switch for every one of them.
+   * Two places to answer one question, and the one that interrupted was the
+   * one to go. New book still asks, at the start, where nothing is interrupted.
    */
-  const [askMatter, setAskMatter] = useState(() => shouldAskMatter(book));
 
   const open = (id: string) => {
     onNavigate?.();
@@ -824,26 +812,6 @@ export function BookPanel({
           />
         </div>
       </div>
-
-      {askMatter && (
-        <MatterSetupDialog
-          onCreate={(picks) => {
-            setAskMatter(false);
-            rememberMatterAsked(bookId);
-            const first = createMatterPages(bookId, picks);
-            if (!first) return;
-            // Land on the first page they asked for, with its list open beside
-            // it — the same move Start makes, so what they just chose is on
-            // screen rather than behind a card.
-            body.remember(picks[0].part);
-            open(first);
-          }}
-          onSkip={() => {
-            setAskMatter(false);
-            rememberMatterAsked(bookId);
-          }}
-        />
-      )}
 
       {renaming && (
         <PromptDialog

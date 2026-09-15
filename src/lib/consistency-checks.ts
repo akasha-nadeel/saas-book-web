@@ -18,7 +18,7 @@
  * from the engine because the engine is what emits in it.
  */
 
-import { ALL_CHECKS, type CheckId } from "./consistency";
+import { ALL_CHECKS, type CheckId } from "./consistency-ids";
 
 /** The three headings the choice cards sit under. */
 export type CheckGroup = "spelling" | "punctuation" | "format";

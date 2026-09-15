@@ -15,7 +15,11 @@ import {
 import { nounFor } from "@/lib/plural";
 import { download } from "@/lib/export";
 import { toBlocks } from "@/lib/export/blocks";
+import { TIER_NAMES } from "@/lib/billing/tiers";
+import { FREE_RECORD_DAYS } from "@/lib/free-limits";
+import { onFreePlan } from "@/lib/launch";
 import {
+  activitySince,
   bookTimeline,
   canonicalText,
   chapterCanonicalText,
@@ -23,10 +27,13 @@ import {
   importDays,
   toHex,
   utcOffset,
+  versionsSince,
+  windowStart,
   writingRecord,
   type RecordChapter,
 } from "@/lib/provenance";
 import { useActivity, useHydrated, useShelf } from "@/lib/use-library";
+import { usePlan } from "@/lib/use-plan";
 
 /**
  * The writing record — the answer to "prove you wrote this".
@@ -56,6 +63,9 @@ import { useActivity, useHydrated, useShelf } from "@/lib/use-library";
  * something that failed to load rather than as emphasis.
  */
 export function ProvenancePage({ bookId }: { bookId: string }) {
+  /* The writing record has two halves since 2026-09-15: Free reads the last
+     `FREE_RECORD_DAYS` of the log and carries no fingerprint, Pro reads the
+     twelve months the log keeps. Both the screen and the file say which. */
   // Read here with the other hooks rather than beside the early return
   // below: hooks cannot sit after a conditional, and this screen has
   // several of its own already.
@@ -64,14 +74,34 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
   const activity = useActivity();
   const book = findBook(shelf, bookId);
 
+  /*
+   * **Free reads the last thirty days; Pro reads the whole log** (2026-09-15).
+   * The log goes on recording for everybody, so this is a window over what is
+   * kept rather than a clock that starts on upgrade. `onFreePlan` is the one
+   * three-part test: nothing is cut while the plan is still loading, or when
+   * no gateway is configured.
+   */
+  const plan = usePlan();
+  const free = onFreePlan(plan);
+  const from = useMemo(
+    () => (free ? windowStart(FREE_RECORD_DAYS) : null),
+    [free],
+  );
+
   const [built, setBuilt] = useState<{
     text: string;
     fingerprint: string | null;
+    /** Left out of this copy on purpose, rather than refused by the browser. */
+    withheld: boolean;
   } | null>(null);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const record = useMemo(() => writingRecord(activity), [activity]);
+  const whole = useMemo(() => writingRecord(activity), [activity]);
+  const record = useMemo(
+    () => (from ? writingRecord(activitySince(activity, from)) : whole),
+    [activity, from, whole],
+  );
   const imports = useMemo(() => importDays(record), [record]);
 
   /**
@@ -112,31 +142,43 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
 
       const readable = parsed.filter((p) => p.ok);
 
+      // A free copy carries no fingerprints at all, so none are taken.
+      const withheld = from !== null;
+
       const chapters: RecordChapter[] = await Promise.all(
-        parsed.map(async ({ meta, blocks, ok }) => ({
-          title: meta.title,
-          words: meta.words,
-          fingerprint: ok
-            ? await sha256(chapterCanonicalText({ title: meta.title, blocks }))
-            : null,
-          ...(ok ? {} : { unreadable: true as const }),
-          versions: parseHistory(getHistoryRaw(meta.id))
+        parsed.map(async ({ meta, blocks, ok }) => {
+          const versions = parseHistory(getHistoryRaw(meta.id))
             .map((s) => ({ at: s.at, words: s.words }))
             // parseHistory hands back newest first, for the panel that shows
             // "restore the last one". Here the chapter has to read as a thing
             // that grew, so it is turned round.
-            .reverse(),
-        })),
+            .reverse();
+          return {
+            title: meta.title,
+            words: meta.words,
+            fingerprint:
+              ok && !withheld
+                ? await sha256(chapterCanonicalText({ title: meta.title, blocks }))
+                : null,
+            ...(ok ? {} : { unreadable: true as const }),
+            // Cut to the same window as the day log, so the drafts cannot
+            // say the book began earlier than the copy admits to covering.
+            versions: from ? versionsSince(versions, from) : versions,
+          };
+        }),
       );
 
-      const fingerprint = await sha256(
-        canonicalText(
-          readable.map(({ meta, blocks }) => ({ title: meta.title, blocks })),
-        ),
-      );
+      const fingerprint = withheld
+        ? null
+        : await sha256(
+            canonicalText(
+              readable.map(({ meta, blocks }) => ({ title: meta.title, blocks })),
+            ),
+          );
 
       setBuilt({
         fingerprint,
+        withheld,
         text: formatRecord({
           title: book.title,
           ...(book.author ? { author: book.author } : {}),
@@ -147,6 +189,8 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
           imports,
           at: Date.now(),
           zone: utcOffset(),
+          window: from ? { from } : null,
+          fingerprintWithheld: withheld,
         }),
       });
     } catch {
@@ -210,9 +254,43 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
             and the count would still be stale — history is not one of the
             stores this screen subscribes to. It is gathered once, below, when
             the document is built. */}
+        {/* ---- The window, said before the numbers ------------------------
+            On Free, above the log it limits, so nobody reads "12 days written"
+            as the whole story. It names the first day the log actually holds,
+            which is the honest reason to want the rest, and nothing more. */}
+        {free && from && (
+          <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-line bg-panel px-5 py-4">
+            <div className="min-w-0 max-w-prose">
+              <p className="text-sm font-bold text-fg">
+                Showing the last {FREE_RECORD_DAYS} days
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-muted">
+                {whole.firstDay !== null && whole.firstDay < from
+                  ? `Your record goes back to ${whole.firstDay}. ${TIER_NAMES.pro} includes the last 12 months, and the fingerprint.`
+                  : `${TIER_NAMES.pro} includes the last 12 months as your record grows, and the fingerprint.`}{" "}
+                Every day is still being kept either way.
+              </p>
+            </div>
+            <Link
+              href="/upgrade"
+              className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink
+                         outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-accent/50"
+            >
+              See {TIER_NAMES.pro}
+            </Link>
+          </section>
+        )}
+
         <section className="overflow-hidden rounded-xl border border-line bg-panel">
-          {record.firstDay === null ? (
+          {whole.firstDay === null ? (
             <EmptyLog bookId={book.id} />
+          ) : record.firstDay === null ? (
+            /* Kept days, none of them inside the window. "Nothing recorded
+               yet" would be false here, so this says what is true. */
+            <p className="px-5 py-6 text-sm text-muted">
+              Nothing written in the last {FREE_RECORD_DAYS} days. Earlier days
+              are kept, from {whole.firstDay} onwards.
+            </p>
           ) : (
             <>
               <div className="grid divide-y divide-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
@@ -279,9 +357,25 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
 
         <section className="mt-4 rounded-xl border border-line bg-panel p-5">
           <ul className="flex flex-col gap-2.5">
-            <Holds>Day by day</Holds>
-            <Holds>Every draft the app saved</Holds>
-            <Holds>A fingerprint of the text as it stands</Holds>
+            <Holds>
+              Day by day{free ? `, for the last ${FREE_RECORD_DAYS} days` : ""}
+            </Holds>
+            <Holds>
+              Every draft the app saved{free ? " in those days" : ""}
+            </Holds>
+            {free ? (
+              <li className="flex items-center gap-2.5 text-sm text-muted">
+                <span
+                  aria-hidden="true"
+                  className="rounded-full border border-line px-1.5 py-0.5 text-[10px] font-bold uppercase"
+                >
+                  {TIER_NAMES.pro}
+                </span>
+                A fingerprint of the text as it stands
+              </li>
+            ) : (
+              <Holds>A fingerprint of the text as it stands</Holds>
+            )}
           </ul>
 
           <button
@@ -332,6 +426,12 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
                   store it for you.
                 </p>
               </section>
+            ) : built.withheld ? (
+              <p className="rounded-xl border border-line bg-panel px-5 py-4 text-sm text-muted">
+                No fingerprint in this copy: it is part of {TIER_NAMES.pro}, and
+                the document says it is not included. This copy covers the last{" "}
+                {FREE_RECORD_DAYS} days, and says that too.
+              </p>
             ) : (
               <p className="rounded-xl border border-line bg-panel px-5 py-4 text-sm text-muted">
                 No fingerprint: this browser will not do cryptography on an

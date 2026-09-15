@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { DESTINATIONS } from "@/components/landing/works-with";
 import { download, fileSize, type Format } from "@/lib/export";
 import { Button } from "@/components/ui/button";
@@ -86,9 +87,12 @@ const CATALOGUE_FORMAT: Partial<Record<DoneFormat, string>> = {
 
 export function ExportDoneDialog({
   done,
+  bookId,
   onClose,
 }: {
   done: ExportDone;
+  /** For the writing record's link. */
+  bookId: string;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -233,6 +237,22 @@ export function ExportDoneDialog({
             What is left is what this MVP actually is: the file is written,
             and here is where it went. `roadmapFor` and `storeReadiness` are
             untouched, and all three come back with the tools. */}
+
+        {/* **The writing record, one line** (2026-09-15). The moment a file
+            leaves is the moment somebody else starts reading the book, and
+            the record is what a writer wants ready if one of them asks
+            whether it is theirs. A link, not a card: this dialog is about the
+            file that was just made. */}
+        <p className="mt-5 font-sans text-sm leading-relaxed text-tremor-content">
+          Sending it out? Keep a{" "}
+          <Link
+            href={`/book/${bookId}/provenance`}
+            className="font-semibold text-accent hover:underline"
+          >
+            writing record
+          </Link>{" "}
+          ready, for if anyone asks whether you used AI.
+        </p>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
           <Button onClick={onClose} className="ml-auto">

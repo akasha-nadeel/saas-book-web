@@ -144,6 +144,42 @@ export function daysBetween(from: string, to: string): number {
 }
 
 /**
+ * The first day a window of `days` days covers, today included.
+ *
+ * **The Free plan's record is a window, and this is its edge** (2026-09-15).
+ * The log goes on recording every day for everybody; a free copy of the
+ * document is cut to the last `FREE_RECORD_DAYS`, and Pro reads all of it. So
+ * upgrading unlocks history that already exists rather than starting a clock.
+ *
+ * Anchored at midday before stepping back, for the reason `daysBetween` is: a
+ * daylight-saving change an hour either side of midnight would otherwise move
+ * the edge by a whole day.
+ */
+export function windowStart(days: number, now: number = Date.now()): string {
+  const noon = new Date(now);
+  noon.setHours(12, 0, 0, 0);
+  noon.setDate(noon.getDate() - Math.max(0, days - 1));
+  return dayKey(noon);
+}
+
+/** The day log cut to the days on or after `from`. Keys compare as ISO dates. */
+export function activitySince(activity: Activity, from: string): Activity {
+  const out: Activity = {};
+  for (const [day, words] of Object.entries(activity)) {
+    if (day >= from) out[day] = words;
+  }
+  return out;
+}
+
+/** The drafts saved on or after the local day `from`. */
+export function versionsSince<T extends { at: number }>(
+  versions: readonly T[],
+  from: string,
+): T[] {
+  return versions.filter((v) => dayKey(v.at) >= from);
+}
+
+/**
  * The days too large to have been typed.
  *
  * Reported rather than hidden, and described rather than judged. A writer who
@@ -360,9 +396,27 @@ export function formatRecord({
   imports,
   at,
   zone,
+  window = null,
+  fingerprintWithheld = false,
 }: {
   title: string;
   author?: string;
+  /**
+   * Set when this copy covers only the days from `from` onwards.
+   *
+   * **The file must say so in its own words**, because the file is what gets
+   * forwarded: a thirty-day copy read as the whole history would tell an
+   * accuser the book was written in a month.
+   */
+  window?: { from: string } | null;
+  /**
+   * The fingerprints were left out of this copy on purpose.
+   *
+   * Distinct from `fingerprint: null`, which means the browser refused. The two
+   * need different sentences, and printing neither would leave a reader
+   * wondering which.
+   */
+  fingerprintWithheld?: boolean;
   /** The library-wide day log. */
   record: WritingRecord;
   /** What this book's own snapshots say, which is a floor. */
@@ -395,6 +449,16 @@ export function formatRecord({
     "processor's edit history.",
   );
   lines.push("");
+
+  if (window) {
+    lines.push("THIS COPY");
+    lines.push(
+      `This copy covers ${window.from} to ${when.slice(0, 10)} only. Earlier`,
+      "days and drafts are kept on the author's machine but are not included",
+      "here, so nothing below says when the writing began.",
+    );
+    lines.push("");
+  }
 
   /* This book, before the library-wide log — it is the question the reader
      came with, and burying it under a figure about a different question was
@@ -499,7 +563,11 @@ export function formatRecord({
     lines.push("");
   }
 
-  if (fingerprint) {
+  if (fingerprintWithheld) {
+    lines.push("FINGERPRINT");
+    lines.push("Not included in this copy.");
+    lines.push("");
+  } else if (fingerprint) {
     lines.push("FINGERPRINT");
     lines.push("SHA-256 of the manuscript text as of the moment above:");
     lines.push(`  ${fingerprint}`);

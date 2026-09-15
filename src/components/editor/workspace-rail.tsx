@@ -54,6 +54,11 @@ export function selectPanel(
  */
 const GROUPS: readonly (readonly PanelTab[])[] = [
   ["chapters", "search", "consistency"],
+  /* Ideas, the story bible and bookmarks are all held back from the rail. The
+     first two came back for a day on 2026-09-15 and the owner took them out
+     again: ideas lives in the dashboard's side panel instead, and the bible is
+     hidden everywhere. The note above still describes where they belong if
+     they return. */
   ["notes"],
   /* **How the page looks, and what goes on it.** Its own group because it is
      the one tab that changes the *book* rather than telling you about it —

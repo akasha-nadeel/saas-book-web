@@ -9,37 +9,32 @@
  *
  * **Plain strings and no JSX**, so a Server Component and a client component
  * can both read it. The same reason `plan-rows.ts` carries no `"use client"`.
+ *
+ * **Both are filled since 2026-09-16**, as the reference design the cards copy
+ * draws them: indigo on the white card, gold on the indigo one. Each is the
+ * only button on its own card, so two fills side by side are two answers
+ * rather than two competing primaries. See `price-*` in `globals.css`.
  */
 
 /**
- * The filled one, for the plan being recommended.
+ * The one shape both share: 3rem tall, a small radius, Roboto at 1.0625rem.
  *
- * `text-accent-ink` rather than a fixed white by day: the fill is the brand
- * blue, and the ink on it has to follow the theme. **At night the featured
- * card is the upgrade gradient** (see `CardTone` in `plan-card.tsx`), so the
- * button turns to a veil of white with white type — a periwinkle slab with
- * dark ink on a purple card would be a third colour on it.
+ * It lifts a pixel and deepens on hover rather than fading, because fading a
+ * fill towards the card behind it is the one direction that reads as less
+ * pressable.
  */
-export const PLAN_BUTTON_PRIMARY = `block w-full rounded-xl bg-accent px-5 py-3
-  text-center font-sans text-sm font-semibold text-accent-ink shadow-sm
-  outline-none transition-[opacity,box-shadow,background-color] hover:opacity-90
-  hover:shadow-md focus-visible:ring-2 focus-visible:ring-accent/60
-  dark:bg-white/20 dark:text-white dark:ring-1 dark:ring-white/35
-  dark:hover:bg-white/30 dark:hover:opacity-100 dark:focus-visible:ring-white/70`;
+const SHAPE = `flex h-12 w-full items-center justify-center rounded-[0.3rem] px-5
+  text-center font-pricing text-[1.0625rem] font-medium outline-none
+  transition-[transform,filter] hover:-translate-y-px hover:brightness-95
+  focus-visible:ring-2 focus-visible:ring-offset-2`;
 
-/**
- * The quieter twin, for every card that is not the featured one.
- *
- * **Three filled accent buttons in a row is three primary actions**, which is
- * none: the eye has nowhere to land and the recommendation stops reading as a
- * recommendation. So the featured card keeps the fill and its neighbours take
- * an outline — still a real press, plainly secondary.
- */
-export const PLAN_BUTTON_PLAIN = `block w-full rounded-xl border border-line
-  bg-surface px-5 py-3 text-center font-sans text-sm font-semibold text-fg
-  shadow-sm outline-none transition-[background-color,box-shadow]
-  hover:bg-raised hover:shadow-md focus-visible:ring-2
-  focus-visible:ring-accent/60`;
+/** Gold, for the indigo card. */
+export const PLAN_BUTTON_PRIMARY = `${SHAPE} bg-price-gold text-price-gold-ink
+  focus-visible:ring-price-gold focus-visible:ring-offset-price-brand`;
+
+/** Indigo, for the white card. */
+export const PLAN_BUTTON_PLAIN = `${SHAPE} bg-price-brand text-white
+  focus-visible:ring-price-brand focus-visible:ring-offset-price-card`;
 
 export function planButton(featured?: boolean): string {
   return featured ? PLAN_BUTTON_PRIMARY : PLAN_BUTTON_PLAIN;

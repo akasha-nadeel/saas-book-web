@@ -108,40 +108,20 @@ export interface Occurrence {
   mark: string;
 }
 
-export type CheckId =
-  | "names"
-  | "spelling"
-  | "style"
-  | "hyphens"
-  | "quotes"
-  | "doubled"
-  | "unclosed"
-  | "numbers"
-  | "capitals"
-  | "breaks"
-  | "typos";
-
-/**
- * Every check, in the order `consistencyReport` emits them.
- *
- * Here rather than in the catalogue beside it because this *is* the emit order
- * — the sequence of calls at the foot of this file — and a second list saying
- * so somewhere else would be a second answer to one question. The words and
- * the hue for each live in `consistency-checks.ts`, which reads this.
+/*
+ * The ids, the emit order and the free/Pro split live in `consistency-ids.ts`,
+ * which imports nothing, so the pricing rows and the upgrade dialog can read
+ * them without pulling this module's word lists into their bundles.
  */
-export const ALL_CHECKS: readonly CheckId[] = [
-  "names",
-  "spelling",
-  "style",
-  "quotes",
-  "unclosed",
-  "doubled",
-  "hyphens",
-  "numbers",
-  "capitals",
-  "breaks",
-  "typos",
-];
+import {
+  ALL_CHECKS,
+  FREE_CHECKS,
+  isProCheck,
+  PRO_CHECKS,
+  type CheckId,
+} from "./consistency-ids";
+
+export { ALL_CHECKS, FREE_CHECKS, isProCheck, PRO_CHECKS, type CheckId };
 
 export interface ConsistencyFinding {
   /**
@@ -180,6 +160,58 @@ export interface ConsistencyReport {
   /** Whether a hand-kept story bible was there to check names against. */
   usedBible: boolean;
   findings: ConsistencyFinding[];
+}
+
+/** A report as one plan sees it. */
+export interface PlanView {
+  /** The findings this writer is shown. */
+  shown: ConsistencyFinding[];
+  /** How many findings came from Pro checks, whether or not they are shown. */
+  proFound: number;
+  /** The Pro checks that actually ran, from `ran`. */
+  proRan: readonly CheckId[];
+}
+
+/**
+ * What a writer on `free` is shown of a report.
+ *
+ * **On Free the six Pro checks still run, and only their count comes back**
+ * (2026-09-15) — "The 6 Pro checks found 14 more things" is a fact about this
+ * book, where a number worked out any other way would be invented. The count
+ * is only as good as the run, so `proRan` travels with it: a Pro check that
+ * could not run (the near-miss check without its word list) must not be read
+ * as having found nothing, which is the same rule `ran` exists for.
+ */
+export function forPlan(report: ConsistencyReport, free: boolean): PlanView {
+  const pro = report.findings.filter((f) => isProCheck(f.check));
+  return {
+    shown: free
+      ? report.findings.filter((f) => !isProCheck(f.check))
+      : report.findings,
+    proFound: pro.length,
+    proRan: report.ran.filter(isProCheck),
+  };
+}
+
+/**
+ * The report as a free writer's screen should describe it.
+ *
+ * On Free the Pro checks run behind the scenes for their count, so the raw
+ * report's `ran` names checks the writer never picked. Every sentence built
+ * from `ran` ("5 of 11 checks", "nothing came back") has to be about the run
+ * the writer asked for, so on Free both `ran` and `findings` are cut to the
+ * free checks. Pro gets the report untouched.
+ */
+export function reportForPlan(
+  report: ConsistencyReport,
+  free: boolean,
+): ConsistencyReport {
+  if (!free) return report;
+  return {
+    ...report,
+    ran: report.ran.filter((id) => !isProCheck(id)),
+    findings: report.findings.filter((f) => !isProCheck(f.check)),
+  };
 }
 
 /** What one story-bible entry answers to. Most books have no bible at all. */

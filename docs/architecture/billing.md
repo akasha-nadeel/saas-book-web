@@ -20,6 +20,7 @@ Read before touching `src/lib/billing/`, `src/lib/free-limits.ts`, `src/componen
 >   `pro` and narrows the CHECKs; `asTier` refuses the old names.
 > - **Pro buys two things**: unlimited books (Free holds one) and unlimited
 >   title checks (Free runs one a day). **$5.99 a month or $49.99 a year.**
+>   (Superseded twice: six things since 2026-09-16 — see below.)
 > - **The credit economy is gone** — `credits.ts`, `starter-pass.ts`,
 >   `aiChatClosed()`, `claimCredits`, `ai_credits`, `ai_usage`, `requirePro()`
 >   and `requireTier()`. The one server-side limit left is the book trigger.
@@ -111,17 +112,39 @@ are that PayHere must be sent **no `recurrence` and no `duration`** or it bills
 the one-off price every month, that there is no period end to store, and that
 `isPro` has to answer without a date.
 
-**What is free is enough to understand the product.** Free includes **one
-book**, unlimited chapters and words, autosave/sync where accounts are
-configured, **every export format**, the consistency check, voice typing and one
-title check a day. Pro adds unlimited books and unlimited title checks, and
-nothing else. **Both pricing cards list every row of the comparison table**
-(`plan-highlights.ts`, since 2026-09-14), one line per `ROWS` label in table
-order, and `plan-highlights.test.ts` fails if a row reaches the table and not
-the cards. **One free book is stricter than every AI-free competitor
-checked** (WriteO and Novlr give two, Reedsy Studio unlimited) — that is the
-owner's deliberate push towards paying, and the first thing to revisit if
-sign-ups stall. EPUB and PDF were Pro until 2026-08-27; see the note in
+**What is free is enough to understand the product.** Since 2026-09-16 Free
+includes **three books**, unlimited chapters and words, autosave/sync where
+accounts are configured, **every export format**, voice typing, **five parked
+ideas at a time**, **three title checks a day**, **5 of the 11 consistency
+checks** and the **last 30 days of the writing record**. Pro adds unlimited
+books, title checks and parked ideas, all 11 consistency checks, the writing
+record for the twelve months the log keeps with its fingerprint, and **paperback
+setup, which Free does not have** (`ProGate` in `PaperbackPage` and the
+dashboard's Paperback area). All three changes were the owner's, on 2026-09-16:
+the title check went back up from one because one left no room for a second
+thought; ideas became an occupancy limit (forgetting one makes room, and a
+writer already past five keeps every one); paperback setup became Pro's alone.
+**Both pricing cards list every row of the comparison table their plan
+includes** (`plan-highlights.ts`, since 2026-09-14), one line per `ROWS` label
+in table order, and `plan-highlights.test.ts` fails if a row reaches the table
+and not the cards; `plan-rows.test.ts` pins which six rows differ and that
+paperback setup is the only one Free does not have. (The story bible's
+series view and unlimited advance readers were two more for a day, until both
+tools went back behind the launch gate at the owner's request.)
+
+**Why this split, decided with the owner on 2026-09-15.** One free book was
+stricter than every AI-free competitor checked (WriteO and Novlr give two,
+Reedsy Studio unlimited), and it was the first thing the design note said to
+revisit. Three lets a writer try a series. What Pro sells moved from *access*
+(books) towards *depth*, the way the trade sells it: Grammarly keeps plain
+mistakes free and sells consistency checks, PerfectIt sells nothing but
+consistency at $70 a year, and Reedsy Studio's paid add-ons are history and
+outlining on top of a free core. Writers with a backlist are the ones Pro is
+aimed at — Written Word Media's 2025 survey found high earners write lots of
+books in series — which is why more books and the full record are paid.
+**Only the book count is server-enforced**; the rest are browser gates through
+`onFreePlan`, and the owner chose them knowing that. None hides anything a
+writer typed. EPUB and PDF were Pro until 2026-08-27; see the note in
 `launch.ts` for why that was the wrong thing to charge for, and
 `launch.test.ts` for what now stops it drifting back. The backend enforces the
 book limit in the database trigger (which counts everything but the trash, and
@@ -145,16 +168,19 @@ of manuscripts. Three shapes replaced it:
 
 | Shape | Tools | Free |
 |---|---|---|
-| **Per day** | comps, covers, title check | 3 / 3 / 1 a day |
+| **Per day** | comps, covers, title check | 3 / 3 / 3 a day |
 | **Per book** | blurb, prose report, track | 5 / 6 / 2 books |
 | **By occupancy** | ARC readers, seats | 10 a book / 2 a book |
+| **Held, across the library** | parked ideas | 5 at a time |
 
-**The title check is the live row, and its number is a pricing decision rather
-than a cost one** (2026-09-14): unlimited title checks are one of the two things
-Pro sells, so Free runs one a day (two until the owner cut it, the same day)
-while comps and covers, still hidden, stay at three. A limit of one needed the
-daily sentences to agree with it, which is what `workOne` in `free-limits.ts`
-is for.
+**The title check is a live row, and its number is a pricing decision rather
+than a cost one**: unlimited title checks are one of the things Pro sells. Free
+ran one a day from 2026-09-14 (two until the owner cut it, the same day) and
+three since 2026-09-16, level with comps and covers. `workOne` in
+`free-limits.ts` stays, so a daily limit of one would still read in the
+singular. **Parked ideas are the other live row** — the `held` shape, whose
+sentences speak of the library rather than of a book, and which say how to make
+room.
 
 **There was a fourth shape, "in total, for good"**, for work that cost a
 model call every press — keyword suggestions, the blurb conversation and the

@@ -220,6 +220,22 @@ Three more things follow from the palette, and each has bitten already:
   #ffffff on purpose: `--color-panel` is white in daylight, and a pure white
   sheet on a white card is a sheet nobody can see.
 
+- **`--color-price-*` and `font-pricing` (Roboto) are the pricing cards', and
+  they are the seventh exception** (2026-09-16). The owner supplied a reference
+  pricing section — a white card with a thin indigo outline, an indigo card
+  under a gold tab, gold bolts, a switch with a discount pill — and asked for it
+  copied in layout, colour, face, size and spacing. That is a second palette,
+  which is what this list exists to stop, and it was chosen knowingly. What
+  keeps it contained: only `plan-card.tsx`, `plan-button.ts` and
+  `period-toggle.tsx` wear these names, and nothing else may. Unlike
+  `--color-upgrade-*` it **has a night version** (the owner's choice): the
+  ground, card, ink, greys and rule change with the scheme in the `@theme` and
+  light blocks, while the indigo, the gold and the ink on gold are stated the
+  same in both. The day subtitle grey is the reference's own ~1.8:1 and stays
+  that way by the owner's choice; the feature lines were raised to 4.9:1 on
+  first sight. Roboto loads with `preload: false`, so only the two pages that
+  draw the cards fetch it.
+
 ## The six named themes
 
 Added 2026-09-06. Until then the app had two palettes and `prefs.theme` had

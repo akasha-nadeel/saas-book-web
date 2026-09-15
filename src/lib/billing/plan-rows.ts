@@ -12,12 +12,15 @@
  * `FREE_LIMITS`, which are the same constants the gates enforce, so the pricing
  * page cannot promise something the app then refuses.
  *
- * **The order of this array is the order in the table.** The two rows where
- * the plans differ come first in their groups; everything else is the same on
- * both, and a row of identical values is the argument rather than filler.
+ * **The order of this array is the order in the table.** Books leads; the rest
+ * run in the order a book is made in. Six rows differ between the plans since
+ * 2026-09-16 (books, ideas, title checks, the consistency check, the writing
+ * record and paperback setup); a row of identical values is the argument rather
+ * than filler. Paperback setup is the one row Free does not have at all.
  */
 
-import { FREE_LIMITS } from "@/lib/free-limits";
+import { ALL_CHECKS, FREE_CHECKS } from "@/lib/consistency-ids";
+import { FREE_LIMITS, FREE_RECORD_DAYS } from "@/lib/free-limits";
 import { plural } from "@/lib/plural";
 import { TIER_LIMITS, TIER_ORDER, type PlanTier } from "./tiers";
 
@@ -81,6 +84,16 @@ export const ROWS: {
     label: "Voice typing",
     values: everywhere(INCLUDED),
   },
+  /* Occupancy, so "at a time" rather than a total: forgetting one makes room.
+     The number is the one `useLimitGate` counts against. */
+  {
+    group: "Writing",
+    label: "Ideas",
+    values: {
+      free: `${FREE_LIMITS.ideas.free} at a time`,
+      pro: UNLIMITED,
+    },
+  },
   /* **The second thing Pro buys.** The number comes from `FREE_LIMITS`, which
      is what `useLimitGate` spends, so this cannot promise a count the screen
      then refuses. `pro: null` there means no ceiling, which is the one value
@@ -102,9 +115,30 @@ export const ROWS: {
     label: "Export",
     values: everywhere("Word, EPUB, PDF"),
   },
+  /* Both counts come from `consistency-ids.ts`, which the picker locks by. */
   {
     group: "Publishing",
     label: "Consistency check",
-    values: everywhere(INCLUDED),
+    values: {
+      free: `${FREE_CHECKS.length} checks`,
+      pro: `All ${ALL_CHECKS.length}`,
+    },
+  },
+  /* The free window is `FREE_RECORD_DAYS`; Pro reads what the log keeps,
+     which is `KEEP_DAYS` — the test beside this pins the "12 months". */
+  {
+    group: "Publishing",
+    label: "Writing record",
+    values: {
+      free: `Last ${FREE_RECORD_DAYS} days`,
+      pro: "Last 12 months",
+    },
+  },
+  /* **Pro only since 2026-09-16**, the owner's decision — `ProGate` holds the
+     screen. The table draws Free's cell as a dash. */
+  {
+    group: "Publishing",
+    label: "Paperback setup",
+    values: { free: NOT_INCLUDED, pro: INCLUDED },
   },
 ];

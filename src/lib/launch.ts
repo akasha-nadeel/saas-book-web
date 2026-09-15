@@ -4,8 +4,15 @@
  */
 
 export const LAUNCH_LIMITS = {
-  /** Mirrors `TIER_LIMITS.free.books` and the book-limit trigger. */
-  freeBooks: 1,
+  /**
+   * Mirrors `TIER_LIMITS.free.books` and the book-limit trigger.
+   *
+   * Three since 2026-09-15, up from one. One was stricter than every
+   * competitor checked (WriteO and Novlr give two, Reedsy Studio unlimited) and
+   * the design note named it as the first thing to revisit; three lets a writer
+   * try a series before paying.
+   */
+  freeBooks: 3,
   /**
    * **Every format, on both plans, and the two arrays being identical is the
    * point rather than an oversight.**
@@ -119,6 +126,13 @@ export const PLANS_ON_SALE: boolean = false;
  * **`/api/comps` stays open**, because it is the route the title check runs on.
  * Gating a screen and gating the data behind it are separate decisions, and
  * this is the case that shows why they have to be.
+ *
+ * **`paperback` and `provenance` came off on 2026-09-15**, ranked first by
+ * that day's research: writers suspected of using AI (the writing record) and
+ * KDP refusing a paperback over its margins and spine (paperback setup).
+ * `arc` came off the same day and went back on it: the owner reviewed it in
+ * the running app and took it out again. Neither remaining screen links to one
+ * still on this list.
  */
 const HIDDEN_BOOK_TOOL_PATHS = new Set([
   "arc",
@@ -128,10 +142,8 @@ const HIDDEN_BOOK_TOOL_PATHS = new Set([
   "covers",
   "listing",
   "money",
-  "paperback",
   "progress",
   "prose",
-  "provenance",
   "read",
   "roadmap",
   "structure",
@@ -149,17 +161,17 @@ export function hiddenLaunchRoute(pathname: string): boolean {
 export const LAUNCH_POST_BACKLOG = [
   "Publishing roadmap",
   "Store listing details",
-  "Paperback setup",
   "Comparable-title research",
   "Blurb workshop",
   "Categories and keyword tools",
   "Cover checker",
   "Structure report",
   "Prose report",
-  "Progress and writing record",
+  "Progress",
   "Money tracking",
   "Advance copies",
   "Collaboration and invitations",
-  "Story bible, ideas, and bookmarks panels",
+  "Story bible panel",
+  "Bookmarks panel",
   "Markdown export",
 ] as const;

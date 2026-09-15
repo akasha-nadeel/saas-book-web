@@ -179,6 +179,41 @@
   --color-upgrade-ink: #7c3aed; /* the button's text, on white */
 
   /* ------------------------------------------------------------------------
+     The pricing cards: `price-*`, the seventh entry on the closed list.
+
+     **Copied from a reference design at the owner's request (2026-09-16)** —
+     a white card and an indigo card with a gold tab, gold bolts and a gold
+     button — and set in Roboto (`font-pricing`), which is that design's face.
+     It is a second palette on two pages, which is exactly what the closed list
+     exists to prevent, and it was chosen knowingly: the cards are drawn only by
+     `plan-card.tsx`, `plan-button.ts` and `period-toggle.tsx`, and nothing else
+     may wear these names.
+
+     **The day values are the reference's own**, pale greys included — the
+     subtitle sits near 1.8:1 on white, which is below the 4.5:1 the rest of
+     the app holds, and the owner chose to keep it that way. **The feature lines
+     are the exception**: the owner had them raised on first sight, to #6e7180
+     (4.9:1) by day and #9aa0b3 by night. **The night values keep the same
+     ladder on the app's dark ground**, the subtitle equally faint on purpose. The indigo, the gold and the ink on gold are the same in
+     both themes: saturated fills that carry their own ink either way.
+
+     These are the night values, like the rest of `@theme`; the light block
+     restates every one of them. */
+  --color-price-ground: #13171e;
+  --color-price-card: #1b2029;
+  --color-price-card-line: #4b43b8;
+  --color-price-ink: #f1f2fa;
+  --color-price-pale: #525868; /* the subtitle and "/month" */
+  --color-price-list: #9aa0b3; /* the feature lines — raised by the owner, 6:1 */
+  --color-price-old: #6c7282; /* the struck price */
+  --color-price-rule: #2a303b;
+  --color-price-brand: #5243e6; /* the indigo card, button and switch */
+  --color-price-brand-soft: #6f66d8; /* the discount pill's outline */
+  --color-price-brand-text: #a9a3f5; /* indigo as type, on the ground */
+  --color-price-gold: #ffd02b; /* the tab, the bolts, the Pro button */
+  --color-price-gold-ink: #1b1b2f;
+
+  /* ------------------------------------------------------------------------
      The guide button: a green fill, on one control.
 
      **A documented exception, and a narrow one.** Green already means
@@ -764,6 +799,9 @@
   --font-brand: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-code: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
 
+  /* The pricing cards only — the reference design's face. See `price-*`. */
+  --font-pricing: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+
   /* The writing surface. The line measure used to live here too; the page now
      fills its column, so the window sets the line length. */
   --text-manuscript: 1.1875rem; /* 19px */
@@ -929,6 +967,22 @@
   --color-upgrade-from: #9333ea;
   --color-upgrade-to: #4f46e5;
   --color-upgrade-ink: #7c3aed;
+
+  /* The pricing cards in daylight: the reference design's own values. See the
+     note on `price-*` in `@theme` for why the greys are this pale. */
+  --color-price-ground: #f7f8fc;
+  --color-price-card: #ffffff;
+  --color-price-card-line: #b8b2f4;
+  --color-price-ink: #1b1b2f;
+  --color-price-pale: #c0c2cc;
+  --color-price-list: #6e7180;
+  --color-price-old: #9ea0ab;
+  --color-price-rule: #e8e9ef;
+  --color-price-brand: #5243e6;
+  --color-price-brand-soft: #b7b1f3;
+  --color-price-brand-text: #5243e6;
+  --color-price-gold: #ffd02b;
+  --color-price-gold-ink: #1b1b2f;
 
   /* The guide button in daylight: the same two values as the dark block. See
      the note there — a saturated fill carries white on either ground, and a
@@ -1266,6 +1320,19 @@
   --color-upgrade-from: #9333ea;
   --color-upgrade-to: #4f46e5;
   --color-upgrade-ink: #7c3aed;
+  --color-price-ground: #13171e;
+  --color-price-card: #1b2029;
+  --color-price-card-line: #4b43b8;
+  --color-price-ink: #f1f2fa;
+  --color-price-pale: #525868;
+  --color-price-list: #9aa0b3;
+  --color-price-old: #6c7282;
+  --color-price-rule: #2a303b;
+  --color-price-brand: #5243e6;
+  --color-price-brand-soft: #6f66d8;
+  --color-price-brand-text: #a9a3f5;
+  --color-price-gold: #ffd02b;
+  --color-price-gold-ink: #1b1b2f;
   --color-guide: #2f7d32;
   --color-guide-hover: #276b2a;
   --color-sheet: #fcfbf7;

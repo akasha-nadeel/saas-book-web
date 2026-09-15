@@ -12,9 +12,13 @@
  * therefore held to the same rule as the landing page — live somewhere a person
  * can read them all at once and check.
  *
- * **Everything here is built and works.** Nothing is a preview, and none of it
- * is gated behind a plan. A tool that is not finished does not go in this list;
- * it goes in `PLANNED` on the dashboard, as a card that plainly says so.
+ * **Everything here is built and works.** Nothing is a preview. Since
+ * 2026-09-15 two of them give Free part and Pro the rest (the writing record's
+ * window, the consistency check's six extra checks), and since 2026-09-16
+ * paperback setup is Pro's alone — its screen opens `ProGate` for a free
+ * writer, which says what it is for. The descriptions below make no plan claim
+ * either way; the screens do that. A tool that is not finished does not go in
+ * this list.
  */
 
 export interface BookTool {
@@ -91,8 +95,25 @@ export const GET_IT_OUT: ToolGroup = {
       name: "Export",
       what: "Word, EPUB or PDF, free on either plan — the file a shop, an agent or an editor asks for.",
     },
+    /* The two below joined on 2026-09-15. Paperback setup is the numbers the
+       printed file needs; the writing record is the other file a writer may
+       have to send once the book is out — the one that answers "did you use
+       AI". */
+    {
+      path: "paperback",
+      icon: "ruler",
+      name: "Paperback setup",
+      what: "Spine width, inside margin and the full cover size for the page count you actually have, from KDP's published figures.",
+    },
+    {
+      path: "provenance",
+      icon: "shield",
+      name: "Writing record",
+      what: "The dated trail the writing left, in a document you can send if anyone says you used AI. Evidence, not proof.",
+    },
   ],
 };
+
 
 /**
  * The things only a whole-book read can find.

@@ -1,13 +1,16 @@
 /**
  * What each card says a plan is for, and everything it gives.
  *
- * **Each card lists every row of the comparison table, in the table's order**
- * (2026-09-14). The cards used to carry a handful and leave the rest to the
- * table, and the owner wanted a reader to see the whole plan without scrolling
- * down to it. The table stays underneath, where the same lines sit side by side.
- * Each line names the `ROWS` label it stands for, and a test holds the two sets
- * equal, so a row added to the table cannot be missing from a card. Nothing here
- * may say something the table then contradicts.
+ * **Each card lists every row of the comparison table its plan includes, in the
+ * table's order** (2026-09-14). The cards used to carry a handful and leave the
+ * rest to the table, and the owner wanted a reader to see the whole plan without
+ * scrolling down to it. The table stays underneath, where the same lines sit
+ * side by side. Each line names the `ROWS` label it stands for, and a test holds
+ * the two sets equal, so a row added to the table cannot be missing from a card.
+ * A row the plan does not include (paperback setup on Free, since 2026-09-16)
+ * is left off that card: the card is a list of features, and a line saying "not
+ * included" there would read as one. Nothing here may say something the table
+ * then contradicts.
  *
  * **Every figure is read out of `TIER_LIMITS` or `FREE_LIMITS`, never typed.**
  * These lines are prose, which is exactly the place a number goes stale
@@ -18,7 +21,8 @@
  * references rather than as data.
  */
 
-import { FREE_LIMITS } from "@/lib/free-limits";
+import { ALL_CHECKS, FREE_CHECKS } from "@/lib/consistency-ids";
+import { FREE_LIMITS, FREE_RECORD_DAYS } from "@/lib/free-limits";
 import { nounFor } from "@/lib/plural";
 import { TIER_LIMITS, type PaidTier, type PlanTier } from "./tiers";
 
@@ -86,10 +90,8 @@ const VOICE: Highlight = { row: "Voice typing", text: "Voice typing" };
  * be introduced later.
  */
 const EXPORT: Highlight = { row: "Export", text: "Export — Word, EPUB, PDF" };
-const CONSISTENCY: Highlight = {
-  row: "Consistency check",
-  text: "Consistency check",
-};
+/* Pro only since 2026-09-16, so only the paid card carries it. */
+const PAPERBACK: Highlight = { row: "Paperback setup", text: "Paperback setup" };
 
 /** The lines on the Free card. */
 const FREE_HIGHLIGHTS: Highlight[] = [
@@ -102,12 +104,26 @@ const FREE_HIGHLIGHTS: Highlight[] = [
   SYNC,
   VOICE,
   {
+    row: "Ideas",
+    lead: String(FREE_LIMITS.ideas.free),
+    text: `parked ${nounFor(FREE_LIMITS.ideas.free, "idea")} at a time`,
+  },
+  {
     row: "Title check",
     lead: String(FREE_LIMITS.titleCheck.free),
     text: `${nounFor(FREE_LIMITS.titleCheck.free, "title check")} a day`,
   },
   EXPORT,
-  CONSISTENCY,
+  {
+    row: "Consistency check",
+    lead: String(FREE_CHECKS.length),
+    text: "consistency checks",
+  },
+  {
+    row: "Writing record",
+    lead: `${FREE_RECORD_DAYS} days`,
+    text: "of writing record",
+  },
   NO_AI,
 ];
 
@@ -115,7 +131,7 @@ const FREE_HIGHLIGHTS: Highlight[] = [
  * The paid card.
  *
  * Every line is spelled out rather than "Everything in Free", so the two cards
- * can be read across line for line: the two that differ sit where the table
+ * can be read across line for line: the lines that differ sit where the table
  * puts them.
  */
 const PAID_HIGHLIGHTS: Record<PaidTier, Highlight[]> = {
@@ -124,9 +140,16 @@ const PAID_HIGHLIGHTS: Record<PaidTier, Highlight[]> = {
     CHAPTERS,
     SYNC,
     VOICE,
+    { row: "Ideas", lead: "Unlimited", text: "parked ideas" },
     { row: "Title check", lead: "Unlimited", text: "title checks" },
     EXPORT,
-    CONSISTENCY,
+    {
+      row: "Consistency check",
+      lead: `All ${ALL_CHECKS.length}`,
+      text: "consistency checks",
+    },
+    { row: "Writing record", lead: "12 months", text: "of writing record" },
+    PAPERBACK,
     NO_AI,
   ],
 };
