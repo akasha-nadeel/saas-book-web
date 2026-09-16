@@ -479,15 +479,28 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   transitioning once they have arrived**: the 700ms ease is the entrance, and
   left on it made them trail two-thirds of a second behind a zoom gesture and
   float off the paper.
-- **Page & type is the one tab that is not the panel**
-  (`editor/tools-popover.tsx`). It opens as a card at the rail’s edge, because
-  a dozen short settings rows in a 25rem full-height column is a panel
-  three-quarters empty that pushes the manuscript sideways to be it. Portalled
+- **Tools is the one tab that is not the panel** (`editor/tools-popover.tsx`,
+  key `page`). It opens as a strip of tools at the rail’s edge, because a dozen
+  short settings rows in a 25rem full-height column is a panel three-quarters
+  empty that pushes the manuscript sideways to be it. Portalled
   and `fixed` (the rail scrolls, and would clip it), ceilinged at the **rail’s**
   top rather than the window’s, and its Escape test runs in the **capture**
   phase — the pickers’ own menus listen on `document`, React flushes their
   close before a bubble-phase listener here runs, so asked on the way up
   “is a menu open” always answered no and one press shut both.
+- **The strip is five tools and every one acts on the manuscript**
+  (2026-09-16): Type, a picture, dictation, typewriter scrolling, paragraph
+  marks. **Paper and theme went to the top bar** (`editor/paper-theme.tsx`) —
+  it was the one tool there that changes how the *app* looks, three presses
+  down, and the bar’s right-hand group already held the focus control under the
+  same argument. It arrives as a `paperControl` slot, because that bar takes no
+  editor and no prefs. Its popover is a settings card and not `ui/menu.tsx`
+  (`role="menu"` over a swatch row is a lie), and its Escape is **ordinary** —
+  nothing in it opens a portalled menu, which was checked; add a picker there
+  and the capture-phase rule comes with it. **The link went to the selection
+  bar**, where `bab1c3d` had already put one and left this copy behind.
+  `PAPERS` is now one list, in `paper-theme.tsx`, imported by the phone’s
+  `format-controls.tsx`, which keeps its own 44px touch swatches.
 - **The left chrome is one slot, `--sidebar-width` wide, and the page stands
   beside it.** At most one thing in it is visible: the book navigator, a tool
   panel, or a tool panel over the navigator. `BookPanel` takes that width

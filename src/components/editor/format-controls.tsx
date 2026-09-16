@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { PromptDialog } from "@/components/ui/dialog";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { PAPERS } from "@/components/editor/paper-theme";
 import { applyFormattingCommand } from "@/lib/editor/formatting-commands";
 import type { TextAlignValue } from "@/lib/editor/text-align";
 import {
@@ -34,16 +35,11 @@ const ALIGNMENTS: { value: TextAlignValue; label: string }[] = [
   { value: "justify", label: "Justify" },
 ];
 
-const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
-  /* First, and the same row the Tools strip offers: the sheet follows the
-     app until the writer says otherwise. */
-  { value: "theme", label: "Match the theme", swatch: "var(--paper-bg)" },
-  { value: "white", label: "White", swatch: "#ffffff" },
-  { value: "cream", label: "Off-white", swatch: "#ededed" },
-  { value: "sepia", label: "Grey", swatch: "#d6d6d6" },
-  { value: "slate", label: "Charcoal", swatch: "#1c1c1c" },
-  { value: "black", label: "Black", swatch: "#0d0d0d" },
-];
+/* **The list is imported; only the layout is this file's.** There were two
+   copies of it, and they had already begun to differ. The swatches stay 44px
+   circles in a row rather than the bar's labelled rows: this sheet is thumbs on
+   glass, and a name beside each colour is not worth the scroll here. What must
+   not differ is *which* papers exist. */
 
 /* Filled rather than outlined, like every field in the pass. `text-base` and
    `h-11` stay: this sheet is thumbs on glass, and 16px is also what stops iOS

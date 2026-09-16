@@ -666,10 +666,14 @@ export function SelectionToolbar({
       </div>
     </BubbleMenu>
 
-    {/* **The same dialog the Tools strip opens**, so there is one link box in
-        the app rather than two that drift apart. Outside the bubble menu: it
-        is a modal in the browser's top layer, and a modal inside a floating
-        bar that hides on a blur would be closed by its own opening.
+    {/* **The only link box in the app now**, and for a while it was one of two:
+        the Tools strip kept its own copy after this one arrived, which is the
+        half of that move nobody finished. The strip's went on 2026-09-16 — a
+        control acting on a selection has no business sitting as far from the
+        selection as the window allows, which is the same argument that put this
+        one here. Outside the bubble menu: it is a modal in the browser's top
+        layer, and a modal inside a floating bar that hides on a blur would be
+        closed by its own opening.
 
         `normalizeHref` is what lets a writer type `example.com`. It answers
         null for something that is not a link at all, and then nothing is set —

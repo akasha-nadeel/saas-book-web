@@ -97,6 +97,42 @@ load-bearing:
   so by then the menu is already out of the DOM and “is a menu open” always
   answered no. Asked on the way down, it is still true.
 
+### Amendment, 2026-09-16: the strip is five, and both departures had reasons
+
+The strip held seven. Two left on the same day for opposite reasons, and the
+count is still the argument — a column of unlabelled glyphs is a memory test —
+so what matters is that the five left all act on the manuscript.
+
+- **Paper and theme went to the top bar** (`paper-theme.tsx`). It was the one
+  tool here that changes how the *app* looks rather than what is in the book,
+  and reaching it cost three presses: the rail, this strip, then a panel beside
+  it — for a setting a writer changes when the light does. The bar's right-hand
+  group already held the focus control under the note *“a view control, so it
+  stands with the two that leave the app”*; now it holds both, and
+  `editor-top-bar.tsx` takes it as a `paperControl` slot beside `history`,
+  `fileActions` and `importControl`, because that bar still takes no editor and
+  no prefs.
+- **It is a settings popover, not a menu**, so `ui/menu.tsx` is not reused
+  despite already solving the placement: it renders `role="menu"` over
+  `menuitem` children, and this is a paper list, a segmented control and a row
+  of swatches. **Its Escape may be ordinary**, and that was checked rather than
+  assumed — nothing in it opens a portalled menu, so the capture-phase rule
+  above stays where it is still needed, on the Type panel's pickers. Add a
+  picker here and that rule comes with it.
+- **The link went to the selection bar, where it had already gone.** `bab1c3d`
+  put one there — *“attaching a link took four presses… the selection bar is
+  where every other mark on a selection lives”* — and the strip's copy survived
+  that commit. It was the worse of the two by the very argument that moved it: a
+  control acting on a selection, sitting as far from the selection as the window
+  allows. `link-url.ts` and its test are untouched; the bar is its only caller.
+- **`PAPERS` is one list now.** There were two — here and in
+  `format-controls.tsx` for the phone — and they had begun to drift. The phone
+  keeps its 44px touch swatches and imports the data.
+- **The phone lost nothing.** `.editor-top-bar` is `display: none` under
+  `data-editor-layout="continuous"`, so the new button is desktop-only by
+  construction; the writing dock's Format sheet still carries paper and
+  appearance, as it always did.
+
 ## Focus mode, and the two rules to the page (2026-09-05)
 
 **`prefs.focusMode` puts the chrome away** — no bar, no rail, no panel, no phone

@@ -51,7 +51,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Colour themes",
-        desc: `${TINTS.map((t) => t.name).join(", ")} — beside plain light, plain dark, and whichever your computer is set to. A theme colours the whole editor: the bar, the rail, the panels and the page you type on. Under Paper and theme in Page and type.`,
+        desc: `${TINTS.map((t) => t.name).join(", ")} — beside plain light, plain dark, and whichever your computer is set to. A theme colours the whole editor: the bar, the rail, the panels and the page you type on. Under the paper button at the right of the editor's top bar, beside Import — or under Format on a phone.`,
       },
       {
         name: "Page and type",

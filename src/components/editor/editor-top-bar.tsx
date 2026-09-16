@@ -49,6 +49,7 @@ export function EditorTopBar({
   history,
   fileActions,
   importControl,
+  paperControl,
 }: {
   bookId: string;
   bookTitle: string;
@@ -87,6 +88,14 @@ export function EditorTopBar({
   fileActions?: React.ReactNode;
   /** The import control, which owns its own file input and dialogs. */
   importControl?: React.ReactNode;
+  /**
+   * Paper and theme, which owns its own popover.
+   *
+   * A slot like the three above rather than props, and for the same reason:
+   * this bar takes no editor and no prefs, and a view control that needs the
+   * stored paper should not be what makes it start.
+   */
+  paperControl?: React.ReactNode;
 }) {
   /* The mark’s motion is this button’s to start, for the reason written beside
      `RailButton`: an 18px glyph in a 32px target is left alone through most of
@@ -246,6 +255,12 @@ export function EditorTopBar({
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
+        {/* **The two view controls stand together, ahead of the two that leave
+            the app.** Paper and theme came here from the rail's Tools strip,
+            where it was three presses down and the only tool in a column that
+            otherwise acts on the manuscript. It is the same argument the focus
+            button below is already making. */}
+        {paperControl}
         {/* **A view control, so it stands with the two that leave the app
             rather than beside the File menu** — nothing it does touches the
             manuscript. The glyph is the panel one, because this and the button

@@ -39,6 +39,7 @@ import { useStoredZoom } from "@/lib/editor/use-stored-zoom";
 import { suspendPagination } from "@/lib/editor/pagination";
 import { WorkspaceRail } from "@/components/editor/workspace-rail";
 import { ToolsPopover } from "@/components/editor/tools-popover";
+import { PaperThemeButton } from "@/components/editor/paper-theme";
 import { icons } from "@/components/editor/icon-rail";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ImportChapterButton } from "@/components/editor/import-chapter-button";
@@ -593,6 +594,10 @@ export function ChapterEditor({
             <ImportChapterButton book={book} presentation="bar" />
           ) : null
         }
+        /* Not gated on `canWriteThis`: the paper, the theme and the tint are
+           this reader's own preferences, not the book's, so somebody reading a
+           manuscript shared with them still gets to turn the lights down. */
+        paperControl={<PaperThemeButton paper={prefs.paper} />}
       />
       )}
 
@@ -618,7 +623,6 @@ export function ChapterEditor({
         onClose={() => setToolsOpen(false)}
         book={book}
         editor={liveEditor}
-        paper={prefs.paper}
         typewriter={prefs.typewriter}
         marks={prefs.marks}
         dictation={dictation}

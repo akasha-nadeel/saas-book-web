@@ -46,12 +46,15 @@ export const PANEL_TITLES: Record<PanelTab, string> = {
    *
    * **This is the one tab that is not the panel.** It opens as a strip of
    * tools at the rail’s edge (`tools-popover.tsx`), each one either doing its
-   * job on the press or opening a small panel of its own beside it.
+   * job on the press or opening a small panel of its own beside it — one of
+   * them does, since 2026-09-16.
    *
    * **The word is "Tools" and the key is still `page`.** The key is a stored
    * preference and a member of the `PanelTab` union; renaming it would be a
    * migration for a word nobody sees. It was called Page & type while it was
-   * a card of labelled settings rows, which is not what it is any more.
+   * a card of labelled settings rows, which is not what it is any more — and
+   * the paper and the theme it was named for are not even in here now, having
+   * gone to the top bar where the app's other view control lives.
    */
   page: "Tools",
   history: "Versions",

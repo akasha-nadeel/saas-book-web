@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ToolsPanel } from "@/components/editor/tools-panel";
 import type { Editor } from "@tiptap/react";
-import type { Book, PaperColor } from "@/lib/library-store";
+import type { Book } from "@/lib/library-store";
 import type { Dictation } from "@/lib/editor/use-dictation";
 
 /**
@@ -42,7 +42,6 @@ export function ToolsPopover({
   onClose,
   book,
   editor,
-  paper,
   typewriter,
   marks,
   dictation,
@@ -52,7 +51,6 @@ export function ToolsPopover({
   onClose: () => void;
   book: Book;
   editor?: Editor | null;
-  paper: PaperColor;
   typewriter: boolean;
   marks: boolean;
   dictation: Dictation;
@@ -217,7 +215,6 @@ export function ToolsPopover({
         <ToolsPanel
           book={book}
           editor={editor}
-          paper={paper}
           typewriter={typewriter}
           marks={marks}
           dictation={dictation}

@@ -4,20 +4,16 @@ import { useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { ListGroup, ListRow, SectionHeader } from "@/components/ui/list";
 import { Picker } from "@/components/ui/picker";
-import { PromptDialog } from "@/components/ui/dialog";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ThemeToggle, TintSwatches } from "@/components/theme/theme-toggle";
 import { RailMark, useMarkHandle } from "@/components/editor/rail-mark";
 import type { MarkName } from "@/components/editor/rail-mark";
 import { ACCEPTED, importImage } from "@/lib/image-import";
 import { insertWidthPercent } from "@/lib/editor/image-resize";
-import { normalizeHref } from "@/lib/editor/link-url";
 import {
   setPref,
   setTypography,
   typographyOf,
   type Book,
-  type PaperColor,
 } from "@/lib/library-store";
 import {
   FONTS,
@@ -48,38 +44,37 @@ import { useEditorState } from "@/components/editor/editor-toolbar";
  * job on the press or opening a small panel beside it with *only* its own
  * rows. Nothing but the tool you asked for is on screen.
  *
- * **Seven, and the count is the point.** Type, the paper (with the theme,
- * which is the same question), a picture, a link, dictation, typewriter
- * scrolling and the paragraph marks. A column of unlabelled glyphs is a memory test past about eight —
- * the argument that put a word under every icon on the rail — so this one
- * stops well short of that, and each carries a tooltip.
+ * **Five, and every one of them acts on the manuscript.** Type, a picture,
+ * dictation, typewriter scrolling and the paragraph marks. A column of
+ * unlabelled glyphs is a memory test past about eight — the argument that put a
+ * word under every icon on the rail — so this one stops well short of that, and
+ * each carries a tooltip.
  *
- * **The four that act do not open anything**, and that is deliberate: a
- * picture opens the file picker, a link opens its dialog, and the two switches
- * flip where they stand and show it. A panel holding one switch would be a
- * second press for nothing.
+ * **It was seven, and the two that left had different reasons.**
+ *
+ * - *Paper and theme* went to the top bar (`paper-theme.tsx`). It was the one
+ *   tool here that changes how the **app** looks rather than what is in the
+ *   book, and reaching it meant the rail, then this strip, then a panel beside
+ *   it — three presses for a thing a writer changes when the light does. The
+ *   bar's right-hand group already holds the other view control and says so.
+ * - *A link* went to the selection bar, and had in fact already gone: `bab1c3d`
+ *   put one there — *"attaching a link took four presses… the selection bar is
+ *   where every other mark on a selection lives"* — and this copy survived that
+ *   commit. It is the worse of the two by the same argument that moved it, a
+ *   control acting on a selection sitting as far from the selection as the
+ *   window allows.
+ *
+ * **The three that act do not open anything**, and that is deliberate: a
+ * picture opens the file picker, and the two switches flip where they stand and
+ * show it. A panel holding one switch would be a second press for nothing.
  */
 
-const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
-  /* First, because it is what a theme sets and what most writers will be on:
-     the sheet follows the app until they say otherwise. Its swatch is the
-     paper the theme is actually painting, read from the same custom property
-     the page uses, so the row shows the colour rather than describing it. */
-  { value: "theme", label: "Match the theme", swatch: "var(--paper-bg)" },
-  { value: "white", label: "White", swatch: "#ffffff" },
-  { value: "cream", label: "Off-white", swatch: "#ededed" },
-  { value: "sepia", label: "Grey", swatch: "#d6d6d6" },
-  { value: "slate", label: "Charcoal", swatch: "#1c1c1c" },
-  { value: "black", label: "Black", swatch: "#0d0d0d" },
-];
-
 /** Which tools open a panel of their own. The rest act where they stand. */
-type ToolPanel = "type" | "paper";
+type ToolPanel = "type";
 
 export function ToolsPanel({
   book,
   editor,
-  paper,
   typewriter,
   marks,
   dictation,
@@ -87,7 +82,6 @@ export function ToolsPanel({
 }: {
   book: Book;
   editor?: Editor | null;
-  paper: PaperColor;
   typewriter: boolean;
   /** Whether the ¶ is shown at the end of every paragraph. */
   marks: boolean;
@@ -100,12 +94,10 @@ export function ToolsPanel({
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [linkAsked, setLinkAsked] = useState<string | null>(null);
   const [open, setOpen] = useState<ToolPanel | null>(null);
 
   const type = typographyOf(book);
   const live = editor && !editor.isDestroyed ? editor : null;
-  const existingLink = live?.getAttributes("link").href as string | undefined;
 
   /** The book's own typography, which every one of these writes straight to. */
   const setType = (patch: Parameters<typeof setTypography>[1]) =>
@@ -171,13 +163,6 @@ export function ToolsPanel({
             active={open === "type"}
             onClick={() => show("type")}
           />
-          <Tool
-            mark="paper"
-            label="Paper and theme"
-            active={open === "paper"}
-            onClick={() => show("paper")}
-          />
-
           {canWrite && (
             <>
               <Rule />
@@ -186,12 +171,6 @@ export function ToolsPanel({
                 label={busy ? "Reading the file…" : "A picture"}
                 disabled={busy || !live}
                 onClick={() => fileRef.current?.click()}
-              />
-              <Tool
-                mark="link"
-                label={existingLink ? "Edit the link" : "A link"}
-                disabled={!live}
-                onClick={() => setLinkAsked(existingLink ?? "https://")}
               />
             </>
           )}
@@ -345,67 +324,6 @@ export function ToolsPanel({
               </>
             )}
 
-            {open === "paper" && (
-              <>
-                <SectionHeader className="mb-2">Paper</SectionHeader>
-                {/* Rows rather than a row of swatches: the panel has the width
-                    for the name, and five colours with their names read faster
-                    than five colours you have to hover to identify. */}
-                <ListGroup tone="lifted" as="ul">
-                  {PAPERS.map((option) => (
-                    <ListRow
-                      key={option.value}
-                      title={option.label}
-                      onClick={() => setPref("paper", option.value)}
-                      leading={
-                        <span
-                          aria-hidden="true"
-                          /* `block`, or the height and width have nothing to
-                             apply to: the row wraps `leading` in a plain span,
-                             so this is an inline box unless it is told
-                             otherwise, and it came out a sliver. */
-                          className={`block h-5 w-5 shrink-0 rounded-full border ${
-                            paper === option.value
-                              ? "border-accent ring-2 ring-accent/40"
-                              : "border-line"
-                          }`}
-                          style={{ background: option.swatch }}
-                        />
-                      }
-                      trailing={
-                        paper === option.value ? (
-                          <span className="text-accent">✓</span>
-                        ) : null
-                      }
-                    />
-                  ))}
-                </ListGroup>
-
-                {/* **The theme is here and not a tool of its own**, because it
-                    is the same question the paper asks — how bright is this
-                    going to be — and the writer asking it is in front of the
-                    manuscript at midnight. Two glyphs for one decision is two
-                    places to look for it. */}
-                <SectionHeader className="mt-4 mb-2">Theme</SectionHeader>
-                <ListGroup tone="lifted">
-                  <ListRow title="Appearance" trailing={<ThemeToggle />} />
-                  {/* Under the three schemes, because they are one setting with
-                      nine answers — and in the same panel as the paper, so how
-                      the app looks and how the page looks are settled in one
-                      place. The paper stays its own choice: a white sheet under
-                      a dark app is the commonest pairing there is.
-
-                      The swatches take the row's whole width rather than its
-                      trailing slot: six circles beside a label squeezed the
-                      word "Colour" to a single letter in a 16rem panel. */}
-                  <ListRow>
-                    <span className="mb-2 block text-[13px] text-fg">Colour</span>
-                    <TintSwatches />
-                  </ListRow>
-                </ListGroup>
-              </>
-            )}
-
           </div>
         )}
       </div>
@@ -430,29 +348,6 @@ export function ToolsPanel({
         />
       )}
 
-      {linkAsked !== null && live && (
-        <PromptDialog
-          title={existingLink ? "Edit link" : "Add link"}
-          label="Address"
-          initial={linkAsked}
-          confirmLabel={existingLink ? "Update" : "Add link"}
-          placeholder="https://"
-          removeLabel="Remove link"
-          onRemove={
-            existingLink
-              ? () => live.chain().focus().unsetLink().run()
-              : undefined
-          }
-          /* A bare domain is a link too — see `normalizeHref`, which the bar
-             over a selection runs its input through as well, so both
-             boxes store the same thing. */
-          onSubmit={(typed) => {
-            const href = normalizeHref(typed);
-            if (href) live.chain().focus().setLink({ href }).run();
-          }}
-          onClose={() => setLinkAsked(null)}
-        />
-      )}
     </>
   );
 }
