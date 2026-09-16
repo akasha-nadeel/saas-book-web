@@ -79,3 +79,5 @@ CLAUDE.md.backup-*
 # Local upstream source checkouts used to verify editor behavior. These are
 # reference material only and are never part of the application bundle.
 /.reference/
+
+certificates

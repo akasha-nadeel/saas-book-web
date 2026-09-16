@@ -36,15 +36,31 @@ export function PaddleInlineCheckout({
   onBack: () => void;
 }) {
   const [failed, setFailed] = useState(false);
-  // React 19 runs effects twice in development; opening a checkout twice into
-  // the same frame leaves two of them.
+  /**
+   * React 19 runs effects twice in development; opening a checkout twice into
+   * the same frame leaves two of them. This ref is the whole of what prevents
+   * that, and it is enough on its own — it is never reset, so one mount opens
+   * one checkout.
+   *
+   * **A `cancelled` flag stood beside it and the pair deadlocked**, which is
+   * why no checkout ever appeared in development. The two guards were written
+   * for opposite hazards and ran in this order: the first pass set `opened` and
+   * began the async work; the cleanup between passes set `cancelled`; the
+   * second pass returned at the `opened` guard without restarting anything; and
+   * then the first pass's `await` resolved, read `cancelled`, and returned
+   * before `Checkout.open`. Nothing opened, nothing threw, and `failed` stayed
+   * false — an empty bordered box and a silent console, which reads exactly
+   * like Paddle refusing the domain.
+   *
+   * It was invisible in production, where effects run once. The replacement is
+   * below: ask the DOM whether the frame is still there, which distinguishes a
+   * real unmount from React's development double-run. A flag cannot.
+   */
   const opened = useRef(false);
 
   useEffect(() => {
     if (opened.current) return;
     opened.current = true;
-
-    let cancelled = false;
 
     (async () => {
       const paddle = await initializePaddle({
@@ -65,19 +81,19 @@ export function PaddleInlineCheckout({
         },
       });
 
-      if (cancelled) return;
-
       if (!paddle) {
         setFailed(true);
         return;
       }
 
+      // Gone only if the section really left the page — a writer pressing Back
+      // to plans, or navigating away while Paddle.js was still loading. React's
+      // development double-run does not remove it, which is the distinction the
+      // flag this replaced could not make.
+      if (!document.querySelector(`.${FRAME_CLASS}`)) return;
+
       paddle.Checkout.open({ transactionId });
     })().catch(() => setFailed(true));
-
-    return () => {
-      cancelled = true;
-    };
   }, [environment, token, transactionId]);
 
   return (
