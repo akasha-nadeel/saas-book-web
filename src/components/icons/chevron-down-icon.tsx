@@ -53,10 +53,11 @@ const ChevronDownIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
     }, [animate, scope]);
 
     const stop = useCallback(() => {
-      // Nothing to animate once the icon has left the page: motion fires a
-      // hover-end on an unmounting element, and `animate` on an empty scope
-      // throws. See the note in `rail-mark.tsx`.
-      if (!scope.current) return;
+      // **The flag is cleared before the guard, not after.** Nothing to animate
+      // once the icon has left the page — but the loop still has to be told to
+      // end, and returning first left it running against a dead scope. (The
+      // guard stood on both sides of this line, which is the same test twice
+      // with nothing between them that could change the answer.)
       isAnimatingRef.current = false;
       if (!scope.current) return;
       animate(".chevron", { y: 0 }, { duration: 0.2 });

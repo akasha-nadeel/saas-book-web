@@ -44,6 +44,8 @@ const DoubleCheckIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
         },
       );
 
+      // Again, because the await gave the icon half a second to leave the page.
+      if (!scope.current) return;
       await animate(
         ".check-second",
         {

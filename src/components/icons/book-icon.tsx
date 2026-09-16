@@ -38,18 +38,23 @@ const BookIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
         { duration: 0 },
       );
 
+      // Again after every await: each one hands control back for long enough
+      // for the icon to leave the page before the next line runs.
+      if (!scope.current) return;
       await animate(
         ".book-line-1",
         { pathLength: [0, 1], opacity: [0, 1] },
         { duration: 0.3, ease: "easeInOut", delay: 0.1 },
       );
 
+      if (!scope.current) return;
       await animate(
         ".book-line-2",
         { pathLength: [0, 1], opacity: [0, 1] },
         { duration: 0.3, ease: "easeInOut", delay: 0.05 },
       );
 
+      if (!scope.current) return;
       await animate(
         ".book-line-3",
         { pathLength: [0, 1], opacity: [0, 1] },

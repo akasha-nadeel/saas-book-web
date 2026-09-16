@@ -8,12 +8,19 @@
  * directive of their own, so one is added above.
  *
  * **One behaviour is edited: every animation callback returns early on an empty
- * scope.** Motion fires a hover-end on an element that is unmounting, and
- * `animate` against a scope whose ref has already been cleared throws
+ * scope, and checks again after every `await`.** Motion fires a hover-end on an
+ * element that is unmounting, and `animate` against a scope whose ref has
+ * already been cleared throws
  * `Cannot read properties of null (reading 'querySelectorAll')`. Hovering a rail
  * icon and then hiding the rail — entering focus mode, or leaving the editor —
  * is all it takes. Nothing here can catch it from outside, since the throw is
  * inside motion's own callback.
+ *
+ * **The second half of that is what was missing**, and it is the half that
+ * matters in a sequence: a guard at the top of an `async` callback is tested
+ * once, and every `await` after it hands control back for long enough — 300ms
+ * here — for the icon to unmount before the next line runs. So the check goes
+ * after each await as well, not only at the entrance.
  */
 import { forwardRef, useImperativeHandle, useCallback } from "react";
 import type { AnimatedIconHandle, AnimatedIconProps } from "./types";
@@ -41,6 +48,8 @@ const HomeIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
         { scale: [0.95, 1] },
         { duration: 0.3, ease: "easeOut" },
       );
+      // Again, because the await gave the icon 300ms to leave the page.
+      if (!scope.current) return;
       animate(".door", { scaleY: [0, 1] }, { duration: 0.3, ease: "easeOut" });
     }, [animate, scope]);
 

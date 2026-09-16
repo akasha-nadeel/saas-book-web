@@ -42,6 +42,8 @@ const FileDescriptionIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
         },
       );
 
+      // Again, because the await gave the icon 300ms to leave the page.
+      if (!scope.current) return;
       animate(
         ".file-lines",
         {

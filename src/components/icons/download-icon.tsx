@@ -35,7 +35,10 @@ const DownloadIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
       if (isAnimatingRef.current) return;
       isAnimatingRef.current = true;
 
-      while (isAnimatingRef.current) {
+      // `scope.current` is tested alongside the flag at every point the loop
+      // can resume: a cycle outlives the icon otherwise, and `animate` on a
+      // cleared scope throws.
+      while (isAnimatingRef.current && scope.current) {
         // 1. Initial Arrow Drop through Tray
         animate(
           ".arrow-head",
@@ -57,7 +60,7 @@ const DownloadIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
           },
         );
 
-        if (!isAnimatingRef.current) break;
+        if (!isAnimatingRef.current || !scope.current) break;
 
         // 2. Tray "Weight" Pulse
         await animate(
@@ -66,7 +69,7 @@ const DownloadIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
           { duration: 0.3, ease: "easeOut" },
         );
 
-        if (!isAnimatingRef.current) break;
+        if (!isAnimatingRef.current || !scope.current) break;
 
         // Slight pause between cycles
         await new Promise((resolve) => setTimeout(resolve, 200));
@@ -74,11 +77,12 @@ const DownloadIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
     }, [animate, scope]);
 
     const stop = useCallback(() => {
-      // Nothing to animate once the icon has left the page: motion fires a
-      // hover-end on an unmounting element, and `animate` on an empty scope
-      // throws. See the note in `rail-mark.tsx`.
-      if (!scope.current) return;
+      // **The flag is cleared before the guard, not after.** Nothing to animate
+      // once the icon has left the page — but the loop still has to be told to
+      // end, and returning first left it running against a dead scope for as
+      // long as the component's last cycle took.
       isAnimatingRef.current = false;
+      if (!scope.current) return;
       animate(
         ".arrow-head, .arrow-stem, .tray",
         { y: 0, opacity: 1, scale: 1 },
