@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
-import { GatedTool, useEntitled } from "@/components/upgrade/pro-gate";
+import { GatedTool } from "@/components/upgrade/pro-gate";
+import { onFreePlan } from "@/lib/launch";
+import { usePlan } from "@/lib/use-plan";
 import { bookWordCount, findBook } from "@/lib/library-store";
 import { PAGE_SIZES } from "@/lib/page-setup";
 import {
@@ -59,16 +61,27 @@ const PAPERBACK_WHAT =
 
 export function PaperbackPage({ bookId, embedded, heading }: ToolPageProps) {
   const hydrated = useHydrated();
-  const entitled = useEntitled();
+  const plan = usePlan();
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
 
   const [pages, setPages] = useState<string>("");
   const [stock, setStock] = useState<PaperStock>("white");
 
-  // The app's spinner is for a whole window; inside the dashboard it would
-  // cover the area it is standing in.
-  if (!hydrated)
+  /* **The plan is a third state, not a second one**, and it waits with the
+     store. `useEntitled()` stood here and answers *true* while the subscription
+     route is in flight, so a free writer got the whole of this screen and then
+     had it replaced by the gate a moment later. Waiting shows neither that nor
+     a paywall flashed at somebody already paying.
+
+     It costs a subscriber the width of one request on this route, which is the
+     same wait the shelf is already doing behind them.
+
+     The app's spinner is for a whole window; inside the dashboard it would
+     cover the area it is standing in — though the dashboard settles this
+     before mounting us, so `embedded` reaches this branch only through the
+     store. */
+  if (!hydrated || plan.loading)
     return embedded ? <div className={toolShell(embedded)} /> : <LoadingScreen />;
 
   if (!book) {
@@ -84,7 +97,9 @@ export function PaperbackPage({ bookId, embedded, heading }: ToolPageProps) {
     );
   }
 
-  if (!entitled) {
+  // Known to be metered. Pro and an unconfigured gateway both fall through to
+  // the tool, which is what `onFreePlan` says everywhere else.
+  if (onFreePlan(plan)) {
     return (
       <GatedTool
         book={book}

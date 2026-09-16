@@ -95,6 +95,7 @@ import {
 } from "@/lib/arc";
 import { totals, type Entry, type Ledger } from "@/lib/ledger";
 import { curveOf, MIN_WINDOW_DAYS, type LeftOut } from "@/lib/curve";
+import { ProBadge } from "@/components/upgrade/pro-badge";
 import { ProGate, useEntitled } from "@/components/upgrade/pro-gate";
 import { storeReadiness, type ReadinessIssue } from "@/lib/publishing";
 import { progressOf, roadmapFor, type Phase } from "@/lib/roadmap";
@@ -195,6 +196,14 @@ const AREAS: {
   stage: boolean;
   /** The editor rail's animated drawing, where it already draws this thing. */
   mark?: MarkName;
+  /**
+   * Part of Pro, so the rail says so before the press.
+   *
+   * Declared here rather than tested as `id === "paperback"` at the two rails
+   * that draw it — this table is already the one description of an area, and a
+   * second Pro area should be one field, not two more conditions.
+   */
+  pro?: boolean;
 }[] = [
   {
     id: "overview",
@@ -261,6 +270,7 @@ const AREAS: {
     live: true,
     icon: shelfIcons.paperback,
     stage: true,
+    pro: true,
   },
 ];
 
@@ -622,6 +632,12 @@ export function Bookshelf({
      the restore gate below and `ProCard` need the answer, so the card takes it
      as a prop rather than asking again. */
   const plan = usePlan();
+  /* Known to be metered, by the one three-part test — so a Pro badge is absent
+     for somebody paying, absent while the answer is still in flight, and absent
+     where no gateway is configured and nothing is held back. Computed here and
+     passed down for the same reason `plan` is: two rails draw the badge, and a
+     second fetch would be a second answer to one question. */
+  const free = onFreePlan(plan);
 
   const [trashing, setTrashing] = useState<Book | null>(null);
   const [erasing, setErasing] = useState<Book | null>(null);
@@ -890,6 +906,16 @@ export function Bookshelf({
                           ? showShelf("active")
                           : goToArea(row.area)
                       }
+                      /* The slot the view rows put their counts in. It sits
+                         inside the collapsing wrapper, so the badge goes with
+                         the label at 64px — which is right: there is no room
+                         for it beside a glyph, and the tooltip carries the
+                         name there anyway. */
+                      badge={
+                        AREA_BY_ID[row.area]!.pro && free ? (
+                          <ProBadge />
+                        ) : undefined
+                      }
                     >
                       {AREA_BY_ID[row.area]!.label}
                     </SideItem>
@@ -973,6 +999,7 @@ export function Bookshelf({
           <MobileDashboardNavigation
             account={account}
             area={area}
+            free={free}
             onArea={goToArea}
             onClose={() => setNavigationOpen(false)}
             onDialog={setDialog}
@@ -1441,12 +1468,15 @@ export function Bookshelf({
 function MobileDashboardNavigation({
   account,
   area,
+  free,
   onArea,
   onClose,
   onDialog,
 }: {
   account: Account | null;
   area: Area;
+  /** Known to be metered — the drawer draws the same Pro badges the rail does. */
+  free: boolean;
   onArea: (area: Area) => void;
   onClose: () => void;
   onDialog: (
@@ -1515,6 +1545,7 @@ function MobileDashboardNavigation({
                 icon={item.icon}
                 active={area === item.id}
                 onClick={() => onArea(item.id)}
+                badge={item.pro && free ? <ProBadge /> : undefined}
               >
                 {item.label}
               </SideItem>
@@ -2997,8 +3028,25 @@ function ResumeSlot({
  * everything it depicts is already in the words beside it. It is also hidden
  * below `sm`, where the card is the full width of a phone and there is no room
  * for a figure without squeezing the sentence into a column.
+ *
+ * **The words are a prop so the card can stand on a section as well as on
+ * Overview** (2026-09-16). Paperback setup is Pro's alone, and the plain gate's
+ * card under a banner read as a locked door where this reads as an offer — so
+ * that area asks for the same card with its own sentence. The guard, the
+ * gradient, the scrim and the figure stay here once: a second copy with a
+ * different heading is how two upgrade prompts end up in two tones.
  */
-function ProCard({ plan }: { plan: PlanState }) {
+function ProCard({
+  plan,
+  title = "Room for the next book",
+  children,
+}: {
+  plan: PlanState;
+  /** The heading. Defaults to Overview's. */
+  title?: string;
+  /** The sentence under it. Defaults to Overview's. */
+  children?: ReactNode;
+}) {
   if (plan.loading || !plan.billing || plan.pro) return null;
 
   return (
@@ -3031,12 +3079,16 @@ function ProCard({ plan }: { plan: PlanState }) {
       />
 
       <div className="min-w-0 flex-1">
-        <h3 className="text-base font-bold text-white">Room for the next book</h3>
+        <h3 className="text-base font-bold text-white">{title}</h3>
         <p className="mt-1.5 text-sm leading-relaxed text-white/85">
-          {TIER_NAMES.pro} takes the shelf from{" "}
-          {plural(TIER_LIMITS.free.books ?? 0, "book")} to unlimited, and takes
-          the daily limit off title checks. Every export format is free on
-          every plan, this one included.
+          {children ?? (
+            <>
+              {TIER_NAMES.pro} takes the shelf from{" "}
+              {plural(TIER_LIMITS.free.books ?? 0, "book")} to unlimited, and
+              takes the daily limit off title checks. Every export format is
+              free on every plan, this one included.
+            </>
+          )}
         </p>
         <Link
           href="/upgrade"
@@ -5015,9 +5067,20 @@ function IdeasArea() {
  * Paperback setup — the numbers a printed book needs, from its page count.
  *
  * **Part of Pro since 2026-09-16.** A free writer gets the banner and the
- * gate's card, and no book picker: choosing a book only to meet the same lock
+ * offer card, and no book picker: choosing a book only to meet the same lock
  * on every one is a control that does nothing. `PaperbackPage` gates as well,
  * for the tool's own route.
+ *
+ * **The offer is `ProCard`, not `ProGate`** — the same purple card Overview
+ * ends on, with this tool's own sentence. Under a photographic banner the
+ * gate's flat panel read as a locked door; the card reads as an offer, and one
+ * shape for "here is what Pro adds" beats two. It carries the whole of what the
+ * gate said: what the tool is for, the way to the prices, and that nothing
+ * recorded is touched.
+ *
+ * The plan is read here rather than through `useEntitled()` because this needs
+ * the *third* answer that hook folds away — see the comment on the branch
+ * below. It also means the card and the gate settle from one fetch.
  */
 function PaperbackArea({
   books,
@@ -5026,7 +5089,7 @@ function PaperbackArea({
   books: Book[];
   current: Book | null;
 }) {
-  const entitled = useEntitled();
+  const plan = usePlan();
   const what =
     "Spine width, inside margin and the full cover size for a book's page count, from Amazon KDP's published figures.";
 
@@ -5046,7 +5109,38 @@ function PaperbackArea({
         title="Know the numbers before the printer does"
         subtitle="Spine, gutter and cover size from your page count."
       />
-      {entitled ? (
+      {/* **Three answers, because the plan has three.** `usePlan()` starts at
+          UNKNOWN and asks the server on mount, so for the width of one request
+          a Pro account is indistinguishable from a free one — and whichever of
+          the two this drew during it was wrong for the other. Drawing the tool
+          meant a free writer watched the picker and the whole of paperback
+          setup appear and then be replaced by the card; drawing the card meant
+          a subscriber saw half a second of a paywall, which is the failure
+          people screenshot.
+
+          So while the answer is unknown it draws neither. `onFreePlan` is the
+          one three-part test for *known to be metered* — `!loading && billing
+          && !pro` — which leaves Pro and an unconfigured gateway on the same
+          side as they are everywhere else: with no gateway there are no plans
+          and nothing is held back. */}
+      {plan.loading ? (
+        /* The card's own corner and height, with nothing in it and no spinner:
+           a quarter of a second of a loading mark is more noticeable than a
+           quiet box, and the common answer here is the card, so matching it
+           means nothing moves when the answer lands. Not `ToolPending`, which
+           is `h-[28rem]` for the tool that follows it — three times this and a
+           long drop up the page when the card arrives instead. */
+        <div
+          aria-busy="true"
+          className="min-h-52 rounded-lg border border-line bg-panel"
+        />
+      ) : onFreePlan(plan) ? (
+        <ProCard plan={plan} title="Paperback setup is part of Pro">
+          {what} The wrap is drawn to scale — back, spine and front — so you
+          can see its shape before you send it. Nothing you have already
+          recorded is touched, and it is all still on this machine.
+        </ProCard>
+      ) : (
         <BookToolArea
           books={books}
           current={current}
@@ -5059,13 +5153,6 @@ function PaperbackArea({
             </div>
           )}
         </BookToolArea>
-      ) : (
-        <ProGate
-          title="Paperback setup"
-          what={`${what} The wrap is drawn to scale — back, spine and front — so you can see its shape before you send it.`}
-        >
-          {null}
-        </ProGate>
       )}
     </div>
   );

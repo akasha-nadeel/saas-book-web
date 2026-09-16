@@ -863,14 +863,21 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   `consistency-ids.ts`, and is told how many things the other six found); the
   writing record's **twelve months** with its fingerprint (Free reads the last
   **30 days**, `FREE_RECORD_DAYS`, and the file says so); and **paperback
-  setup, which Free does not get at all** — `PaperbackPage` and the dashboard's
-  Paperback area both open `ProGate`, and it is the one row allowed to say "Not
-  included". **Only the book count is enforced by the server**; the rest are
+  setup, which Free does not get at all** — `PaperbackPage` opens `GatedTool`
+  and the dashboard's Paperback area draws `ProCard`, and it is the one row
+  allowed to say "Not included". **Only the book count is enforced by the
+  server**; the rest are
   browser gates through `onFreePlan` / `useLimitGate` / `useEntitled`, which the
   owner chose knowingly. Nothing a writer typed is hidden by any of them — the
   log keeps recording, parked ideas past five stay — so upgrading opens what
   already exists. (The story bible's series view and unlimited advance readers
   were Pro rows for a day, until both tools went back behind the gate.)
+  **A Pro row says so before the press.** `components/upgrade/pro-badge.tsx` is
+  the one badge — the upgrade gradient, 10px uppercase, no plan logic inside it
+  because six render at once in the check picker — worn by the rail's Paperback
+  row (`AREAS` carries `pro`, both rails read it) and by a locked consistency
+  check. Every caller decides with `onFreePlan`, so it is absent for Pro, absent
+  while the plan is unknown, and absent where no gateway is configured.
   **Both pricing cards list every row of the comparison table their plan
   includes**, in table order (`plan-highlights.ts`); `plan-highlights.test.ts`
   fails if a row reaches the table and not the cards.
@@ -980,6 +987,17 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   before the answer arrived told a writer with unlimited books there was no
   room. It is `!plan.loading && plan.billing && …` in both places now. Not
   knowing yet is not a reason to refuse, and the server is the real enforcement.
+- **A whole Pro *screen* draws neither answer while the plan is unknown**
+  (2026-09-16), which is the rule above pointed at a screen rather than a
+  press. `useEntitled()` answers true while the fetch is in flight, so
+  `PaperbackArea` and `PaperbackPage` drew the tool and then replaced it with
+  the offer a moment later — the flash a free writer actually sees. Both now
+  take the three answers `onFreePlan` distinguishes: loading draws a quiet
+  placeholder the size of what follows, metered draws the offer, anything else
+  draws the tool. **Waiting is the only state that flashes nothing at
+  anybody** — drawing the gate instead would show a paywall to somebody already
+  paying. `useEntitled()` itself is unchanged and right where it is used, on a
+  card inside a screen the writer already has (`BookCurve`).
 - **`free-limits.ts` is the earlier metering policy and much of it is asleep** —
   most tools it gates are ones the launch MVP hides. The seats row is on a live
   path (`ShareDialog` still opens from the editor and the

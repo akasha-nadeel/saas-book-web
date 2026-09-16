@@ -236,6 +236,22 @@ Three more things follow from the palette, and each has bitten already:
   first sight. Roboto loads with `preload: false`, so only the two pages that
   draw the cards fetch it.
 
+**The Pro badge is a *fill* of `--color-upgrade-*`, not a ninth exception**
+(2026-09-16). `components/upgrade/pro-badge.tsx` is one 10px uppercase lozenge
+reading "Pro", worn by the dashboard rail's Paperback row (both rails) and by a
+locked check in `consistency/check-picker.tsx`. It borrows the gradient the
+upgrade card and the limit banners already fill with, so purple means the same
+thing in every one of them, and it needs no dark variant because that gradient
+is stated identically in all three blocks. Two things about it were decided
+rather than fallen into. It is **not** `--color-badge-pro-*`, the pricing
+table's purple: that is a tint because twenty filled lozenges down two columns
+all shout at one volume, and one badge on a row is the opposite case — there the
+fill is what makes it findable without reading. And it is **`rounded-md`**, like
+the "Usually" marker whose markup it copies, because a full pill is a control in
+this app. White on it clears 5.4:1 at the purple end and 6.4:1 at the indigo,
+which is what that type size needs; the gradient's values may not be lightened
+without re-measuring it.
+
 ## The six named themes
 
 Added 2026-09-06. Until then the app had two palettes and `prefs.theme` had
