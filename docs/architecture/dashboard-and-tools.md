@@ -287,7 +287,35 @@ Library returning 503 for a few minutes tells a writer their title is free when
 it is on the shelf below. A failure and a clean result look identical in the
 data; only the source flags tell them apart.
 
+**The consistency check carries that obligation furthest** (2026-09-16), because
+it is the tool a writer is likeliest to disbelieve. Every check already had a
+written explanation — `NAME_NOTE`, `QUOTE_NOTE` and the rest in
+`consistency.ts` — and every one of them hung off a *finding*, so it was drawn
+only when something was found and was missing in the one case where the writer
+is actually asking a question. A writer typed `kamal` three times and `camal`
+once, ran the name check, read "Nothing came back", and had no way on screen to
+learn that the check reads capitalised words only and wants the common spelling
+eight times over.
 
+- **`looksFor` and `ignores` on `CHECK_LOOK`** are the two lines, and
+  `silentChecks(report)` in `consistency.ts` is the one derivation of *which
+  checks ran and found nothing*. It reads `ran`, never what was picked, so a
+  check that **could not** run — the near-miss check without its word list — is
+  absent rather than explained, which is the same rule `ran` itself exists for.
+- **Feed it the plan-filtered report.** `reportForPlan` strips the Pro checks
+  out of `ran` and `findings` together, so a free writer can never be told a
+  withheld Pro check was silent when it simply was not theirs to see.
+- **The thresholds in that copy are pinned by test** against `MIN_DOMINANT`,
+  `DOMINANCE` and `MIN_EITHER_CASE`, the way `launch.test.ts` pins the free book
+  limit against its migration. `consistency-checks.ts` imports nothing but
+  `consistency-ids` on purpose — the pricing rows and the picker must not pull
+  in the engine's three word lists — so the numbers are written there as words,
+  and the test is what keeps them true. A screen explaining a refusal with a
+  number that is no longer the reason is the exact failure this was built
+  against.
+- **It still never says clean.** The heading is "What was looked for", and the
+  sentence above it is unchanged: that is not praise, and a book can be
+  inconsistent in ways none of these looks at.
 
 **The side panel's order, and the frame its tool areas share** (2026-09-15).
 The rail is `RAIL` in `bookshelf.tsx`, read top to bottom, in the order the

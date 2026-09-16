@@ -214,6 +214,29 @@ export function reportForPlan(
   };
 }
 
+/**
+ * The checks that read the book and came back with nothing.
+ *
+ * **Read off `ran`, never off what was picked**, which is the same distinction
+ * `ran` itself exists for: a check that *could not* run — the near-miss check
+ * without its word list — is absent from `ran` and must not be reported as
+ * having found nothing. A check nobody ticked is absent for the same reason and
+ * wants no explanation either.
+ *
+ * Give it the plan-filtered report (`reportForPlan`) and the Pro checks fall out
+ * with it, so a free writer is never told a Pro check was silent when it was
+ * simply withheld.
+ *
+ * Here rather than in the component because it is the judgement and the
+ * component is the presentation of it — the split `consistency-checks.ts`
+ * already makes, and the one every tool on this shelf makes.
+ */
+export function silentChecks(report: ConsistencyReport): readonly CheckId[] {
+  return report.ran.filter(
+    (id) => !report.findings.some((finding) => finding.check === id),
+  );
+}
+
 /** What one story-bible entry answers to. Most books have no bible at all. */
 export type NameGroup = readonly string[];
 
@@ -1582,7 +1605,7 @@ const BOTH_CASES = new Set([
 ]);
 
 /** Under this many of *each*, a capital is a habit rather than a decision. */
-const MIN_EITHER_CASE = 3;
+export const MIN_EITHER_CASE = 3;
 const MAX_CAPITAL_FINDINGS = 10;
 
 const CAPITAL_NOTE =

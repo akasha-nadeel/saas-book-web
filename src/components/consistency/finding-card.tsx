@@ -36,6 +36,13 @@
 import Link from "next/link";
 
 import { SwitchTrack } from "@/components/ui/switch";
+import {
+  cardEdge,
+  cardGround,
+  hueDisplay,
+  hueText,
+  tint,
+} from "@/components/consistency/check-hue";
 import { CHECK_LOOK } from "@/lib/consistency-checks";
 import type {
   ConsistencyFinding,
@@ -60,71 +67,12 @@ const EXCERPTS = 3;
  * Colour — one hue per check, mixed into theme tokens
  * ------------------------------------------------------------------ */
 
-/**
- * **Mixed, never painted flat**, which is what makes one value work in both
- * themes with no second table: by day the tokens are white and near-white, so
- * 14% of a hue is a pastel; at night they are near-black, so the same 14% is a
- * deep tint. `tool-marks.tsx` does exactly this for its sixteen tiles, and it
- * is why this adds no seventh entry to the closed list of colour exceptions.
- *
- * These go through `style`, not a class. Tailwind v4 finds utilities by
- * scanning source for complete strings, and a hue only known at runtime is a
- * class nothing generates.
+/*
+ * **The mixers moved to `check-hue.ts` when the check marks arrived**, so the
+ * measured percentages have one home. Everything that was written here is there,
+ * including the daylight measurements on amber and the instruction to re-measure
+ * them when a hue changes.
  */
-const mix = (hue: string, percent: number, into: string) =>
-  `color-mix(in srgb, ${hue} ${percent}%, var(${into}))`;
-
-/**
- * The hue at a given strength, over whatever is behind it.
- *
- * **Used wherever a token would have been, because three of them are not what
- * they are at the top of the document.** Inside the editor's panel
- * `--color-surface`, `--color-raised` and `--color-line` are re-pointed to
- * translucent washes of `fg` — `#17171a0d` and friends — so that a panel layers
- * over whatever ground it is dropped onto. That is right for the panel and
- * quietly wrong for this card, which supplies its own ground: every box built
- * on `--color-surface` came out as a 5% black veil over the tint instead of the
- * white box the design is made of, and the same card looked correct on the full
- * screen and wrong in the rail.
- *
- * `--color-panel`, `--color-fg` and the status family are the same in both
- * places, so those are still read directly. Everything else is a translucent
- * hue, which needs no token at all.
- */
-const tint = (hue: string, percent: number) =>
-  `color-mix(in srgb, ${hue} ${percent}%, transparent)`;
-
-/** The card itself: the most saturated thing in the finding. */
-const cardGround = (hue: string) => mix(hue, 14, "--color-panel");
-const cardEdge = (hue: string) => tint(hue, 45);
-
-/**
- * The hue as ink: mixed against `fg`, which darkens it by day and lightens it at
- * night, so one number carries both. A flat hue would be a pale wash on white in
- * daylight and legible only at night.
- *
- * **Two of them, because the thresholds are two**, and both were measured rather
- * than guessed — in daylight, on the palest of the six hues, which is amber:
- *
- * - `hueDisplay` is the card's title. 24px bold is **large text**, so its bar is
- *   3:1; 72% gives amber 3.30:1 by day and 6.2:1 at night.
- * - `hueText` is everything else the hue writes — chapter links, chips, the
- *   lopsided line. Normal text, so the bar is 4.5:1, and 56% is what amber needs
- *   to reach it — 4.55:1. Sixty per cent is 4.17:1 and fails.
- *
- * **Set by the palest hue, not by each**, which is what keeps the six a family
- * rather than six separate decisions. One mix at 72% for *everything* was the
- * first attempt and it failed on amber, teal and emerald in daylight — amber
- * worst at 3.28:1 — while the same values were 5.4:1 and better at night, which
- * is exactly the half that gets looked at while a dark theme is being built.
- *
- * **The card's ground is not the lever it looks like.** Paling it from 14% to 8%
- * moves the title from 3.02:1 to only 3.16:1, because a 14% tint of a light hue
- * is already close to white; the ink percentage is what carries this. Change a
- * hue in `consistency-checks.ts` and these two numbers are what to re-measure.
- */
-const hueDisplay = (hue: string) => mix(hue, 72, "--color-fg");
-const hueText = (hue: string) => mix(hue, 56, "--color-fg");
 
 /**
  * A box inside the card: the page's own ground, neutral.

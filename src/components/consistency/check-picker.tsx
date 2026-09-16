@@ -36,15 +36,17 @@
  */
 
 import { ALL_CHECKS, type CheckId } from "@/lib/consistency";
-import { TIER_NAMES } from "@/lib/billing/tiers";
+import { ProBadge } from "@/components/upgrade/pro-badge";
 import {
   CHECK_GROUPS,
+  CHECK_LOOK,
   checksIn,
   type CheckGroup,
 } from "@/lib/consistency-checks";
+import { CheckMark } from "@/components/consistency/check-marks";
 import { plural } from "@/lib/plural";
 import { Tooltip } from "@/components/ui/tooltip";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EDITOR_LAYOUT_EVENT } from "@/lib/use-visual-viewport";
 
 /**
@@ -65,6 +67,48 @@ function useNoHover(): boolean {
     return () => root.removeEventListener(EDITOR_LAYOUT_EVENT, read);
   }, []);
   return touch;
+}
+
+/**
+ * Below this, the picker is a column beside something rather than a screen.
+ *
+ * The editor's panel runs about 240–400px; the full page's picker sits in a
+ * `7xl` measure. Nothing lands between the two.
+ */
+const TIP_FLIP_WIDTH = 420;
+
+/**
+ * Whether the picker is a narrow column, so a tooltip has to open sideways.
+ *
+ * **A tooltip above a card lands on the card above it.** In the panel that is
+ * eleven cards in one column, so the label for the check being hovered covers
+ * the neighbour it is being compared against — the one thing a writer is doing
+ * at that moment. Opening to the right puts it clear of the panel entirely,
+ * over the manuscript, where it covers nothing being read.
+ *
+ * **It measures the space, not the device**, which is the doctrine
+ * `lib/editor/editor-layout.ts` runs on and the reason this is not the `dense`
+ * flag the panel forbids: the same picker in a wide window keeps its labels
+ * above, because there it has the room.
+ *
+ * A phone never reaches this. `useNoHover()` is already true in continuous
+ * layout, where the example is printed on the card and no tooltip is drawn.
+ */
+function useNarrow() {
+  const box = useRef<HTMLDivElement>(null);
+  const [narrow, setNarrow] = useState(false);
+
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(([entry]) => {
+      setNarrow(entry.contentRect.width < TIP_FLIP_WIDTH);
+    });
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, []);
+
+  return [box, narrow] as const;
 }
 
 export function CheckPicker({
@@ -102,9 +146,10 @@ export function CheckPicker({
   const count = [...picked].filter((id) => !locked.has(id)).length;
   const available = ALL_CHECKS.length - locked.size;
   const noHover = useNoHover();
+  const [box, narrow] = useNarrow();
 
   return (
-    <div className="@container">
+    <div ref={box} className="@container">
       {onBack && (
         /* **Back has to lead somewhere.** Leaving the results by pressing Back
            and then finding no way in again is a trap door, not a way out. */
@@ -148,13 +193,14 @@ export function CheckPicker({
                       key={check.id}
                       on={!isLocked && picked.has(check.id)}
                       locked={isLocked}
+                      id={check.id}
                       name={check.name}
                       hint={check.hint}
-                      hue={check.hue}
                       onChange={() =>
                         isLocked ? onLocked?.(check.id) : onToggle(check.id)
                       }
                       showHint={noHover}
+                      tipSide={narrow ? "right" : "top"}
                     />
                   );
                 })}
@@ -230,18 +276,21 @@ export function CheckPicker({
 function CheckCard({
   on,
   locked,
+  id,
   name,
   hint,
-  hue,
   onChange,
   showHint,
+  tipSide,
 }: {
   on: boolean;
   /** Not on this writer's plan: drawn unpicked, with the plan's name on it. */
   locked: boolean;
+  /** The check itself, for its mark. The hue is read from it rather than passed
+      beside it — two ways in is two things to keep in step. */
+  id: CheckId;
   name: string;
   hint: string;
-  hue: string;
   onChange: () => void;
   /**
    * Draw the example under the name instead of leaving it to the tooltip.
@@ -252,7 +301,14 @@ function CheckCard({
    * the eleven names do not explain themselves.
    */
   showHint: boolean;
+  /**
+   * Which way the tooltip opens — decided by the picker, which is the only
+   * party that knows how much room it has. See `useNarrow`.
+   */
+  tipSide: "top" | "right";
 }) {
+  const hue = CHECK_LOOK[id].hue;
+
   return (
     <button
       type="button"
@@ -280,36 +336,22 @@ function CheckCard({
           : undefined
       }
     >
-      <span
-        aria-hidden="true"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] transition-colors"
-        style={
-          on
-            ? { backgroundColor: hue, color: "var(--color-panel)" }
-            : {
-                backgroundColor: "var(--color-lifted)",
-                color: "var(--color-muted)",
-              }
-        }
-      >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-[18px] w-[18px]"
-        >
-          {/* A magnifier over a line of text: what every one of these does is
-              read the book looking for one thing. One mark for all eleven and
-              not eleven metaphors — the hue is what tells them apart, and it is
-              the same hue their findings carry. */}
-          <circle cx="10.5" cy="10.5" r="5.5" />
-          <path d="m15 15 4.5 4.5" />
-          <path d="M8 9.5h5M8 12h3" />
-        </svg>
-      </span>
+      {/* **A mark of its own, where there used to be one magnifier for all
+          eleven.** The old note argued that what every check does is the same —
+          read the book looking for one thing — so one glyph was honest and the
+          hue could carry which. It asked a writer to learn a legend of eleven
+          colours, and the same tile now has to lead a row in a result they are
+          scanning rather than sit beside a name they are reading. `CheckMark`
+          holds the artwork and the argument.
+
+          **Colour no longer means picked, and that is the trade.** It used to:
+          a flat hue when on, neutral when off. But a picker of eleven grey
+          tiles until you tick them teaches nothing, which is the whole reason
+          the marks exist. The card's own ground and border still say picked —
+          see the `style` above — so the mark says *which check* and the card
+          says *whether it is on*, which is what a hue already means everywhere
+          else in this feature. */}
+      <CheckMark id={id} />
 
       <span className="min-w-0 flex-1">
         <span className="block text-[13px] leading-snug font-semibold text-fg">
@@ -322,15 +364,13 @@ function CheckCard({
         )}
       </span>
 
-      {locked && (
-        <span
-          className="shrink-0 rounded-full border border-line px-1.5 py-0.5 text-[10px] font-bold text-muted uppercase"
-        >
-          {TIER_NAMES.pro}
-        </span>
-      )}
+      {/* The shared badge rather than a pill written here: the rail's Paperback
+          row wears the same one, so "purple means Pro" is one statement in one
+          file. It was a grey outlined capsule, which read as another piece of
+          the card's own chrome. */}
+      {locked && <ProBadge />}
 
-      {!showHint && <Tooltip label={hint} side="top" />}
+      {!showHint && <Tooltip label={hint} side={tipSide} />}
     </button>
   );
 }

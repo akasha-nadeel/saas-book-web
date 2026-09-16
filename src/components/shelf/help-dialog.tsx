@@ -87,7 +87,11 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "The consistency check",
-        desc: `Reads the whole book at once for the ${ALL_CHECKS.length} things a writer cannot catch by re-reading their own draft: a name spelled two ways, British and American spellings side by side, a word written two ways, straight quotation marks among curly ones, a quotation mark left open, a word typed twice, a compound that gains and loses its hyphen, a number written as a word in one place and in digits in another, a term capitalised only sometimes, scene breaks marked more than one way, and a word used once that is one letter from a word you use often — a mistyped invented name, which no spelling checker can catch because it has never heard of the word either. Tick the ones you want and run those. ${TIER_NAMES.free} runs ${FREE_CHECKS.length} of them — ${FREE_CHECKS.map((id) => CHECK_LOOK[id].name.toLowerCase()).join(", ")} — and says how many things the other ${PRO_CHECKS.length} found.`,
+        /* The list is read off the catalogue rather than typed out again. It
+           was eleven hand-written phrases, which is eleven chances to describe
+           a check the engine no longer runs — and this dialog is the only place
+           in the app that explains what exists. */
+        desc: `Reads the whole book at once for the ${ALL_CHECKS.length} things a writer cannot catch by re-reading their own draft: ${ALL_CHECKS.map((id) => CHECK_LOOK[id].name.toLowerCase()).join(", ")}. That last one is a mistyped invented name, which no spelling checker can catch because it has never heard of the word either. Tick the ones you want and run those. A check that comes back with nothing says what it was looking for, and what it deliberately leaves alone — so a silent result is never mistaken for a clean one. ${TIER_NAMES.free} runs ${FREE_CHECKS.length} of them — ${FREE_CHECKS.map((id) => CHECK_LOOK[id].name.toLowerCase()).join(", ")} — and says how many things the other ${PRO_CHECKS.length} found.`,
       },
       {
         name: "Dictation",

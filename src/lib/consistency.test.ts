@@ -10,6 +10,7 @@ import {
   PRO_CHECKS,
   REAL_BREAK,
   reportForPlan,
+  silentChecks,
   driftKey,
   looksLikeDrift,
   withinOneEdit,
@@ -1531,5 +1532,50 @@ describe("the free and Pro checks", () => {
     const view = forPlan(report, true);
     expect(view.proRan).not.toContain("typos");
     expect(view.proRan).toHaveLength(PRO_CHECKS.length - 1);
+  });
+
+  describe("the checks that came back with nothing", () => {
+    it("lists a check that ran and found nothing", () => {
+      const silent = silentChecks(report);
+      expect(silent).toContain("quotes");
+      expect(silent).toContain("doubled");
+    });
+
+    it("leaves out a check that found something", () => {
+      const silent = silentChecks(report);
+      for (const found of ["names", "spelling", "hyphens"]) {
+        expect(silent).not.toContain(found);
+      }
+    });
+
+    it("leaves out a check that could not run at all", () => {
+      /*
+       * The distinction the whole feature turns on. The near-miss check needs
+       * a word list the browser fetches; without it the check is absent from
+       * `ran`, and a screen that explained what it "looked for" would be
+       * describing a search that never happened — the one thing an empty
+       * result is never allowed to do.
+       */
+      expect(report.ran).not.toContain("typos");
+      expect(silentChecks(report)).not.toContain("typos");
+    });
+
+    it("never tells a free writer a withheld Pro check was silent", () => {
+      // `spelling` and `hyphens` are Pro and both found something. Read off the
+      // raw report they are correctly absent; read off the free writer's own
+      // view they are absent because the whole check is, which is the answer
+      // that has to survive — a free writer hears about them through
+      // `ProChecksNote`, as a count, and never as a check that found nothing.
+      const free = reportForPlan(report, true);
+      const silent = silentChecks(free);
+      expect(silent.every((id) => !isProCheck(id))).toBe(true);
+      expect(silent).not.toContain("spelling");
+      expect(silent).toContain("quotes");
+    });
+
+    it("says nothing about a run nobody asked for", () => {
+      const nothing = { ...report, ran: [], findings: [] };
+      expect(silentChecks(nothing)).toEqual([]);
+    });
   });
 });

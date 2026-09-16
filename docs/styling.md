@@ -402,6 +402,48 @@ only in `finding-card.tsx` so this section is not read as still describing it.
   `--color-fg` and the status family are the same in both places**; build on
   those, or on a translucent hue that needs no token at all.
 
+### Amendment, 2026-09-16: eleven check marks, and what colour means in the picker
+
+The check picker carried **one** glyph — a magnifier over a line of text — for
+all eleven checks, on the argument that what every check does is the same and
+the hue is what tells them apart. `check-marks.tsx` replaces it with a mark per
+check, and the argument it replaces is worth keeping: one shape in eleven
+colours is a legend the writer has to hold in their head, and it stopped
+working the day the same tile had to lead a row in a result being scanned rather
+than sit beside a name being read. **Eleven shapes is something you recognise.**
+
+- **It adds nothing to the closed list**, and the way it avoids doing so is the
+  point. `tool-marks.tsx` bakes literal hexes into its sixteen — that set *is*
+  one of the exceptions. These eleven take their fills as arguments, mixed from
+  the check's existing `CHECK_LOOK[id].hue` into theme tokens, so one value is a
+  pastel plate by day, a deep one at night, and correct under all six tints with
+  no second table. Same trick as the finding card, same trick as the tool marks.
+- **The mixers now live in `check-hue.ts`**, lifted out of `finding-card.tsx` on
+  the *second* caller rather than the third. The percentages there were measured
+  in daylight on the palest hue, and the note on them ends "these two numbers are
+  what to re-measure" — an instruction with two copies is an instruction that
+  gets followed once.
+- **Colour stopped meaning *picked* in the picker, deliberately.** It used to: a
+  flat hue when ticked, a neutral tile when not. A picker showing eleven grey
+  plates until you tick them teaches nothing, which is the whole reason the
+  marks exist. The card's own tinted ground and border still say picked, so
+  **the mark says which check and the card says whether it is on** — which is
+  what a hue already means everywhere else in this feature.
+- **Three steps, and the gap between them was measured on screen.** Tile at 13%
+  over `--color-panel`, the supporting shape at 52%, the carrying shape at the
+  `hueDisplay` mix. At 34% over a 16% tile the support all but vanished: the
+  doubled-word mark read as one bar rather than two, and the hyphen mark lost
+  the blocks its hyphen is meant to join, which is the entire silhouette.
+- **Four of the eleven are letterforms** — the two quotation marks, `Aa` and
+  `12`. That is not a shortcut: those glyphs are the *subject* of their checks,
+  and drawing a picture of a quotation mark instead of a quotation mark is the
+  worse choice. The other seven are geometry, on the same 24 grid as everything
+  else here.
+
+This does not reopen the rail-icon rule below. That one is about **chrome** —
+eleven coloured discs down the edge of a manuscript — and these are content
+classification, the same job the tool marks do on the dashboard.
+
 ## The editor's rail icons
 
 `src/components/icons/` is [itshover](https://itshover.com) (Apache-2.0),

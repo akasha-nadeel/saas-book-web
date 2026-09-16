@@ -28,6 +28,7 @@ import {
   useCheckPlan,
 } from "@/components/consistency/pro-checks";
 import { RunBar, ranLine } from "@/components/consistency/run-bar";
+import { SilentChecks } from "@/components/consistency/silent-checks";
 import { UpgradeDialog } from "@/components/upgrade/upgrade-dialog";
 import { namesOf } from "@/lib/bible";
 import { bookTextOf, readable } from "@/lib/book-text";
@@ -347,6 +348,10 @@ export function ConsistencyPanel({ bookId }: { bookId: string }) {
                 </ul>
               </>
             )}
+
+            {/* `shown`, not `report`: on Free a Pro check that found something
+                must never be listed here as having found nothing. */}
+            <SilentChecks report={shown} />
 
             {free && <ProChecksNote view={forPlan(report, true)} />}
           </>
