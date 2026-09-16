@@ -161,6 +161,10 @@ export async function signInWithGoogle(formData: FormData) {
       provider: "google",
       options: {
         redirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(next)}`,
+        // Without this Google skips its account chooser whenever the browser
+        // holds one signed-in account that has approved the app before, so a
+        // writer on a shared browser has no way to pick a different account.
+        queryParams: { prompt: "select_account" },
       },
     });
 
