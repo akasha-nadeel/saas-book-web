@@ -112,7 +112,7 @@ export function trashedBookClosed(
  * Plain const rather than an environment read: `launch.ts` imports nothing and
  * is read by client and server alike, so one boolean serves every call site.
  */
-export const PLANS_ON_SALE: boolean = false;
+export const PLANS_ON_SALE: boolean = true;
 
 /**
  * The book-tool segments the proxy sends home, plus `read`.
