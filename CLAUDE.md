@@ -1261,10 +1261,17 @@ custom properties the editor and the reading view both read.
   which reverses the rule that stood here while the ground was black — where
   everything above it had to be lighter, lifted by a hairline, since a shadow on
   black is invisible. On a coloured ground the opposite reads better: cards,
-  rails and the sidebar are darker wells cut into the page, and a *selected* row
-  sinks rather than lifts (`--color-selected` is a dark pill on the chrome, an
-  accent wash by day). `raised` still lifts, because a hover has to come towards
-  the pointer whichever way the rest of the stack runs.
+  rails and the sidebar are darker wells cut into the page. `raised` still
+  lifts, because a hover has to come towards the pointer whichever way the rest
+  of the stack runs — and **`selected` lifts with it, which reverses what this
+  file said until 2026-09-16.** A selected row used to sink into the chrome by
+  the same argument the wells are built on, and on a rail already at #070a11
+  that made the one row a writer looks for first the least lit thing on screen;
+  a well cannot say "you are here" by getting darker still. So
+  `--color-selected` is an accent wash by day and a **neutral lift** at night
+  (16% white over `--color-nav`, no hue — the accent is spent on "this is the
+  way forward"), stated in the three chrome blocks, of which `.shelf-sidebar`
+  is the one anything reads.
 - **Every token stated in one block must be stated in all of them.** A name in
   only one keeps its dark value in daylight, and it will be a hairline nobody
   notices for a month. With the tints that is eight blocks rather than two, so

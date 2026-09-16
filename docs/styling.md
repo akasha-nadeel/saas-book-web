@@ -46,12 +46,20 @@ default, and **it stopped being greyscale on 2026-09-01** — `surface` #141b34 
 **The two themes stack in opposite directions, and neither is arbitrary.** On
 white the desk is grey, cards are white on it, and a hover *deepens*. On the
 indigo the page is the **lightest** surface and every card, rail and panel is a
-darker well cut into it — which is why a *selected* row sinks into the chrome
-(`--color-selected` is a dark pill there) rather than lifting off it. This
-reverses what this file said while the ground was black, where a surface had to
-be lighter to be seen at all because a shadow on black is invisible. `raised`
-crosses over between the blocks in both readings: a hover comes towards the
-pointer whichever way the rest of the stack runs.
+darker well cut into it. This reverses what this file said while the ground was
+black, where a surface had to be lighter to be seen at all because a shadow on
+black is invisible. `raised` crosses over between the blocks in both readings:
+a hover comes towards the pointer whichever way the rest of the stack runs.
+
+**`selected` crosses over with it, and it did not always.** A selected row used
+to *sink* into the chrome on the navy set, by the same argument the wells are
+built on — and on a rail already at #070a11 that made the one row a writer
+needs to find first the least lit thing on the screen. A well cannot say "you
+are here" by getting darker still; past a point there is nothing left to take
+away. So `--color-selected` is an accent wash by day and a **neutral lift** at
+night — 16% white over `--color-nav`, no hue, because the accent is spent on
+"this is the way forward" and a rail tab is only "this is where you are". Mixed
+from white rather than stated, so a tinted rail lifts in its own colour.
 
 Two rules keep the pair honest, and both are in the file:
 
@@ -464,10 +472,15 @@ sheet draw through. Two rules hold it together, and both were paid for:
   whose subject is a page of prose, and the exact thing the closed list above
   exists to prevent. There is no `--color-mark-*` family; there was one for an
   afternoon and it is gone.
-- **Selected is the dashboard's own wash**, `bg-blue-500/15
-  dark:bg-blue-500/25`, taken verbatim from `SideItem` in `bookshelf.tsx`. Two
-  navigations in one product must not disagree about what selected looks like.
-  It replaced a filled `bg-accent` tile that inverted its icon and shouted.
+- **Selected is a colour, not a deeper ground.** One `bg-raised` plate sits
+  behind the mark for hover and selected alike, and `text-accent` on the glyph
+  is what says which. It read `bg-blue-500/15 dark:bg-blue-500/25` for a while,
+  taken verbatim from `SideItem` in `bookshelf.tsx` on the rule that two
+  navigations must not disagree — but at 44px the two states then differed only
+  by how deep they sat, which is a comparison you can only make with both in
+  front of you. The dashboard rail still answers with a ground (an accent wash
+  by day, a neutral lift at night); a rail this narrow answers with the hue.
+  Both replaced a filled `bg-accent` tile that inverted its icon and shouted.
 - The animation is started from the **button**, through each icon's imperative
   handle, because the glyph is 24px inside a 48px target and most of a hover
   never touches it — and it is skipped outright under

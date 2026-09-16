@@ -2590,12 +2590,24 @@ body {
   --color-line: color-mix(in srgb, #ffffff 12%, transparent);
   --color-raised: color-mix(in srgb, #ffffff 8%, transparent);
 
-  /* **The active row sinks rather than lifts.** A white wash was right when
-     the rail was near-black and everything on it had to come forward; on the
-     navy set the rail is already a well and the page above it is the lightest
-     surface, so "you are here" reads as a darker pill cut into the rail —
-     which is what the design this palette follows does. */
-  --color-selected: #030507;
+  /* **The active row lifts, and it lifts without a hue.**
+
+     This said the opposite for a while — a darker pill cut into the rail, on
+     the reasoning that the navy page is the lightest surface and every piece
+     of chrome is a well below it, so "you are here" should sink further. What
+     that produced on a rail already at #070a11 was a near-black hole: the one
+     row a writer needs to find first was the one place on the screen with the
+     least light in it. A well cannot show where you are by getting darker
+     still — past a point there is nothing left to take away.
+
+     So it lifts, and it lifts *neutrally*: 16% white, no blue, because the
+     accent is reserved for "this is the way forward" and a rail tab is only
+     "this is where you are". Mixed from white rather than stated as a literal,
+     like the three lifts above it, so it composites over `--color-nav` and a
+     tinted rail gets a lighter pill in its own hue instead of a navy one. It
+     lands near #2f3137 on the plain rail — roughly three times the hover
+     beneath it, so the two states are still plainly different steps. */
+  --color-selected: color-mix(in srgb, #ffffff 16%, transparent);
   --color-selected-fg: #ffffff;
 }
 
@@ -2624,10 +2636,13 @@ body {
   --color-line: color-mix(in srgb, #ffffff 12%, transparent);
   --color-raised: color-mix(in srgb, #ffffff 8%, transparent);
 
-  /* Selected nav — the open chapter — sinks with white text, like the rail's
-     rows. Kept a touch stronger than the shelf's, which carry an edge bar this
-     list does not. */
-  --color-selected: #020304;
+  /* Selected nav — the open chapter — lifts with white text, like the rail's
+     rows, and takes the rail's own figure: three chrome classes holding two
+     different answers to "what does selected look like" is how the two sides
+     of the app end up disagreeing. Read by nothing today — `bg-selected` has
+     one call site, the dashboard rail — which is exactly why it is kept in
+     step by hand rather than left at the near-black it used to state. */
+  --color-selected: color-mix(in srgb, #ffffff 16%, transparent);
   --color-selected-fg: #ffffff;
 }
 
@@ -2656,7 +2671,13 @@ body {
   --color-muted: #bcc5de; /* nav labels and tools */
   --color-line: color-mix(in srgb, #ffffff 12%, transparent);
   --color-raised: color-mix(in srgb, #ffffff 8%, transparent);
-  --color-selected: #030507;
+
+  /* **This is the one that is read**, by `SideItem`'s `dark:bg-selected`, and
+     the reasoning is in `.nav-chrome` above. It is also the block that wins:
+     `@theme`, `[data-theme="dark"]` and all six `[data-tint="…"]` blocks are
+     one class of specificity each and all sit earlier in this file, so the
+     dashboard rail takes this value under plain dark and under every tint. */
+  --color-selected: color-mix(in srgb, #ffffff 16%, transparent);
   --color-selected-fg: #ffffff;
 }
 

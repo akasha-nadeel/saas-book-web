@@ -5753,18 +5753,27 @@ function SideItem({
       : "gap-2.5 px-3 py-2 text-left"
   } text-sm font-medium ${
     active
-      ? /* `accent/10`, and the same string `RailButton` uses in
-           `icon-rail.tsx` — the note there records why both moved off a
-           literal blue together.
+      ? /* **Both halves come forward; only the material differs.**
 ​
-           **The `dark:` pair is the navy set, where selected sinks.** By day
-           the rail is white and an active row has to come forward, so the
-           accent wash stands. At night the rail is a dark well below the
-           lightest surface on screen, and a wash *lifting* off it reads as a
-           hover that got stuck — the darker pill is what says "you are here".
-           A token would have to be invented for one call site to say this,
-           which is the case `docs/styling.md` keeps `dark:` for. */
-        "bg-accent/10 font-semibold text-fg dark:bg-selected dark:text-selected-fg"
+           By day the rail is near-white, so the pill is an accent wash — 15%
+           rather than the 10% it carried, which was pale enough to read as a
+           smudge on the row rather than as "you are here". `globals.css`
+           writes down the rule it follows: a saturated hue at low alpha reads
+           fainter than a neutral at the same figure, so blue has to be asked
+           for in larger amounts than grey.
+​
+           At night the rail is a dark well and the wash is the wrong material
+           — `--color-selected` is a neutral lift there, no hue, because the
+           accent is reserved for "this is the way forward" and a rail tab is
+           only "this is where you are". The token carries that (and follows a
+           tinted rail's own colour); this end just says which token.
+​
+           The editor's rail answers the same question differently on purpose:
+           one `bg-raised` plate for hover and selected alike, with the accent
+           on the *mark* saying which. `icon-rail.tsx` records why — at that
+           size, two states differing by depth is a comparison you can only
+           make with both in front of you. */
+        "bg-accent/15 font-semibold text-fg dark:bg-selected dark:text-selected-fg"
       : "text-fg/80 hover:bg-raised/70 hover:text-fg"
   }`;
 
