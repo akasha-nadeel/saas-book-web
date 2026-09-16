@@ -22,6 +22,12 @@
 import { ALL_CHECKS, FREE_CHECKS } from "@/lib/consistency-ids";
 import { FREE_LIMITS, FREE_RECORD_DAYS } from "@/lib/free-limits";
 import { plural } from "@/lib/plural";
+import {
+  FREE_PAPERS,
+  FREE_TINTS,
+  PRO_PAPERS,
+  SHOWN_TINTS,
+} from "@/lib/theme-access";
 import { TIER_LIMITS, TIER_ORDER, type PlanTier } from "./tiers";
 
 /**
@@ -92,6 +98,21 @@ export const ROWS: {
     values: {
       free: `${FREE_LIMITS.ideas.free} at a time`,
       pro: UNLIMITED,
+    },
+  },
+  /* **Both halves of one answer**, which is why this is a row and not two: the
+     paper and the app's colour are the same question asked twice, and the
+     picker in the top bar puts them one above the other. The counts come from
+     `theme-access.ts`, which is what the swatches lock by, so a colour moving
+     between the plans moves this line with it. Free is a real answer here and
+     not a dash — it keeps a colour, so that a locked swatch is an offer rather
+     than the first time the writer sees the feature. */
+  {
+    group: "Writing",
+    label: "Colour themes",
+    values: {
+      free: `${plural(FREE_TINTS.length, "colour")}, ${FREE_PAPERS.length} papers`,
+      pro: `All ${SHOWN_TINTS.length}, all ${FREE_PAPERS.length + PRO_PAPERS.length} papers`,
     },
   },
   /* **The second thing Pro buys.** The number comes from `FREE_LIMITS`, which

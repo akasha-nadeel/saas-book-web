@@ -13,6 +13,12 @@ import {
 } from "@/lib/billing/tiers";
 import { DialogClose } from "@/components/ui/dialog";
 import { ALL_CHECKS, FREE_CHECKS } from "@/lib/consistency-ids";
+import {
+  FREE_PAPERS,
+  FREE_TINTS,
+  PRO_PAPERS,
+  SHOWN_TINTS,
+} from "@/lib/theme-access";
 
 /**
  * What the free plan runs out of, said as two columns rather than one red line.
@@ -49,7 +55,7 @@ import { ALL_CHECKS, FREE_CHECKS } from "@/lib/consistency-ids";
  * on both plans now, so the refusal it headlined cannot happen. Gone rather
  * than left as a dialog for a state the app has no way to reach.
  */
-export type UpgradeReason = "books" | "restore" | "checks";
+export type UpgradeReason = "books" | "restore" | "checks" | "themes";
 
 /**
  * Which plan each refusal is answered by.
@@ -62,6 +68,7 @@ const SELLS: Record<UpgradeReason, PaidTier> = {
   books: "pro",
   restore: "pro",
   checks: "pro",
+  themes: "pro",
 };
 
 /* **Each headline names the plan it is selling**, and the count it quotes is
@@ -80,6 +87,14 @@ const HEADLINES: Record<UpgradeReason, { lead: string; title: string }> = {
   checks: {
     lead: `${ALL_CHECKS.length - FREE_CHECKS.length} more checks, across the whole book.`,
     title: `${TIER_NAMES.free} runs ${FREE_CHECKS.length} of the consistency checks. ${TIER_NAMES.pro} runs all ${ALL_CHECKS.length}.`,
+  },
+  /* Pressed on a swatch (2026-09-16). It hides nothing the writer typed either:
+     a locked colour is a colour, and the manuscript reads the same on any of
+     them. The counts come from `theme-access.ts` rather than being typed, so a
+     colour moving between the plans cannot leave this sentence behind. */
+  themes: {
+    lead: "Every colour, and both dark papers.",
+    title: `${TIER_NAMES.free} comes with ${plural(FREE_TINTS.length, "colour")} and ${FREE_PAPERS.length} papers. ${TIER_NAMES.pro} opens all ${SHOWN_TINTS.length} and all ${FREE_PAPERS.length + PRO_PAPERS.length}.`,
   },
 };
 

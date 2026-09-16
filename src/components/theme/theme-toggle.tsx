@@ -1,7 +1,11 @@
 "use client";
 
-import { TINTS, setTheme, type Theme } from "@/lib/library-store";
+import { TINTS, setTheme, type Theme, type Tint } from "@/lib/library-store";
+import { SHOWN_TINTS } from "@/lib/theme-access";
+import { TIER_NAMES } from "@/lib/billing/tiers";
 import { usePrefs } from "@/lib/use-library";
+import { Tooltip } from "@/components/ui/tooltip";
+import { ProCrown } from "@/components/upgrade/pro-crown";
 
 /**
  * System / Light / Dark, as one segmented control.
@@ -100,13 +104,16 @@ export function ThemeToggle() {
   );
 }
 
+/** Nothing locked — a stable identity, so the default does not remount the row. */
+const NONE: ReadonlySet<Tint> = new Set();
+
 /**
- * The six named themes, as a row of swatches under the three schemes.
+ * The named themes, as a row of swatches under the three schemes.
  *
  * **Swatches and not a list of words**, because the answer is a colour: a
- * writer choosing between Tawny Leather and Dusty Olive is choosing what the
- * app will look like, and six names in a column tells them nothing they can
- * see. Each still carries its name for a screen reader and on hover.
+ * writer choosing between Aubergine Page and Charcoal Ink is choosing what the
+ * app will look like, and names in a column tell them nothing they can see.
+ * Each still carries its name for a screen reader and on hover.
  *
  * **The swatch is the seed**, which is the colour on the palette card — not the
  * ground the theme actually paints, which is that colour taken light or dark
@@ -114,11 +121,29 @@ export function ThemeToggle() {
  * recognisable; the derivation is in `globals.css` with its reasoning.
  *
  * One radiogroup with the three above it would have been truer to the fact that
- * this is one setting with nine answers, but a radiogroup's arrow keys would
- * then run through nine controls of two different shapes. Two groups, one
- * question — and pressing any of the nine is the same `setTheme`.
+ * this is one setting with several answers, but a radiogroup's arrow keys would
+ * then run through controls of two different shapes. Two groups, one question —
+ * and pressing any of them is the same `setTheme`.
+ *
+ * **Which tints are drawn is `SHOWN_TINTS`, not `TINTS`.** The light three are
+ * held back for now; `theme-access.ts` carries that decision and its reason.
+ *
+ * **A locked swatch stays pressable**, which is `check-picker.tsx`'s rule: the
+ * press opens the offer instead of doing the thing. Drawing it disabled would
+ * leave a writer with nothing to press and no way to find out why.
  */
-export function TintSwatches() {
+export function TintSwatches({
+  locked = NONE,
+  onLocked,
+}: {
+  /**
+   * The tints this writer has not paid for. Decided once by the caller —
+   * `usePlan()` is a fetch per call site, so it must not be asked here.
+   */
+  locked?: ReadonlySet<Tint>;
+  /** What a refused press opens. Without it a locked swatch simply does nothing. */
+  onLocked?: (id: Tint) => void;
+} = {}) {
   const { theme } = usePrefs();
 
   return (
@@ -127,18 +152,26 @@ export function TintSwatches() {
       aria-label="Colour theme"
       className="flex flex-wrap items-center gap-1.5"
     >
-      {TINTS.map((tint) => {
-        const active = theme === tint.id;
+      {SHOWN_TINTS.map((id) => {
+        const tint = TINTS.find((candidate) => candidate.id === id);
+        if (!tint) return null;
+        const shut = locked.has(tint.id);
+        /* Drawn unselected while locked, like a locked check is drawn unpicked:
+           a ring around a colour the writer cannot have reads as "this is on". */
+        const active = !shut && theme === tint.id;
+        const label = shut ? `${tint.name} — ${TIER_NAMES.pro}` : tint.name;
         return (
           <button
             key={tint.id}
             type="button"
             role="radio"
             aria-checked={active}
-            aria-label={tint.name}
-            title={tint.name}
-            onClick={() => setTheme(tint.id)}
-            className={`h-6 w-6 rounded-full border outline-none
+            aria-label={label}
+            title={label}
+            onClick={() => (shut ? onLocked?.(tint.id) : setTheme(tint.id))}
+            /* `relative` for the crown and for `Tooltip`, which finds its
+               trigger by `parentElement` and measures from it. */
+            className={`relative h-6 w-6 rounded-full border outline-none
                         transition-transform hover:scale-110
                         focus-visible:ring-2 focus-visible:ring-accent/60 ${
                           active
@@ -146,7 +179,10 @@ export function TintSwatches() {
                             : "border-line"
                         }`}
             style={{ background: tint.seed }}
-          />
+          >
+            {shut && <ProCrown />}
+            <Tooltip label={label} side="top" nowrap />
+          </button>
         );
       })}
     </div>

@@ -3241,7 +3241,7 @@ export function darkPaper(paper: PaperColor, theme: Theme): boolean {
   return paper === "slate" || paper === "black";
 }
 
-const PAPER_COLORS: readonly PaperColor[] = [
+export const PAPER_COLORS: readonly PaperColor[] = [
   "theme",
   "white",
   "cream",

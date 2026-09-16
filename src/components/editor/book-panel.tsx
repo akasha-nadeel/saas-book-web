@@ -130,7 +130,7 @@ function destinationsFrom(
  * book would make the chrome the loudest thing on the screen again, which is
  * the whole reason the parts' colour ladder came off these cards.
  */
-const CARD_BUTTON = `border border-accent/30 bg-accent/15 text-black dark:text-fg
+const CARD_BUTTON = `border border-accent/30 bg-accent/15 text-fg
                      hover:border-accent/60 hover:bg-accent/25
                      focus-visible:ring-accent/50`;
 
@@ -143,7 +143,7 @@ const CARD_BUTTON = `border border-accent/30 bg-accent/15 text-black dark:text-f
  * one just makes the reader work out which is which. `CARD_BUTTON` still
  * carries the fill, and only the disclosure wears it.
  */
-const CARD_QUIET = `border border-transparent bg-transparent text-black dark:text-fg
+const CARD_QUIET = `border border-transparent bg-transparent text-fg
                     hover:border-accent/30 hover:bg-accent/10
                     focus-visible:ring-accent/50`;
 
@@ -184,7 +184,7 @@ const ROW_ACTIVE = "border-transparent bg-accent/10 font-medium text-fg";
  * instead now, which is what the label was always for, and the panel keeps one
  * button style from top to bottom.
  */
-const CARD_STRIP = `border border-accent/30 bg-accent/15 text-black dark:text-fg hover:bg-accent/25
+const CARD_STRIP = `border border-accent/30 bg-accent/15 text-fg hover:bg-accent/25
                     focus-visible:ring-accent/50`;
 
 /**
@@ -570,7 +570,16 @@ export function BookPanel({
       // no manuscript to protect and this panel is the only way into the book,
       // so it is always shown — hiding it there would leave that screen a guide
       // with no navigation at all.
-      className={`book-panel flex-col bg-white dark:bg-transparent ${
+      //
+      // **It paints nothing, which the note above already claimed and the class
+      // list did not.** `bg-white dark:bg-transparent` sat here: literal white
+      // by day, and `dark:` only matches `[data-theme=dark]`, so under a light
+      // tint the white won and this column stayed white beside a cream rail —
+      // the exact bug `globals.css` records against `.nav-chrome`. Transparent
+      // is the fix *and* the original intent: the row behind carries the ground,
+      // so the navigator and the manuscript read as one surface under every
+      // theme.
+      className={`book-panel flex-col ${
         className
           ? className
           : `w-(--sidebar-width) shrink-0 ${
@@ -1352,7 +1361,12 @@ function MatterCard({
                   ${
                     compact
                       ? CARD_STRIP
-                      : `bg-white dark:bg-panel/60 ${
+                      : /* `bg-lifted`, not `bg-white`: the card is a face
+                           standing on the panel's ground, which is what that
+                           token is for, and it is `#ffffff` in plain light — so
+                           this changes nothing for an untinted writer and stops
+                           the cards painting white over a tinted column. */
+                        `bg-lifted dark:bg-panel/60 ${
                           active ? CARD_EDGE_ACTIVE : CARD_EDGE
                         }`
                   }
@@ -1377,7 +1391,7 @@ function MatterCard({
              prose that has got loose into the chrome. */
           className={`min-w-0 flex-1 truncate font-sans font-semibold
                       transition-[font-size,color,line-height] duration-500
-                      ease-out ${compact ? "text-sm text-black dark:text-fg" : "text-base font-semibold text-fg"}`}
+                      ease-out ${compact ? "text-sm text-fg" : "text-base font-semibold text-fg"}`}
         >
           {label}
         </h3>
@@ -1390,7 +1404,7 @@ function MatterCard({
           className={`shrink-0 font-sans text-xs transition-opacity duration-500
                       ease-out ${
                         compact
-                          ? "text-black dark:text-fg opacity-100 font-medium"
+                          ? "text-fg opacity-100 font-medium"
                           : "w-0 overflow-hidden opacity-0"
                       }`}
         >

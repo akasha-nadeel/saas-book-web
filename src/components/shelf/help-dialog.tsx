@@ -11,6 +11,7 @@ import { MAX_SNAPSHOTS } from "@/lib/history";
 import { IMPORT_FORMATS } from "@/lib/import";
 import { TINTS } from "@/lib/library-store";
 import { plural } from "@/lib/plural";
+import { SHOWN_TINTS } from "@/lib/theme-access";
 
 /**
  * What OpenChapter can do, in one place.
@@ -50,12 +51,12 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "One chapter at a time on a page the size of the book you are making. One bar across the top: home, a File menu, undo and redo, the word count, whether it has saved, and Import and Export at the right. One rail down the left opens the chapter list, search, the consistency check, notes, versions and the trash, one at a time.",
       },
       {
-        name: "Colour themes",
-        desc: `${TINTS.map((t) => t.name).join(", ")} — beside plain light, plain dark, and whichever your computer is set to. A theme colours the whole editor: the bar, the rail, the panels and the page you type on. Under the paper button at the right of the editor's top bar, beside Import — or under Format on a phone.`,
+        name: "Colour and paper",
+        desc: `The paper button at the right of the editor's top bar, beside Import — or Format on a phone. Two rows of swatches: the colour of the page you type on, and the colour of the app. ${SHOWN_TINTS.map((id) => TINTS.find((t) => t.id === id)?.name).filter(Boolean).join(", ")}, beside plain light, plain dark, and whichever your computer is set to. Hover any swatch for its name. The page can follow the theme or keep its own colour, so a dark app with a white sheet is yours if you want it. ${TIER_NAMES.pro} opens the rest of the colours and both dark papers.`,
       },
       {
         name: "Page and type",
-        desc: "The Tools button on the rail opens a card rather than a panel: font, size, line spacing, paragraph style, first-line indent and the space between paragraphs. The paper has its own setting there — white, cream, sepia, slate, black, or whatever the theme says — so you can keep a dark theme with a light page. Typewriter scrolling holds the line you are typing at a fixed height, and paragraph marks show where your paragraphs actually end, so empty ones stop looking like room on the page.",
+        desc: "The Tools button on the rail opens a card rather than a panel: font, size, line spacing, paragraph style, first-line indent and the space between paragraphs. Typewriter scrolling holds the line you are typing at a fixed height, and paragraph marks show where your paragraphs actually end, so empty ones stop looking like room on the page.",
       },
       {
         name: "Focus mode",

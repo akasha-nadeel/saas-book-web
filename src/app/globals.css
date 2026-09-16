@@ -2679,8 +2679,17 @@ body {
   --color-muted: #bcc5de; /* the line under it */
 }
 
-/* The hero band. A wash that lifts off the black ground from one corner —
-   the same gesture the light theme made with lavender, in value instead. */
+/* The hero band. A wash that lifts off the ground from one corner —
+   the same gesture the light theme made with lavender, in value instead.
+
+   **The wash is literal; the ground underneath is a token**, which is the rule
+   the chrome classes below are written to. This used to state a navy gradient
+   outright and `#ffffff` for light, with no tint awareness at all — so the whole
+   editor workspace painted navy under Copper Ink and white under Parchment,
+   whichever colour the writer had just chosen. Layering the wash over
+   `--color-surface` keeps the gesture and lets every theme and tint supply its
+   own ground; `surface` rather than `nav` because this is the desk the page
+   stands on, not a piece of chrome. */
 .shelf-hero {
   background:
     radial-gradient(
@@ -2688,7 +2697,7 @@ body {
       rgba(255, 255, 255, 0.09) 0%,
       rgba(255, 255, 255, 0) 55%
     ),
-    linear-gradient(115deg, #1b202b 0%, #090c11 100%);
+    var(--color-surface);
 }
 
 /* --------------------------------------------------------------------------
@@ -2761,9 +2770,13 @@ body {
   --color-muted: #62626b;
 }
 
-:root[data-theme="light"] .shelf-hero {
-  background: #ffffff;
-}
+/* **No light override any more**, and that is the fix rather than an omission.
+   This block stated `#ffffff`, which a light tint could not beat — a class
+   selector outranks the attribute selector the tint blocks are written with, the
+   same trap documented against `.nav-chrome` above. The base rule now defers to
+   `--color-surface`, which is `#ffffff` in plain light, so day reads exactly as
+   it did and every tint finally gets its own desk. The white wash over a light
+   ground is invisible, so it costs nothing to leave in place. */
 
 /* --------------------------------------------------------------------------
    Display type on the landing page.

@@ -62,7 +62,10 @@ export function ChapterSidebar({
            apart is a question about whether they differ. Where this component
            is somebody’s only surface, the caller says so with `onClose`. */
         onClose={onClose}
-        className="flex h-full w-full flex-col bg-white dark:bg-transparent"
+        /* No ground: the second copy of the `bg-white dark:bg-transparent` the
+           navigator itself used to carry, and it painted white over a tinted
+           panel for the same reason. The chrome behind carries the colour. */
+        className="flex h-full w-full flex-col"
       />
     </div>
   );

@@ -27,14 +27,27 @@
  * added here, that rule comes with it.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 
 import { ListGroup, ListRow, SectionHeader } from "@/components/ui/list";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ThemeToggle, TintSwatches } from "@/components/theme/theme-toggle";
 import { RailMark, useMarkHandle } from "@/components/editor/rail-mark";
-import { setPref, type PaperColor } from "@/lib/library-store";
+import { ProCrown } from "@/components/upgrade/pro-crown";
+import { UpgradeDialog } from "@/components/upgrade/upgrade-dialog";
+import { TIER_NAMES } from "@/lib/billing/tiers";
+import { onFreePlan } from "@/lib/launch";
+import { PRO_PAPERS, PRO_TINTS } from "@/lib/theme-access";
+import { usePlan } from "@/lib/use-plan";
+import { setPref, type PaperColor, type Tint } from "@/lib/library-store";
 
 /**
  * The papers, in one place.
@@ -58,41 +71,118 @@ export const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
   { value: "black", label: "Black", swatch: "#0d0d0d" },
 ];
 
+/** Nothing locked — a stable identity, so the default does not remount a row. */
+const NO_PAPERS: ReadonlySet<PaperColor> = new Set();
+const NO_TINTS: ReadonlySet<Tint> = new Set();
+
+/**
+ * Which colours this writer has not paid for.
+ *
+ * **Asked once, here, and handed down.** `usePlan()` is a fetch of
+ * `/api/billing/subscription` per call site, and eight swatches asking for
+ * themselves would be eight — the reason `ProBadge` carries no plan logic and
+ * `useCheckPlan` sits above the consistency picker rather than inside it. This
+ * is that hook's shape, with two sets instead of one.
+ *
+ * **`onFreePlan` and not `useEntitled`**, for the reason `paperback-page.tsx`
+ * records: with no gateway configured there are no plans and nothing is held
+ * back, and `useEntitled` cannot tell that apart from a free account. Its three
+ * parts also mean a swatch is never locked while the plan is still unknown —
+ * not knowing yet is not a reason to refuse.
+ */
+function useThemePlan() {
+  const free = onFreePlan(usePlan());
+  return useMemo(
+    () => ({
+      papers: free ? new Set(PRO_PAPERS) : NO_PAPERS,
+      tints: free ? new Set(PRO_TINTS) : NO_TINTS,
+    }),
+    [free],
+  );
+}
+
+/**
+ * The papers, as a row of swatches.
+ *
+ * **This reverses the note that stood here**, which said rows rather than a row
+ * of swatches, because the panel had the width for the name and a named colour
+ * reads faster than one you have to hover. What it missed is that the panel
+ * asks the *same kind of question* twice — what colour is the page, what colour
+ * is the app — and was drawing the two in different shapes: six labelled rows
+ * above a strip of circles. One of them had to give, and the strip is the one
+ * that shows the answer, which is a colour. The name is on hover, where the
+ * tints already kept theirs.
+ */
+function PaperSwatches({
+  paper,
+  locked,
+  onLocked,
+}: {
+  paper: PaperColor;
+  locked: ReadonlySet<PaperColor>;
+  onLocked: (value: PaperColor) => void;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Page colour"
+      className="flex flex-wrap items-center gap-1.5"
+    >
+      {PAPERS.map((option) => {
+        const shut = locked.has(option.value);
+        const active = !shut && paper === option.value;
+        const label = shut ? `${option.label} — ${TIER_NAMES.pro}` : option.label;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={label}
+            title={label}
+            /* A refused press must not reach `setPref("paper", …)`: that call
+               stamps `paperPicked`, which detaches the sheet from the theme for
+               good — so a press that was meant to do nothing would freeze a free
+               writer's paper on whatever it happened to be. */
+            onClick={() =>
+              shut ? onLocked(option.value) : setPref("paper", option.value)
+            }
+            /* `relative` for the crown and for `Tooltip`, which finds its
+               trigger by `parentElement` and measures from it. */
+            className={`relative h-6 w-6 rounded-full border outline-none
+                        transition-transform hover:scale-110
+                        focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                          active
+                            ? "border-accent ring-2 ring-accent/40"
+                            : "border-line"
+                        }`}
+            style={{ background: option.swatch }}
+          >
+            {shut && <ProCrown />}
+            <Tooltip label={label} side="top" nowrap />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** The rows themselves, so the popover and the phone's sheet cannot disagree. */
 export function PaperThemeRows({ paper }: { paper: PaperColor }) {
+  const locked = useThemePlan();
+  const [offer, setOffer] = useState(false);
+
   return (
     <>
       <SectionHeader className="mb-2">Paper</SectionHeader>
-      {/* Rows rather than a row of swatches: the panel has the width for the
-          name, and colours with their names read faster than colours you have
-          to hover to identify. */}
-      <ListGroup tone="lifted" as="ul">
-        {PAPERS.map((option) => (
-          <ListRow
-            key={option.value}
-            title={option.label}
-            onClick={() => setPref("paper", option.value)}
-            leading={
-              <span
-                aria-hidden="true"
-                /* `block`, or the height and width have nothing to apply to:
-                   the row wraps `leading` in a plain span, so this is an inline
-                   box unless it is told otherwise, and it came out a sliver. */
-                className={`block h-5 w-5 shrink-0 rounded-full border ${
-                  paper === option.value
-                    ? "border-accent ring-2 ring-accent/40"
-                    : "border-line"
-                }`}
-                style={{ background: option.swatch }}
-              />
-            }
-            trailing={
-              paper === option.value ? (
-                <span className="text-accent">✓</span>
-              ) : null
-            }
+      <ListGroup tone="lifted">
+        <ListRow>
+          <PaperSwatches
+            paper={paper}
+            locked={locked.papers}
+            onLocked={() => setOffer(true)}
           />
-        ))}
+        </ListRow>
       </ListGroup>
 
       {/* **The theme is here and not a control of its own**, because it is the
@@ -102,7 +192,7 @@ export function PaperThemeRows({ paper }: { paper: PaperColor }) {
       <SectionHeader className="mt-4 mb-2">Theme</SectionHeader>
       <ListGroup tone="lifted">
         <ListRow title="Appearance" trailing={<ThemeToggle />} />
-        {/* Under the three schemes, because they are one setting with nine
+        {/* Under the three schemes, because they are one setting with several
             answers — and in the same panel as the paper, so how the app looks
             and how the page looks are settled in one place. The paper stays its
             own choice: a white sheet under a dark app is the commonest pairing
@@ -113,9 +203,15 @@ export function PaperThemeRows({ paper }: { paper: PaperColor }) {
             letter in a 16rem panel. */}
         <ListRow>
           <span className="mb-2 block text-[13px] text-fg">Colour</span>
-          <TintSwatches />
+          <TintSwatches locked={locked.tints} onLocked={() => setOffer(true)} />
         </ListRow>
       </ListGroup>
+
+      {/* Opened by the press that was refused, never by an effect — the rule
+          the whole upgrade path follows. */}
+      {offer && (
+        <UpgradeDialog reason="themes" onClose={() => setOffer(false)} />
+      )}
     </>
   );
 }

@@ -72,10 +72,12 @@ it("opens on the row that separates Free from Pro", () => {
 
 /**
  * **Pro is the whole of what is sold, and these are the rows that say what it
- * buys** (six since 2026-09-16). Everything else must read the same on both
- * plans. **Paperback setup is the one feature Free does not have at all** — the
- * owner's decision on 2026-09-16 — so it is the only row allowed to say "Not
- * included", and Pro may never say it.
+ * buys** (seven since 2026-09-16 — colour themes joined the six that afternoon).
+ * Everything else must read the same on both plans. **Paperback setup is the one
+ * feature Free does not have at all** — the owner's decision on 2026-09-16 — so
+ * it is the only row allowed to say "Not included", and Pro may never say it.
+ * Colour themes is deliberately *not* a second one: Free keeps a colour and four
+ * papers, so the row is a difference rather than a door.
  */
 it("differs between the plans only on the rows Pro sells", () => {
   const differing = ROWS.filter((row) => row.values.free !== row.values.pro).map(
@@ -83,6 +85,7 @@ it("differs between the plans only on the rows Pro sells", () => {
   );
   expect(differing.sort()).toEqual([
     "Books",
+    "Colour themes",
     "Consistency check",
     "Ideas",
     "Paperback setup",

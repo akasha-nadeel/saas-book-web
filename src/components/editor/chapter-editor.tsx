@@ -714,7 +714,10 @@ export function ChapterEditor({
             it (`ChapterSidebar` mounts the same `BookPanel`); the editor
             simply was not going through it. */}
 
-        <div className="editor-main flex min-w-0 flex-1 flex-col bg-white dark:bg-transparent">
+        {/* No ground of its own: `bg-white dark:bg-transparent` here was the
+            third copy of the literal that kept a tint off the editor, and the
+            `.shelf-hero` row behind already paints one for every theme. */}
+        <div className="editor-main flex min-w-0 flex-1 flex-col">
           {/* Keyed on the id and a cross-tab reload counter — not the stored
               text — so a save from another tab reloads the surface, while this
               tab's own autosaves never remount it mid-keystroke. */}

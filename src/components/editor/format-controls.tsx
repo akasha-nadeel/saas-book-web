@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { PromptDialog } from "@/components/ui/dialog";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { PAPERS } from "@/components/editor/paper-theme";
+import { ProCrown } from "@/components/upgrade/pro-crown";
+import { UpgradeDialog } from "@/components/upgrade/upgrade-dialog";
+import { TIER_NAMES } from "@/lib/billing/tiers";
+import { onFreePlan } from "@/lib/launch";
+import { PRO_PAPERS } from "@/lib/theme-access";
+import { usePlan } from "@/lib/use-plan";
 import { applyFormattingCommand } from "@/lib/editor/formatting-commands";
 import type { TextAlignValue } from "@/lib/editor/text-align";
 import {
@@ -105,6 +111,16 @@ export function FormatControls({
   useEditorState(editor);
   const type = typographyOf(book);
   const [linkAsked, setLinkAsked] = useState<string | null>(null);
+  /* The same gate the bar's panel keeps, asked the same way — `onFreePlan`, so
+     a swatch is never locked while the plan is still unknown and never locked
+     at all where no gateway is configured. There is no tint row here, so papers
+     are the whole of it. */
+  const free = onFreePlan(usePlan());
+  const lockedPapers = useMemo(
+    () => (free ? new Set(PRO_PAPERS) : new Set<PaperColor>()),
+    [free],
+  );
+  const [offer, setOffer] = useState(false);
   const run = (command: (liveEditor: Editor) => void) =>
     runCommand ? runCommand(command) : command(editor);
   const command = (value: Parameters<typeof applyFormattingCommand>[1]) =>
@@ -290,23 +306,43 @@ export function FormatControls({
         <div className="flex flex-wrap items-center gap-3">
           <fieldset className="flex min-w-0 gap-2">
             <legend className="sr-only">Page colour</legend>
-            {PAPERS.map((choice) => (
-              <button
-                key={choice.value}
-                type="button"
-                aria-pressed={paper === choice.value}
-                aria-label={choice.label}
-                onClick={() => setPref("paper", choice.value)}
-                className={`h-11 w-11 rounded-full border-2 outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                  paper === choice.value ? "border-accent" : "border-line"
-                }`}
-                style={{ background: choice.swatch }}
-              />
-            ))}
+            {PAPERS.map((choice) => {
+              const shut = lockedPapers.has(choice.value);
+              const active = !shut && paper === choice.value;
+              const label = shut
+                ? `${choice.label} — ${TIER_NAMES.pro}`
+                : choice.label;
+              return (
+                <button
+                  key={choice.value}
+                  type="button"
+                  aria-pressed={active}
+                  aria-label={label}
+                  title={label}
+                  /* A refused press must not reach `setPref("paper", …)`, which
+                     stamps `paperPicked` and detaches the sheet from the theme
+                     for good — the same rule the bar's panel keeps. */
+                  onClick={() =>
+                    shut ? setOffer(true) : setPref("paper", choice.value)
+                  }
+                  className={`relative h-11 w-11 rounded-full border-2 outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                    active ? "border-accent" : "border-line"
+                  }`}
+                  style={{ background: choice.swatch }}
+                >
+                  {/* Larger than the bar's 12px: this swatch is 44px, and a
+                      mark sized for a 24px circle is a speck on it. */}
+                  {shut && <ProCrown size={18} />}
+                </button>
+              );
+            })}
           </fieldset>
           <ThemeToggle />
         </div>
       </section>
+
+      {/* Opened by the press that was refused, never by an effect. */}
+      {offer && <UpgradeDialog reason="themes" onClose={() => setOffer(false)} />}
 
       {linkAsked !== null && (
         <PromptDialog

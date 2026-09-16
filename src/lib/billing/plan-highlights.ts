@@ -24,6 +24,7 @@
 import { ALL_CHECKS, FREE_CHECKS } from "@/lib/consistency-ids";
 import { FREE_LIMITS, FREE_RECORD_DAYS } from "@/lib/free-limits";
 import { nounFor } from "@/lib/plural";
+import { FREE_PAPERS, FREE_TINTS } from "@/lib/theme-access";
 import { TIER_LIMITS, type PaidTier, type PlanTier } from "./tiers";
 
 /**
@@ -109,6 +110,11 @@ const FREE_HIGHLIGHTS: Highlight[] = [
     text: `parked ${nounFor(FREE_LIMITS.ideas.free, "idea")} at a time`,
   },
   {
+    row: "Colour themes",
+    lead: String(FREE_TINTS.length),
+    text: `${nounFor(FREE_TINTS.length, "colour")} and ${FREE_PAPERS.length} papers`,
+  },
+  {
     row: "Title check",
     lead: String(FREE_LIMITS.titleCheck.free),
     text: `${nounFor(FREE_LIMITS.titleCheck.free, "title check")} a day`,
@@ -141,6 +147,7 @@ const PAID_HIGHLIGHTS: Record<PaidTier, Highlight[]> = {
     SYNC,
     VOICE,
     { row: "Ideas", lead: "Unlimited", text: "parked ideas" },
+    { row: "Colour themes", lead: "Every", text: "colour and paper" },
     { row: "Title check", lead: "Unlimited", text: "title checks" },
     EXPORT,
     {
