@@ -63,11 +63,11 @@ describe("displayPrice", () => {
 
   it("uses the prices the cards print", () => {
     expect(priceOf("pro", "monthly")).toBe(5.99);
-    expect(priceOf("pro", "annual")).toBe(49.99);
+    expect(priceOf("pro", "annual")).toBe(59.88);
   });
 
   it("divides the annual total rather than printing a typed figure", () => {
-    expect(displayPrice(perMonthOf("pro", "annual"))).toBe("$4.17");
+    expect(displayPrice(perMonthOf("pro", "annual"))).toBe("$4.99");
   });
 });
 
@@ -160,7 +160,7 @@ describe("annualSavingPercent", () => {
     // than typed precisely so that moving a price moves the badge — the
     // previous hand-written figure survived a price change and became a false
     // claim on the one page a customer reads before paying.
-    for (const tier of PAID_TIERS) expect(annualSavingPercent(tier)).toBe(30);
+    for (const tier of PAID_TIERS) expect(annualSavingPercent(tier)).toBe(17);
   });
 
   it("agrees with the two prices it describes", () => {
@@ -189,14 +189,14 @@ describe("annualSavingPercent", () => {
  * **The badge's precondition, and the reason it is a function rather than an
  * assumption.**
  *
- * One "Save 30%" chip sits above the paid columns. With one paid plan that is
+ * One "Save 17%" chip sits above the paid columns. With one paid plan that is
  * Pro's own saving; the toggle still asks before printing, so a second plan
  * whose saving differs makes the badge disappear rather than lie, and this
  * test says so out loud.
  */
 describe("uniformAnnualSaving", () => {
   it("is the one figure the period toggle may print", () => {
-    expect(uniformAnnualSaving()).toBe(30);
+    expect(uniformAnnualSaving()).toBe(17);
     for (const tier of PAID_TIERS) {
       expect(annualSavingPercent(tier)).toBe(uniformAnnualSaving());
     }

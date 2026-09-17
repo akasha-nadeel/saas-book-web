@@ -19,7 +19,7 @@ Read before touching `src/lib/billing/`, `src/lib/free-limits.ts`, `src/componen
 >   one. `20260914000000_ai_free_pro_plan.sql` rewrites every retired row to
 >   `pro` and narrows the CHECKs; `asTier` refuses the old names.
 > - **Pro buys two things**: unlimited books (Free holds one) and unlimited
->   title checks (Free runs one a day). **$5.99 a month or $49.99 a year.**
+>   title checks (Free runs one a day). **$5.99 a month or $59.88 a year.**
 >   (Superseded twice: six things since 2026-09-16 — see below.)
 > - **The credit economy is gone** — `credits.ts`, `starter-pass.ts`,
 >   `aiChatClosed()`, `claimCredits`, `ai_credits`, `ai_usage`, `requirePro()`
@@ -81,10 +81,12 @@ a secret. `server.ts` reads a writer's subscription (`subscriptionFor`,
 `requirePro()` too, the gate in front of ten model routes; those routes were
 deleted on 2026-09-14 and the gate with them.
 
-**Two cycles, and both renew.** Pro is $5.99 a month or $49.99 a year, which
-displays as about $4.17 a month and rounds to 30% off twelve monthly payments.
-The exact total is stored in `plans.ts`; the displayed monthly equivalent is
-derived from that total so rounding happens once. `uniformAnnualSaving()` still
+**Two cycles, and both renew.** Pro is $5.99 a month or $59.88 a year, which is
+twelve months at $4.99 — a 17% saving, and the trade's own "two months free"
+convention. **This one price is derived the other way round**: $4.99 is the
+figure on the card and the annual total is whatever makes it exact, so the
+displayed month needs no rounding at all. It was $49.99 (about $4.17, 30%)
+until 2026-09-17. `uniformAnnualSaving()` still
 guards the one "Save" badge, so a second paid plan whose saving differed would
 make the badge disappear rather than lie.
 

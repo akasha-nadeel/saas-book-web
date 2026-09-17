@@ -21,9 +21,11 @@ real users at the time, so nothing is migrated gently.
    | Books | 1 | Unlimited |
    | Title checks | 1 a day | Unlimited |
    | Exports (Word, EPUB, PDF), import, sync, consistency check, voice typing | Yes | Yes |
-   | Price | $0 | **$5.99 / month** or **$49.99 / year** |
+   | Price | $0 | **$5.99 / month** or **$59.88 / year** (= $4.99 / month) |
 
-   The yearly price works out to about $4.17 a month, 30% below monthly. After
+   The yearly price is twelve months at $4.99, 17% below monthly — the "two
+   months free" convention. (It was $49.99, about $4.17 and 30%, until
+   2026-09-17.) After
    Paddle's 5% + 50¢, a monthly payment keeps $5.19. That is above the $5 floor
    the earlier Draft price was set against, now with no model cost to cover.
 4. **The site says "No AI" out loud**: in the hero, the FAQ and both pricing

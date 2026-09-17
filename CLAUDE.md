@@ -903,9 +903,13 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   The struck price is the real monthly price, shown only on the annual cycle;
   the tab says "Recommended", not "Popular"; the subtitle keeps the reference's
   pale grey by the owner's choice, and the feature lines were raised.
-- **Prices live once in `plans.ts`: Pro is $5.99 a month or $49.99 a year** —
-  30% off, the top of the band `plans.test.ts` allows, with the per-month figure
-  divided from the total rather than typed. Priced backwards from a floor of $5
+- **Prices live once in `plans.ts`: Pro is $5.99 a month or $59.88 a year** —
+  twelve months at **$4.99**, a 17% saving and the trade's own "two months free"
+  convention, inside the 10–30% band `plans.test.ts` allows. **The annual total
+  is derived from the per-month figure here**, the reverse of every other plan
+  in this table: $4.99 is the number on the card, and 59.88 is what makes it
+  honest. It was $49.99 (30%, the top of the band) until 2026-09-17.
+  Priced backwards from a floor of $5
   kept per monthly sale after Paddle's 5% + 50¢ ($5.99 keeps $5.19) and under
   the AI-free apps that give more (WriteO $9.49/mo, Novlr Starter $8/mo yearly,
   Plottr $9.99/mo); the design note has the research. **USD only.**

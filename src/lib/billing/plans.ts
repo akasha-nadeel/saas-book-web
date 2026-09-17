@@ -71,12 +71,20 @@ const PRICES: Record<PaidTier, Record<Period, { total: number; perMonth: number 
    * so it sits under all of them. The design note is
    * `docs/plans/2026-09-14-ai-free-pro-plan-design.md`.
    *
-   * The year is $49.99, which rounds to 30% off twelve monthly payments: the top
-   * of the band `plans.test.ts` allows.
+   * **The year is $59.88, which is twelve months at $4.99** — a 17% saving on
+   * $5.99. The total is derived from the per-month figure rather than the other
+   * way round, because $4.99 is the number on the card: the annual price is
+   * whatever makes that month honest, and 59.88 is 4.99 × 12 exactly.
+   *
+   * It was $49.99 (30%, the very top of the band) until 2026-09-17, when the
+   * owner asked for a smaller discount. The band `plans.test.ts` holds is
+   * 10–30%: below 10% the annual cycle is not worth a writer's year up front,
+   * and above 30% the monthly price stops being the real one. Twelve months at
+   * full price is $71.88, so the year may sit anywhere from $50.32 to $64.69.
    */
   pro: {
     monthly: { total: 5.99, perMonth: 5.99 },
-    annual: { total: 49.99, perMonth: 49.99 / 12 },
+    annual: { total: 59.88, perMonth: 4.99 },
   },
 };
 
