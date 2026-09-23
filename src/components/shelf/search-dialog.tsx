@@ -7,7 +7,7 @@ import { shelfIcons } from "@/components/shelf/shelf-icons";
 import { BookThumb } from "@/components/shelf/book-thumb";
 import { hasResults, recentBooks, searchShelf } from "@/lib/shelf-search";
 import { plural } from "@/lib/plural";
-import type { Book } from "@/lib/library-store";
+import { bookChapterCount, type Book } from "@/lib/library-store";
 
 /**
  * Finding a book or a chapter by name.
@@ -72,7 +72,10 @@ export function SearchDialog({
     const bookRow = (book: Book): Row => ({
       key: `book:${book.id}`,
       title: book.title,
-      note: plural(book.chapters.length, "chapter"),
+      // The body alone. `book.chapters.length` counts the front- and
+      // back-matter pages too, so a three-chapter novel with the standard
+      // matter set read "19 chapters" in this row.
+      note: plural(bookChapterCount(book), "chapter"),
       lead: <BookThumb book={book} />,
       go: () => {
         onPickBook(book);

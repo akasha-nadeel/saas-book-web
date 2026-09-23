@@ -6,10 +6,14 @@ import {
   canonicalText,
   chapterCanonicalText,
   daysBetween,
+  draftTimeline,
+  fastStretches,
   formatRecord,
   IMPORT_LIKELY,
   importDays,
+  PAGE_LIST_HEADING,
   RECORD_FORMAT,
+  sittings,
   toHex,
   utcOffset,
   versionsSince,
@@ -525,5 +529,309 @@ describe("formatRecord", () => {
     // writers whose first language is not English. A document that leaned on
     // one would be repeating the harm it exists to answer.
     expect(report()).toContain("no test that establishes who wrote");
+  });
+});
+
+describe("the page list counts chapters, not pages", () => {
+  const record = writingRecord({ "2026-01-01": 1200 });
+
+  function report(over: Partial<Parameters<typeof formatRecord>[0]> = {}) {
+    return formatRecord({
+      title: "The Crossing",
+      record,
+      timeline: bookTimeline([]),
+      chapters: [],
+      fingerprint: null,
+      imports: [],
+      at: Date.UTC(2026, 0, 6, 12),
+      zone: "UTC+05:30",
+      ...over,
+    });
+  }
+
+  function page(over: Partial<RecordChapter> = {}): RecordChapter {
+    return {
+      title: "Chapter One",
+      words: 900,
+      fingerprint: null,
+      versions: [],
+      ...over,
+    };
+  }
+
+  /** Two chapters and the standard-ish matter set — the book that reported 9. */
+  const realBook: RecordChapter[] = [
+    page({ title: "Title page", part: "front", words: 10, number: null }),
+    page({ title: "Copyright page", part: "front", words: 4, number: null }),
+    page({ title: "Dedication", part: "front", words: 4, number: null }),
+    page({ title: "Chapter One", number: 1, words: 1259 }),
+    page({ title: "Chapter Two", number: 2, words: 1259 }),
+    page({ title: "Afterword", part: "back", words: 1259, number: null }),
+    page({ title: "Acknowledgements", part: "back", words: 1259, number: null }),
+    page({ title: "About the author", part: "back", words: 1259, number: null }),
+    page({ title: "A word about reviews", part: "back", words: 1259, number: null }),
+  ];
+
+  it("counts the body alone, and never the pages", () => {
+    // The reported bug: a two-chapter book whose record said "Chapters: 9"
+    // while the header on the same screen said two.
+    const text = report({ chapters: realBook });
+    expect(text).toContain("Chapters:            2");
+    expect(text).not.toContain("Chapters:            9");
+  });
+
+  it("reports the matter pages on their own line", () => {
+    expect(report({ chapters: realBook })).toContain("Other pages:         7");
+  });
+
+  it("leaves the line out of a book that has no matter pages", () => {
+    const text = report({ chapters: [page({ number: 1 })] });
+    expect(text).toContain("Chapters:            1");
+    expect(text).not.toContain("Other pages:");
+    // And with nothing to distinguish, nothing to explain either.
+    expect(text).not.toContain("The word total covers every page");
+  });
+
+  it("keeps the word total over every page, and says so", () => {
+    const text = report({ chapters: realBook });
+    expect(text).toContain("Words:               7,572");
+    expect(text).toContain("The word total covers every page listed below");
+  });
+
+  it("says what each entry is, so nine entries are not nine chapters", () => {
+    const text = report({ chapters: realBook });
+    expect(text).toContain("front matter · 10 words");
+    expect(text).toContain("chapter 1 · 1,259 words");
+    expect(text).toContain("back matter · 1,259 words");
+  });
+
+  it("never calls a matter page a chapter", () => {
+    const text = report({
+      chapters: [page({ title: "Dedication", part: "front", words: 4 })],
+    });
+    expect(text).toContain("front matter · 4 words");
+    expect(text).not.toContain("chapter ·");
+  });
+
+  it("leaves an unnumbered body page unnumbered rather than guessing", () => {
+    // `unnumbered` exists because a stray in the body silently takes a number
+    // and every chapter after it counts one too high. Inventing one here is
+    // the same bug in the document.
+    const text = report({ chapters: [page({ title: "END", number: null })] });
+    expect(text).toContain("chapter · 900 words");
+    expect(text).not.toContain("chapter 1");
+    expect(text).not.toContain("chapter null");
+  });
+
+  it("keeps the fingerprint recipe naming the list it is checkable against", () => {
+    // A recipe that points at a heading the document does not print is a
+    // recipe nobody can follow.
+    const text = report({ chapters: realBook, fingerprint: "abc123" });
+    expect(text).toContain(PAGE_LIST_HEADING);
+    expect(text).toContain(`Every page under ${PAGE_LIST_HEADING}`);
+  });
+});
+
+describe("draftTimeline", () => {
+  const at = (h: number, m: number, s = 0) =>
+    Date.UTC(2026, 0, 6, h, m, s);
+
+  function page(over: Partial<RecordChapter> = {}): RecordChapter {
+    return {
+      title: "Chapter One",
+      words: 0,
+      fingerprint: null,
+      versions: [],
+      ...over,
+    };
+  }
+
+  it("pools every page's drafts into one line in time order", () => {
+    const events = draftTimeline([
+      page({
+        title: "Chapter One",
+        versions: [
+          { at: at(9, 0), words: 100 },
+          { at: at(9, 20), words: 300 },
+        ],
+      }),
+      page({
+        title: "Chapter Two",
+        versions: [{ at: at(9, 10), words: 50 }],
+      }),
+    ]);
+
+    expect(events.map((e) => e.chapter)).toEqual([
+      "Chapter One",
+      "Chapter Two",
+      "Chapter One",
+    ]);
+    // The running total is the sum over the drafts kept, so it climbs as each
+    // page is first saved and then follows the one that changed.
+    expect(events.map((e) => e.total)).toEqual([100, 150, 350]);
+  });
+
+  it("gives the first draft no delta, because nothing was measured before it", () => {
+    // A chapter can be created with text already in it — an import does
+    // exactly that — so "+100" here would claim to have watched words arrive
+    // that nobody watched.
+    const [first, second] = draftTimeline([
+      page({
+        versions: [
+          { at: at(9, 0), words: 100 },
+          { at: at(9, 30), words: 400 },
+        ],
+      }),
+    ]);
+    expect(first.delta).toBeNull();
+    expect(first.elapsed).toBeNull();
+    expect(second.delta).toBe(300);
+    expect(second.elapsed).toBe(30 * 60 * 1000);
+  });
+
+  it("reports a chapter cut down as a negative, not as nothing", () => {
+    const [, second] = draftTimeline([
+      page({
+        versions: [
+          { at: at(9, 0), words: 1000 },
+          { at: at(9, 30), words: 600 },
+        ],
+      }),
+    ]);
+    expect(second.delta).toBe(-400);
+  });
+
+  it("answers a book with no drafts at all", () => {
+    expect(draftTimeline([page()])).toEqual([]);
+  });
+});
+
+describe("sittings", () => {
+  const at = (h: number, m: number) => Date.UTC(2026, 0, 6, h, m);
+
+  function timeline(times: number[]): RecordChapter[] {
+    return [
+      {
+        title: "Chapter One",
+        words: 0,
+        fingerprint: null,
+        versions: times.map((t, i) => ({ at: t, words: (i + 1) * 100 })),
+      },
+    ];
+  }
+
+  it("keeps drafts eleven minutes apart in one sitting", () => {
+    // The regression this threshold exists for: `SNAPSHOT_EVERY_MS` is ten
+    // minutes, so drafts of one chapter are never closer than that. A gap
+    // anywhere near it would cut a continuous afternoon into one sitting per
+    // snapshot and print breaks the writer never took.
+    const runs = sittings(draftTimeline(timeline([at(9, 0), at(9, 11), at(9, 22)])));
+    expect(runs).toHaveLength(1);
+    expect(runs[0].drafts).toHaveLength(3);
+  });
+
+  it("splits where the writer plainly went away", () => {
+    const runs = sittings(draftTimeline(timeline([at(9, 0), at(14, 0)])));
+    expect(runs).toHaveLength(2);
+  });
+
+  it("reports a sitting's net change, and null when it opens the record", () => {
+    const runs = sittings(draftTimeline(timeline([at(9, 0), at(9, 20)])));
+    // The first draft has no delta, so the sitting holding it cannot claim a
+    // total rather than quietly leaving that draft out.
+    expect(runs[0].words).toBeNull();
+
+    const later = sittings(draftTimeline(timeline([at(9, 0), at(9, 20), at(14, 0)])));
+    expect(later[1].words).toBe(100);
+  });
+});
+
+describe("fastStretches", () => {
+  function between(ms: number, words: number): RecordChapter[] {
+    return [
+      {
+        title: "Chapter One",
+        words,
+        fingerprint: null,
+        versions: [
+          { at: 1_000_000, words: 0 },
+          { at: 1_000_000 + ms, words },
+        ],
+      },
+    ];
+  }
+
+  it("catches a manuscript landing inside a minute", () => {
+    // What the day threshold cannot see: 7,572 words is nowhere near
+    // IMPORT_LIKELY's twenty thousand between two midnights, but it arrived
+    // in about a minute.
+    const events = draftTimeline(between(61_000, 7_572));
+    expect(fastStretches(events)).toHaveLength(1);
+  });
+
+  it("leaves a fast but human stretch alone", () => {
+    // 1,259 words over ten minutes is 126 a minute — a very good stretch of
+    // typing, and nothing this block has any business naming.
+    const events = draftTimeline(between(10 * 60_000, 1_259));
+    expect(fastStretches(events)).toEqual([]);
+  });
+
+  it("ignores a burst too small to be a passage", () => {
+    // A title typed into a new page, an autosave landing a handful of words.
+    const events = draftTimeline(between(1_000, 20));
+    expect(fastStretches(events)).toEqual([]);
+  });
+
+  it("never flags the first draft, whose arrival nobody watched", () => {
+    const events = draftTimeline([
+      {
+        title: "Chapter One",
+        words: 90_000,
+        fingerprint: null,
+        versions: [{ at: 1_000_000, words: 90_000 }],
+      },
+    ]);
+    expect(fastStretches(events)).toEqual([]);
+  });
+
+  it("survives two drafts saved in the same millisecond", () => {
+    const events = draftTimeline(between(0, 5_000));
+    expect(() => fastStretches(events)).not.toThrow();
+    expect(fastStretches(events)).toHaveLength(1);
+  });
+
+  it("stays a fact: no score, no percentage, no finding", () => {
+    // The failure this block is written against is a report whose headline is
+    // a single figure — the part that gets gamed while the detail that
+    // contradicts it sits in the fine print.
+    const text = formatRecord({
+      title: "The Crossing",
+      record: writingRecord({ "2026-01-06": 7572 }),
+      timeline: bookTimeline(between(61_000, 7_572)),
+      chapters: between(61_000, 7_572),
+      fingerprint: null,
+      imports: [],
+      at: Date.UTC(2026, 0, 6, 12),
+      zone: "UTC+00:00",
+    });
+    expect(text).toContain("STRETCHES FASTER THAN TYPING");
+    expect(text).toContain("evidence of");
+    expect(text).not.toMatch(/\d+%/);
+    expect(text).not.toMatch(/likel(y|ihood)|confiden|score/i);
+  });
+
+  it("omits the whole block when there is nothing to say", () => {
+    const clean = between(10 * 60_000, 1_259);
+    const text = formatRecord({
+      title: "The Crossing",
+      record: writingRecord({ "2026-01-06": 1259 }),
+      timeline: bookTimeline(clean),
+      chapters: clean,
+      fingerprint: null,
+      imports: [],
+      at: Date.UTC(2026, 0, 6, 12),
+      zone: "UTC+00:00",
+    });
+    expect(text).not.toContain("STRETCHES FASTER THAN TYPING");
   });
 });

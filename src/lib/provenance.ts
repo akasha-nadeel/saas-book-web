@@ -326,6 +326,201 @@ export function bookTimeline(
   };
 }
 
+// ---------------------------------------------------------------------------
+// The draft timeline
+//
+// **The record kept the times and threw away what they meant.** The drafts
+// were printed per chapter, oldest first, each as a moment and a word count —
+// so a reader could see that a chapter existed at 06:45 and again at 06:55,
+// and nothing about how it got from one to the other. What a reader of a
+// writing record has come for is the shape of the work: when the author sat
+// down, how long for, and how fast words appeared. That is precisely what a
+// word processor's revision history is prized for, and all of it is already in
+// the data — it was only never read in time order.
+//
+// **Pooled across the book, not per chapter.** `SNAPSHOT_EVERY_MS` in
+// `history.ts` is ten minutes, so two drafts *of one chapter* are never closer
+// than that: a per-chapter rate can never see a fast stretch, and a book whose
+// pages each have a single draft has no pair to compare at all. Every draft of
+// the book in one ordered line is the unit that sees it.
+// ---------------------------------------------------------------------------
+
+/** One saved draft, read in the company of the ones around it. */
+export interface DraftEvent {
+  at: number;
+  /** Which page it is a draft of. */
+  chapter: string;
+  /** The book's word total across the drafts kept, after this one. */
+  total: number;
+  /**
+   * The change in that total since the previous draft, or null for the first.
+   *
+   * **The first draft carries no delta, deliberately.** Before it nothing was
+   * measured — a chapter can be created with text already in it, and an import
+   * does exactly that — so "+1,259" on a first draft would claim to have
+   * watched words arrive that nobody watched. The same refusal as
+   * `RecordChapter.unreadable`: what was not seen is not reported as seen.
+   */
+  delta: number | null;
+  /** Milliseconds since the previous draft, or null for the first. */
+  elapsed: number | null;
+}
+
+/**
+ * Every draft of the book, in the order they were taken.
+ *
+ * `total` is the sum over the drafts *kept*, which is not the same as the
+ * book's word count: a page whose drafts have been swept, or which has never
+ * been snapshotted, contributes nothing until its first one appears. So an
+ * early total understates, and the document says so where it prints them —
+ * the same "at least" this whole section is written in.
+ */
+export function draftTimeline(
+  chapters: readonly RecordChapter[],
+): DraftEvent[] {
+  const events = chapters
+    .flatMap((chapter) =>
+      chapter.versions.map((v) => ({
+        at: v.at,
+        chapter: chapter.title,
+        words: v.words,
+      })),
+    )
+    /* By title as the tie-break, so two drafts saved in the same millisecond
+       come out in a stable order rather than whichever order the chapters
+       happened to be read in. A test that shuffles the input would otherwise
+       be flaky rather than wrong. */
+    .sort((a, b) => a.at - b.at || a.chapter.localeCompare(b.chapter));
+
+  const latest = new Map<string, number>();
+  let previous: { at: number; total: number } | null = null;
+
+  return events.map((event) => {
+    latest.set(event.chapter, event.words);
+    let total = 0;
+    for (const words of latest.values()) total += words;
+
+    const out: DraftEvent = {
+      at: event.at,
+      chapter: event.chapter,
+      total,
+      delta: previous ? total - previous.total : null,
+      elapsed: previous ? event.at - previous.at : null,
+    };
+    previous = { at: event.at, total };
+    return out;
+  });
+}
+
+/**
+ * How long a break has to be before it is a different sitting.
+ *
+ * **It has to clear `SNAPSHOT_EVERY_MS`, which is ten minutes**, by a wide
+ * margin. Drafts of one chapter are never closer together than that, so a
+ * threshold anywhere near it would cut a continuous afternoon into one
+ * "sitting" per snapshot and print breaks the writer never took — inventing a
+ * fact about somebody's working day, which is the thing this whole screen
+ * exists not to do. Ninety minutes is the nearest round number well clear of
+ * it, and it is a plausible break in its own right: a writer who comes back
+ * after an hour and a half has been somewhere else.
+ */
+export const SITTING_GAP_MS = 90 * 60 * 1000;
+
+/** A run of drafts with no long break in it. */
+export interface Sitting {
+  from: number;
+  to: number;
+  drafts: DraftEvent[];
+  /** Net change across the sitting, or null when it opens the record. */
+  words: number | null;
+}
+
+export function sittings(
+  events: readonly DraftEvent[],
+  gap: number = SITTING_GAP_MS,
+): Sitting[] {
+  const out: Sitting[] = [];
+
+  for (const event of events) {
+    const current = out[out.length - 1];
+    if (current && event.at - current.to <= gap) {
+      current.drafts.push(event);
+      current.to = event.at;
+      /* A null delta opens the record and cannot be added to anything; the
+         sitting holding it reports null rather than a total that quietly
+         leaves it out. */
+      current.words =
+        current.words === null || event.delta === null
+          ? null
+          : current.words + event.delta;
+      continue;
+    }
+    out.push({
+      from: event.at,
+      to: event.at,
+      drafts: [event],
+      words: event.delta,
+    });
+  }
+
+  return out;
+}
+
+/**
+ * Beyond which words did not arrive by being typed.
+ *
+ * The companion to `IMPORT_LIKELY`, which is a *day* threshold and therefore
+ * blind to the case that matters most: a whole manuscript landing inside a
+ * minute is nowhere near twenty thousand words between two midnights, so
+ * nothing in the record said it had happened.
+ *
+ * Set clear of any human being, the way `IMPORT_LIKELY` is. The fastest
+ * sustained typing Guinness ever listed was 145–150 wpm over the better part
+ * of an hour; the 212 wpm figure beside it is a self-reported peak, over a
+ * brief stretch, and was copy typing rather than composing prose — a novelist
+ * inventing sentences works at a fraction of either. Six hundred is four times
+ * the best sustained speed ever recorded, so this cannot fire on somebody
+ * writing. For scale, the book that prompted it ran at about 7,450.
+ */
+export const TYPING_CEILING_WPM = 600;
+
+/**
+ * Below which a fast stretch is not worth naming.
+ *
+ * A paragraph pasted from a notes app, a title typed into a new page, an
+ * autosave landing a handful of words in the same second — all of them clear
+ * the rate and none of them is what a reader is looking for. The block is
+ * about passages arriving, and a list padded with twenty-word blips is a block
+ * nobody finishes reading.
+ */
+export const FAST_STRETCH_WORDS = 400;
+
+/**
+ * The stretches in which words arrived faster than anyone types.
+ *
+ * **A fact, not a verdict.** What comes back is the words and the seconds; the
+ * document prints both and says what they are consistent with, and stops. The
+ * moment this returns a score, a percentage or a judgement it becomes the
+ * thing it was written against — a report whose headline figure is the part
+ * that gets gamed, while the detail that contradicts it sits in the fine
+ * print.
+ */
+export function fastStretches(
+  events: readonly DraftEvent[],
+  ceiling: number = TYPING_CEILING_WPM,
+): DraftEvent[] {
+  return events.filter((event) => {
+    if (event.delta === null || event.elapsed === null) return false;
+    if (event.delta < FAST_STRETCH_WORDS) return false;
+    /* Two drafts in the same millisecond would divide by zero. A second is the
+       smallest gap that means anything here, and rounding up can only make the
+       rate look *slower*, so nothing is flagged that the real elapsed time
+       would have cleared. */
+    const minutes = Math.max(event.elapsed, 1000) / 60_000;
+    return event.delta / minutes > ceiling;
+  });
+}
+
 /**
  * The author's own UTC offset, written the way a reader expects to see one.
  *
@@ -354,6 +549,32 @@ export function toHex(bytes: ArrayBuffer): string {
 /** One chapter as the document reports it. */
 export interface RecordChapter {
   title: string;
+  /**
+   * Front or back matter, if it is one.
+   *
+   * **Absent means a body chapter**, the same convention `ChapterMeta.matter`
+   * uses, so a caller that does not set it reads as the common case rather
+   * than as an unknown.
+   *
+   * It is here because the document was counting pages as chapters. A book of
+   * two chapters with the standard matter set reported "Chapters: 9" and then
+   * listed nine entries with nothing saying which was which — the same bug the
+   * export screen had and fixed, where a three-chapter novel read "20
+   * chapters". `provenance.ts` cannot call `chapterMatterOf`: it imports the
+   * activity log and a block type and nothing else, deliberately. So the part
+   * travels on the record.
+   */
+  part?: "front" | "back";
+  /**
+   * The chapter's own number, or null for a matter page and for a body page
+   * the writer marked `unnumbered`.
+   *
+   * **From `chapterNumberOf`, never counted here.** A position in this list is
+   * not a chapter number — the list holds every page in fingerprint order —
+   * and counting body entries as they go by would silently number a stray that
+   * the writer had explicitly taken out of the numbering.
+   */
+  number?: number | null;
   /** The app's own count, so the file and the screen agree. */
   words: number;
   /** SHA-256 of this chapter's canonical text, or null where none was taken. */
@@ -370,6 +591,64 @@ export interface RecordChapter {
   unreadable?: true;
   /** Oldest first, so the chapter reads as a thing that grew. */
   versions: readonly { at: number; words: number }[];
+}
+
+/**
+ * What the page list is called, in one place.
+ *
+ * HOW TO CHECK IT tells a reader the fingerprint is taken over the pages "in
+ * the order listed above", and a recipe is only checkable against the list it
+ * names. The two are written from this constant so a rename cannot move one
+ * without the other — and a test asserts both.
+ */
+export const PAGE_LIST_HEADING = "CHAPTERS AND PAGES";
+
+/**
+ * The tag under each entry: what this page is, in the book's own terms.
+ *
+ * A body page with no number is a chapter the writer marked `unnumbered` — a
+ * part title, an interlude, a stray heading the importer could not place. It
+ * reads plainly as "chapter", because inventing a numeral for it is the
+ * precise bug that flag exists to prevent.
+ */
+/**
+ * The time of day, UTC, as `HH:MM:SS`.
+ *
+ * UTC like every other instant in the file, and for the same reason: the
+ * document is read by somebody who is not in the author's timezone, and the
+ * offset is stated once at the top so the two can be reconciled. The date is
+ * not repeated on every line — the sitting it belongs to carries it.
+ */
+function clockOf(at: number): string {
+  return new Date(at).toISOString().slice(11, 19);
+}
+
+/**
+ * A duration in the largest unit that does not lie about it.
+ *
+ * Seconds up to a minute, then minutes, then hours and minutes — "3600
+ * seconds" is arithmetic rather than information, and a record is read by
+ * somebody in a hurry.
+ */
+function spanOf(ms: number): string {
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+}
+
+/** A change with its sign on it, so a day of cutting reads as work done. */
+function signed(words: number): string {
+  return `${words < 0 ? "−" : "+"}${Math.abs(words).toLocaleString("en")}`;
+}
+
+function pageKind(chapter: RecordChapter): string {
+  if (chapter.part === "front") return "front matter";
+  if (chapter.part === "back") return "back matter";
+  return chapter.number ? `chapter ${chapter.number}` : "chapter";
 }
 
 /**
@@ -434,6 +713,8 @@ export function formatRecord({
   const lines: string[] = [];
   const words = chapters.reduce((sum, c) => sum + c.words, 0);
   const unreadable = chapters.filter((c) => c.unreadable);
+  const bodyPages = chapters.filter((c) => !c.part);
+  const matterPages = chapters.filter((c) => c.part);
 
   lines.push(`WRITING RECORD — ${title}`);
   if (author) lines.push(`Author: ${author}`);
@@ -464,7 +745,15 @@ export function formatRecord({
      came with, and burying it under a figure about a different question was
      the record's oldest weakness. */
   lines.push("THIS BOOK");
-  lines.push(`Chapters:            ${chapters.length}`);
+  /* **Chapters, not pages.** `chapters.length` counts the front- and
+     back-matter pages, and they are not chapters: they are named rather than
+     numbered. A book of two chapters with the standard matter set read
+     "Chapters: 9" here while the header on the same screen said two. The
+     matter is reported on its own line, and only when there is some. */
+  lines.push(`Chapters:            ${bodyPages.length}`);
+  if (matterPages.length > 0) {
+    lines.push(`Other pages:         ${matterPages.length}`);
+  }
   lines.push(`Words:               ${words.toLocaleString("en")}`);
   if (timeline.firstAt === null) {
     lines.push(
@@ -483,6 +772,17 @@ export function formatRecord({
       "\"At least\" is meant literally. The app keeps eight drafts per chapter and",
       "sweeps the oldest away, so these are the ones that survive rather than",
       "every one that was taken.",
+    );
+  }
+  /* The word total covers every page, which is what the fingerprint covers and
+     what the app shows everywhere else. Said out loud, because the line above
+     it now draws a distinction between chapters and pages and a reader would
+     otherwise have to guess which of the two the total was about. */
+  if (matterPages.length > 0) {
+    lines.push(
+      "",
+      "The word total covers every page listed below, front and back matter",
+      "included — not the chapters alone.",
     );
   }
   lines.push("");
@@ -535,12 +835,17 @@ export function formatRecord({
 
   /* The chapter list is what tells a reader *what was fingerprinted*. Without
      it the number at the bottom is a hash of an unnamed thing. */
-  lines.push("CHAPTERS");
+  /* **One list, in fingerprint order, every entry saying what it is.** The
+     numbering is the position in that order — which is what HOW TO CHECK IT
+     refers to — so it cannot double as a chapter number, and without a tag on
+     each line a reader counted nine entries and read nine chapters. The
+     heading names both kinds for the same reason. */
+  lines.push(PAGE_LIST_HEADING);
   chapters.forEach((chapter, i) => {
     const n = String(i + 1).padStart(3, " ");
     lines.push(`${n}. ${chapter.title}`);
     lines.push(
-      `     ${chapter.words.toLocaleString("en")} words` +
+      `     ${pageKind(chapter)} · ${chapter.words.toLocaleString("en")} words` +
         (chapter.fingerprint ? `  sha256 ${chapter.fingerprint}` : ""),
     );
     if (chapter.unreadable) {
@@ -549,17 +854,80 @@ export function formatRecord({
   });
   lines.push("");
 
-  const withVersions = chapters.filter((c) => c.versions.length > 0);
-  if (withVersions.length > 0) {
+  /* ---- The drafts, in the order they were taken ------------------------
+     **Chronological, not grouped by chapter, and the change is the point.**
+     Grouped by chapter this answered "how did this chapter grow"; in time
+     order it answers "how did this book get written", which is the question
+     somebody reading a writing record actually brought. It is the shape a
+     word processor's revision history has, and the reason that history is
+     what writers are told to fall back on. The chapter is named on every
+     line, so the old reading is still available — it is a sort, not a loss. */
+  const timelineEvents = draftTimeline(chapters);
+  if (timelineEvents.length > 0) {
     lines.push("SAVED DRAFTS");
-    for (const chapter of withVersions) {
-      lines.push(chapter.title);
-      for (const version of chapter.versions) {
+    lines.push(
+      "In the order they were taken, across every page of this book. These are",
+      "the drafts that survive, not every one that was made — see above. The",
+      "running total is of the drafts kept, so it starts below the book's own",
+      "word count and catches up as each page is first saved.",
+    );
+    lines.push("");
+    for (const sitting of sittings(timelineEvents)) {
+      const span =
+        sitting.from === sitting.to
+          ? clockOf(sitting.from)
+          : `${clockOf(sitting.from)} – ${clockOf(sitting.to)}`;
+      const length =
+        sitting.to > sitting.from ? `  (${spanOf(sitting.to - sitting.from)})` : "";
+      const net =
+        sitting.words === null
+          ? ""
+          : `  ${signed(sitting.words)}`;
+      lines.push(`${dayKey(sitting.from)}  ${span}${length}${net}`);
+      for (const draft of sitting.drafts) {
+        const grew =
+          draft.delta === null || draft.elapsed === null
+            ? ""
+            : `   ${signed(draft.delta)} in ${spanOf(draft.elapsed)}`;
         lines.push(
-          `  ${new Date(version.at).toISOString()}  ${version.words.toLocaleString("en")} words`,
+          `  ${clockOf(draft.at)}  ${draft.chapter}  —  ${draft.total.toLocaleString("en")} words${grew}`,
         );
       }
+      lines.push("");
     }
+  }
+
+  /* ---- Stretches no one types ------------------------------------------
+     The companion to the import-days block above, and the one that catches
+     what a day threshold cannot: a manuscript arriving inside a minute is
+     nowhere near twenty thousand words between two midnights.
+
+     **It states the words and the seconds and stops.** No percentage, no
+     score, no finding — the reader is told what is consistent with the
+     numbers and left to draw the conclusion, exactly as the import block
+     does. A report whose headline is a single figure is a report whose
+     headline is the part that gets gamed. */
+  const fast = fastStretches(timelineEvents);
+  if (fast.length > 0) {
+    lines.push("STRETCHES FASTER THAN TYPING");
+    for (const event of fast) {
+      lines.push(
+        `${dayKey(event.at)}  ${clockOf(event.at - event.elapsed!)} – ${clockOf(event.at)}  ` +
+          `${signed(event.delta!)} words in ${spanOf(event.elapsed!)}`,
+      );
+    }
+    lines.push("");
+    lines.push(
+      "Words appearing faster than anybody types are a file arriving or a",
+      "passage being pasted in, not a stretch of drafting. That is evidence of",
+      "nothing either way — a writer who drafts somewhere else and pastes the",
+      "result in here leaves exactly this trace, and so does an import. Better",
+      "you see it than have it pointed out to you.",
+      "",
+      `The comparison is ${TYPING_CEILING_WPM} words a minute, which is four times the fastest`,
+      "sustained typing ever recorded, and that was copying rather than",
+      "composing. Nothing a person writes can reach it.",
+    );
     lines.push("");
   }
 
@@ -574,8 +942,8 @@ export function formatRecord({
     if (unreadable.length > 0) {
       lines.push(
         "",
-        `WARNING: ${unreadable.length} ${unreadable.length === 1 ? "chapter" : "chapters"} could not be read and ${unreadable.length === 1 ? "is" : "are"} not in it.`,
-        "The number above covers the rest. The chapters are named in the list",
+        `WARNING: ${unreadable.length} ${unreadable.length === 1 ? "page" : "pages"} could not be read and ${unreadable.length === 1 ? "is" : "are"} not in it.`,
+        "The number above covers the rest. The pages are named in the list",
         "above.",
       );
     }
@@ -586,9 +954,9 @@ export function formatRecord({
       "plain text by these rules — so anybody holding the same book can work it",
       "out for themselves rather than take this file's word for it:",
       "",
-      "  1. Chapters in the order listed above, front and back matter included.",
-      "  2. Each chapter is its title, one blank line, then its paragraphs.",
-      "  3. Paragraphs are separated by one blank line; so are chapters.",
+      `  1. Every page under ${PAGE_LIST_HEADING}, in the order listed there.`,
+      "  2. Each page is its title, one blank line, then its paragraphs.",
+      "  3. Paragraphs are separated by one blank line; so are pages.",
       "  4. Text only. No bold or italics, no images, no scene-break marks. A",
       "     paragraph holding no text is left out altogether.",
       "  5. Runs of spaces and tabs become a single space, and every line is",
@@ -596,8 +964,8 @@ export function formatRecord({
       "  6. Unicode normalised to NFC, encoded UTF-8, lines ending LF, and no",
       "     newline at the end of the file.",
       "",
-      "Each chapter's own number is the same recipe applied to that chapter by",
-      "itself, which is what lets a reader find *which* chapter differs rather",
+      "Each page's own number is the same recipe applied to that page by",
+      "itself, which is what lets a reader find *which* page differs rather",
       "than only that something does.",
       "",
       "Formatting is deliberately outside the recipe: italicising a word does",

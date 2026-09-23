@@ -8,6 +8,8 @@ import { ProBadge } from "@/components/upgrade/pro-badge";
 import { Spinner } from "@/components/ui/spinner";
 import { parseHistory } from "@/lib/history";
 import {
+  chapterMatterOf,
+  chapterNumberOf,
   findBook,
   getBody,
   getHistoryRaw,
@@ -24,6 +26,8 @@ import {
   bookTimeline,
   canonicalText,
   chapterCanonicalText,
+  draftTimeline,
+  fastStretches,
   formatRecord,
   importDays,
   toHex,
@@ -31,6 +35,7 @@ import {
   versionsSince,
   windowStart,
   writingRecord,
+  type DraftEvent,
   type RecordChapter,
 } from "@/lib/provenance";
 import { useActivity, useHydrated, useShelf } from "@/lib/use-library";
@@ -94,6 +99,17 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
     fingerprint: string | null;
     /** Left out of this copy on purpose, rather than refused by the browser. */
     withheld: boolean;
+    /**
+     * Stretches in which words arrived faster than anybody types.
+     *
+     * Only available once the record is built — the drafts are read out of
+     * storage on demand, not subscribed to — so unlike the import-days block
+     * above this one cannot greet the writer on arrival. It is still shown on
+     * the page rather than left in the file, for the reason that block exists:
+     * being surprised by your own record in somebody else's hands is the
+     * failure this screen is here to prevent.
+     */
+    fast: DraftEvent[];
   } | null>(null);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -154,8 +170,17 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
             // "restore the last one". Here the chapter has to read as a thing
             // that grew, so it is turned round.
             .reverse();
+          /* **The list is every page and the record says which is which.** It
+             has to stay every page — that is what the fingerprint covers, and
+             always has — so the part travels with each entry rather than the
+             matter being filtered out. `chapterNumberOf` is asked for the
+             number rather than it being counted here, because it is the one
+             function that knows about `unnumbered`. */
+          const part = chapterMatterOf(meta);
           return {
             title: meta.title,
+            ...(part === "body" ? {} : { part }),
+            number: chapterNumberOf(book, meta.id),
             words: meta.words,
             fingerprint:
               ok && !withheld
@@ -180,6 +205,7 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
       setBuilt({
         fingerprint,
         withheld,
+        fast: fastStretches(draftTimeline(chapters)),
         text: formatRecord({
           title: book.title,
           ...(book.author ? { author: book.author } : {}),
@@ -430,6 +456,52 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
 
         {built && (
           <div className="mt-6 flex flex-col gap-6">
+            {/* ---- Stretches no one types -----------------------------------
+                The day-level block above cannot see this one. `IMPORT_LIKELY`
+                is twenty thousand words between two midnights, set clear of
+                the human range on purpose — so a whole manuscript landing
+                inside a minute sails under it, and the record said nothing.
+                Read across the drafts in time order it is unmissable.
+
+                **It comes first in the built block, above the fingerprint and
+                the document.** Same argument as its neighbour: the one thing
+                on this page a writer is meant to see before anybody else does
+                should not be below a fold, under the file they are about to
+                send. Same `note` tokens for the same reason — worth knowing,
+                and nothing here is wrong.
+
+                The words and the seconds, and no finding. What they are
+                consistent with is said in the next sentence and the reader
+                draws their own conclusion; a headline figure here would be
+                the part that gets gamed. */}
+            {built.fast.length > 0 && (
+              <section className="rounded-xl border border-note-line bg-note-bg px-5 py-4">
+                <p className="text-sm font-bold text-note-fg">
+                  {built.fast.length}{" "}
+                  {built.fast.length === 1 ? "stretch is" : "stretches are"}{" "}
+                  faster than anyone types
+                </p>
+                <ul className="mt-3 space-y-1 font-mono text-xs text-note-fg">
+                  {built.fast.map((event) => (
+                    <li key={event.at}>
+                      {new Date(event.at).toISOString().slice(0, 16).replace("T", " ")}
+                      {" · "}
+                      {event.delta!.toLocaleString()} words in{" "}
+                      {Math.max(1, Math.round(event.elapsed! / 1000))}s
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 max-w-prose text-sm leading-relaxed text-note-fg">
+                  Words arriving faster than anybody types are a file landing or
+                  a passage being pasted in, not a stretch of drafting. That is
+                  evidence of nothing either way — drafting somewhere else and
+                  pasting the result in here leaves exactly this trace. It is in
+                  the document too, so better you see it than have it pointed
+                  out to you.
+                </p>
+              </section>
+            )}
+
             {/* **The fingerprint is a credential, so it is drawn like one** —
                 mono type in an inset field with the copy control on its own
                 header row, the shape every dashboard uses for a key you are
