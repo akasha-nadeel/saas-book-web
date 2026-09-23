@@ -147,8 +147,8 @@ do not treat its absence of a subject as a gap to fill unless somebody asks.
   browser; no dependencies, no network, not part of the build. Its palette is
   copied from `globals.css`, so it goes stale when the tokens move.
 
-The suite is 107 files / 2,048 tests and takes about a minute and a half
-(measured 2026-09-15 after the Free/Pro redraw, all green, run on its own); jsdom prints `HTMLCanvasElement's getContext()` warnings
+The suite is 109 files / 2,119 tests and takes a little over a minute
+(measured 2026-09-23 after the idea board, all green, run on its own); jsdom prints `HTMLCanvasElement's getContext()` warnings
 from the image recoder and `Not implemented: navigation to another Document`
 from the routing tests — both are expected, not failures.
 
@@ -776,17 +776,34 @@ local-only, with the account menu saying why. Every entry point checks
   entire library download would fail for everybody.
 - **Schema changes belong in `supabase/migrations/`**, not only in the
   dashboard. There are **sixteen**. The first seven were confirmed applied live
-  on 2026-08-20; the eighth through the sixteenth
-  (`20260822071735_launch_mvp_entitlements.sql` through
-  `20260915000000_free_three_books.sql`) have not been confirmed here, so check
-  before blaming a route. **The fifteenth must be applied before the code that
-  ships with it**: the app reads `subscriptions.plan` as `free | pro` only, so a
-  row still saying `writer` reads as Free. **So must the sixteenth**: the app
-  offers a second and third free book as soon as it ships, and the old trigger
-  refuses them. It has happened:
-  `20260801000000_feedback.sql` sat unapplied from the day it was written, and
-  the feedback dialog failed for every writer until it went in. Check rather
-  than assume: `select to_regclass('public.<table>')`.
+  on 2026-08-20; the fifteenth and the sixteenth on 2026-09-23. The eighth
+  through the fourteenth (`20260822071735_launch_mvp_entitlements.sql` through
+  `20260914000000_ai_free_pro_plan.sql`, whose own trigger proves it landed)
+  have not been confirmed here, so check before blaming a route. **The
+  fifteenth must be applied before the code that ships with it**: the app reads
+  `subscriptions.plan` as `free | pro` only, so a row still saying `writer`
+  reads as Free.
+
+  **The sixteenth shipped ahead of its SQL and it cost a writer their sync**
+  (2026-09-23) — the second time this exact thing has happened here.
+  `LAUNCH_LIMITS.freeBooks` read 3, so the app let a free writer make a second
+  and third book; the database still carried the fourteenth migration's
+  trigger, which raises at one. `uploadLibrary` was refused with a 23514 and
+  logged `[sync] rows in the rejected batch`, so those books lived in one
+  browser and nowhere else until the SQL went in. **The wording of the
+  exception is how it was identified**: each version of
+  `enforce_launch_book_limit` raises a different sentence, so the message in
+  the console names the migration the database is actually running. The first
+  time was `20260801000000_feedback.sql`, which sat unapplied from the day it
+  was written while the feedback dialog failed for every writer.
+
+  **No test can catch this and `launch.test.ts` is the proof.** It reads the
+  migration *file* and fails if the SQL and the TypeScript disagree — and it
+  was green throughout, because they agreed. Nothing in the suite knows what is
+  in the database. Check rather than assume:
+  `select to_regclass('public.<table>')` for a table, and for this one
+  `select prosrc like '%three books%' from pg_proc where proname =
+  'enforce_launch_book_limit'`.
 - **A table written by nothing but the server still needs a grant to
   `service_role`.** This schema never leans on Supabase's default privileges;
   every server-written table names the role (`book_members`,
@@ -1344,6 +1361,21 @@ custom properties the editor and the reading view both read.
   value badges, `--color-wordmark`, the sixteen tool marks, `--color-sheet`
   (paper, stated identically in both blocks because a picture of paper stays
   literal), and the landing page's `lp-*` set.
+- **`--idea-*` is the newest entry, added 2026-09-23, and it is the one to copy
+  if another is ever needed.** Six hues, a wash, an edge wash and a dim, for
+  the idea board's cards. It is not a palette: the hues are *inputs*, and a
+  card's ground is `color-mix(in srgb, var(--idea-N) var(--idea-wash),
+  var(--color-panel))` — hue plus whatever the live palette says a panel is —
+  so the board follows all eight without being told. Stated in the three
+  **scheme** blocks only, because a tint sets `data-tint` while its scheme
+  still comes from `data-theme`. The light and dark sets are **different
+  hues**, not one set at two strengths: a pale hue washed hard enough to be
+  visible on the night panel takes `--color-fg` down with it. `--color-muted`
+  is not used on these cards — the six tints already ship it under AA on a
+  plain panel, which `theme-tints.test.ts` misses by measuring against
+  `surface` — so the small print is a dimmed `fg` mixed towards the card's own
+  ground. The mix is `in srgb` so that `idea-colours.test.ts` can compute all
+  forty-eight grounds and hold the text on each to `AA_TEXT`.
 - **`--color-tremor-*` is the sixth, added 2026-08-31, and it is the last.** It
   is Tremor's *structure* — its names, its ladder — adopted deliberately for the
   dialog system after the trade-off was put and accepted: a second palette
@@ -1360,8 +1392,11 @@ custom properties the editor and the reading view both read.
   Stated in all three blocks under one name each — **not** Tremor's own
   `tremor-*`/`dark-tremor-*` pair, because this app flips token values by theme
   rather than selecting with `dark:`. `free-limit.tsx`'s `LimitDialog` is
-  exempt: it is a photograph with a literal `#050a18` frame matched to the
-  artwork, and a photograph does not follow the theme.
+  exempt: it is a frame around a painting, drawn in literal values lifted out
+  of the artwork — a warm off-white card (`#f3f1ec`) with the picture set into
+  it, near-black ink and a grey second voice — and a painting does not follow
+  the theme. **Swap the picture and those values are re-matched with it**, the
+  way the landing page's hero framing is re-measured against its backdrop.
 - **The editor's panels speak one grouped-list language**, in `ui/list.tsx`,
   `ui/segmented.tsx`, `ui/field.tsx` and `ui/empty-state.tsx` — one container per
   group of related rows rather than one per row, the label outside it, explanatory

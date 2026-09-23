@@ -244,6 +244,39 @@ Three more things follow from the palette, and each has bitten already:
   first sight. Roboto loads with `preload: false`, so only the two pages that
   draw the cards fetch it.
 
+- **`--idea-*` is the eighth, and it is the cheapest one on the list**
+  (2026-09-23). Six hues, a wash, an edge wash and a dim, for the idea board's
+  sticky-note cards. It earns its place by not being a palette: the hues are
+  *inputs*, and a card's ground is
+  `color-mix(in srgb, var(--idea-N) var(--idea-wash), var(--color-panel))` — so
+  what lands on screen is the hue plus whatever the live palette says a panel
+  is, and the board follows all eight without being told. They are stated in
+  the three **scheme** blocks and not in the six tint blocks, because a tint
+  sets `data-tint` while its scheme still comes from `data-theme`.
+
+  **The two scheme sets are different hues, not one set at two strengths**, and
+  that was measured rather than guessed. A pale hue is invisible on the night
+  panel until it is washed in hard, and washing it in hard destroys the text on
+  top — at 30% `--color-fg` was down to 5.69 and still falling. Daylight gets
+  pale hues at a 42% wash; night gets deep ones at 36%.
+
+  **`--color-muted` is not used on these cards**, and the reason is the useful
+  part: the six tints already ship `muted` on `panel` at 4.36–4.43, under
+  `AA_TEXT`, which `theme-tints.test.ts` does not catch because it holds
+  `muted` against `surface` rather than against a panel. A hue washed on top
+  took it to 3.76 on the dark tints. The small print is a dimmed `--color-fg`
+  mixed towards the card's own ground instead — better drawing as well as
+  better contrast, since the date on a coral note should be dim coral ink
+  rather than the chrome's neutral.
+
+  **The mix is `in srgb` so it can be tested.** `idea-colours.test.ts` computes
+  the exact ground each hue makes in each of the eight palettes — forty-eight
+  combinations nobody typed and nobody can eyeball — and holds the text on it
+  to `AA_TEXT`. An oklab mix would have needed a colour-space implementation in
+  the test, and a value that cannot be checked is a value that drifts. The
+  usual rule applies: **if a hue cannot make a palette that passes, the hue
+  changes and not the floor.**
+
 **The Pro badge is a *fill* of `--color-upgrade-*`, not a ninth exception**
 (2026-09-16). `components/upgrade/pro-badge.tsx` is one 10px uppercase lozenge
 reading "Pro", worn by the dashboard rail's Paperback row (both rails) and by a
