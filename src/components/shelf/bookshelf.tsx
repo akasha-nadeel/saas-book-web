@@ -70,6 +70,7 @@ import {
   needsConfirming,
   planRestore,
   rangeBetween,
+  restoreCapacity,
   selectAll,
   toggle,
   type BulkAction,
@@ -3060,16 +3061,42 @@ function ResumeSlot({
  */
 function ProCard({
   plan,
-  title = "Room for the next book",
+  title,
   children,
 }: {
   plan: PlanState;
-  /** The heading. Defaults to Overview's. */
+  /** The heading. Left out, it is Overview's, and Overview's tells the truth
+   *  about whether there is actually room — see below. */
   title?: string;
   /** The sentence under it. Defaults to Overview's. */
   children?: ReactNode;
 }) {
+  /* Before the guard, because hooks cannot sit after a conditional return. */
+  const shelf = useShelf();
+
   if (plan.loading || !plan.billing || plan.pro) return null;
+
+  /*
+   * **"Room for the next book" is a claim, and it was being made to writers
+   * who had none.** The card draws for every metered writer, so a shelf at or
+   * past the limit was offered Pro under a heading promising capacity it did
+   * not have — a writer with four books on a three-book plan read "Room for
+   * the next book" directly above four covers. That is the no-claim rule
+   * pointed at a heading.
+   *
+   * A shelf can legitimately be over the limit: the free plan has been five
+   * books and one book as well as three, and the rule throughout is that a
+   * writer over it keeps everything they have and simply cannot start
+   * another. So this asks how much room is left rather than assuming the
+   * count is under the cap.
+   *
+   * `restoreCapacity` rather than a second count, because it is already the
+   * one that knows an archived book spends its slot and a shared one does
+   * not. `gated` is true: past the guard above, this writer is metered.
+   */
+  const room = restoreCapacity(shelf, true);
+  const heading =
+    title ?? (room > 0 ? "Room for the next book" : "No room for another book");
 
   return (
     /* A row rather than a picture positioned over the words. The figure is a
@@ -3101,7 +3128,7 @@ function ProCard({
       />
 
       <div className="min-w-0 flex-1">
-        <h3 className="text-base font-bold text-white">{title}</h3>
+        <h3 className="text-base font-bold text-white">{heading}</h3>
         <p className="mt-1.5 text-sm leading-relaxed text-white/85">
           {children ?? (
             <>
