@@ -263,6 +263,71 @@
   --color-sheet-ink: #1f1d1a;
   --color-sheet-edge: #d9d7d0; /* the sheet's own hairline, on either ground */
 
+  /* The idea board's six grounds — the seventh entry on the closed list.
+     ------------------------------------------------------------------------
+     **These are inputs, not colours read off a token.** A card's ground is the
+     hue washed into `--color-panel`:
+
+       background: color-mix(in srgb, var(--idea-3) var(--idea-wash),
+                             var(--color-panel));
+
+     so what a writer sees is the hue *and* whatever the live palette says the
+     panel is. That is what makes this exception cheap. It is stated in the
+     three scheme blocks — here, `[data-theme="light"]` and
+     `[data-theme="dark"]` — and **not** in the six tint blocks, because a tint
+     sets `data-tint` while its scheme still comes from `data-theme`. Six hues
+     across three blocks instead of eight, and a tint carries the board without
+     being told anything.
+
+     **The two sets are not one set at two strengths, and that was learned by
+     measuring.** A pale hue is invisible on a dark panel until it is washed in
+     hard, and washing it in hard destroys the text on top: at 30% over the
+     night panel `--color-fg` fell to 5.69 and kept falling. So daylight gets
+     pale hues washed at 42%, and night gets deep ones at 36% — each set chosen
+     against the ground it actually lands on.
+
+     **`in srgb` rather than `oklab`, on purpose.** An sRGB mix is a plain
+     per-channel average, so `idea-colours.test.ts` can compute the exact
+     ground each hue makes in each of the eight palettes and hold the text on
+     it to `AA_TEXT`. A palette can be picked by eye and look convincing while
+     one of its pairs sits at 3:1. A value that cannot be checked is a value
+     that drifts.
+
+     Six is the count `IDEA_COLOURS` in `src/lib/ideas.ts` states, and the test
+     fails if the two disagree. Which card gets which is folded from the idea's
+     own id, the way a book's default jacket is, so an idea keeps its colour.
+
+     This block is the night set: deep, because the panel under it is nearly
+     black and a card has to sit *on* that rather than glow off it. */
+  --idea-1: #c25a3c; /* coral  */
+  --idea-2: #b8862a; /* amber  */
+  --idea-3: #b04a78; /* rose   */
+  --idea-4: #6a55b4; /* violet */
+  --idea-5: #3f8a4a; /* green  */
+  --idea-6: #2e7f9c; /* cyan   */
+
+  /* How much of the hue reaches the card, and how much harder its hairline is
+     mixed. Both are per scheme for the reason above. */
+  --idea-wash: 36%;
+  --idea-edge-wash: 58%;
+
+  /* How far the card's small print is dimmed towards its own ground.
+     ------------------------------------------------------------------------
+     **`--color-muted` cannot be used on these cards, and the test is how that
+     was found out.** The six tints already ship `muted` on `panel` at 4.36 to
+     4.43 — under `AA_TEXT`, which `theme-tints.test.ts` does not catch because
+     it holds `muted` against `surface` rather than against a panel — and a hue
+     washed on top only made it worse: on the three dark tints it fell to 3.76.
+     So the date and the two actions take a dimmed `--color-fg` instead, mixed
+     towards the card's own ground rather than towards a grey borrowed from the
+     chrome. That is also the better drawing: the small print on a coral note
+     should be dim coral ink, not the app's neutral.
+
+     20% is the far end of what clears 4.5:1 across all forty-eight
+     combinations — the worst is violet on Dusty Olive at 4.69. Raising it is a
+     contrast change, so `idea-colours.test.ts` is the thing that says yes. */
+  --idea-meta-dim: 20%;
+
   /* The pricing table's value badges — a tinted ground, a hairline of the same
      hue, and ink of that hue rather than white.
      ------------------------------------------------------------------------
@@ -1273,6 +1338,21 @@
   --color-tremor-content-emphasis: #374151; /* gray-700 */
   --color-tremor-content-strong: #111827; /* gray-900 */
   --color-tremor-content-inverted: #ffffff;
+
+  /* The idea board, in daylight — pale hues washed harder, because the panel
+     under them is white. The set and the reasoning are on `--idea-1` in
+     `@theme`; these are the same six hues at the lightness this ground needs,
+     not the same values at another strength. */
+  --idea-1: #f4885f;
+  --idea-2: #f7b52e;
+  --idea-3: #ec74a6;
+  --idea-4: #8f78e0;
+  --idea-5: #63c05c;
+  --idea-6: #3fb3d4;
+  --idea-wash: 42%;
+  --idea-edge-wash: 62%;
+  --idea-meta-dim: 20%;
+
 }
 
 /* --------------------------------------------------------------------------
@@ -1453,6 +1533,22 @@
   --color-tremor-content-emphasis: #dde3f5;
   --color-tremor-content-strong: #f1f2fa;
   --color-tremor-content-inverted: #08122e;
+
+  /* The idea board's night set, stated here as well as in `@theme` — the
+     one-to-one rule this file holds the three scheme blocks to, and the reason
+     it exists: without a declaration here, `data-theme="dark"` on a subtree
+     inside a light tree inherits the light hues and the board comes out pale
+     on black. */
+  --idea-1: #c25a3c;
+  --idea-2: #b8862a;
+  --idea-3: #b04a78;
+  --idea-4: #6a55b4;
+  --idea-5: #3f8a4a;
+  --idea-6: #2e7f9c;
+  --idea-wash: 36%;
+  --idea-edge-wash: 58%;
+  --idea-meta-dim: 20%;
+
 }
 
 /* --------------------------------------------------------------------------

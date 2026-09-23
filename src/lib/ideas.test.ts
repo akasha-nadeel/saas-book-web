@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   addIdea,
+  editIdea,
+  IDEA_COLOURS,
   IDEA_MAX,
+  ideaColour,
+  matchIdeas,
   parseIdeas,
   removeIdea,
   titleFromIdea,
@@ -134,5 +138,105 @@ describe("titleFromIdea", () => {
 
   it("always gives a book something to be called", () => {
     expect(titleFromIdea("   ")).toBe("Untitled Book");
+  });
+});
+
+describe("ideaColour", () => {
+  it("gives one idea the same ground every time it is asked", () => {
+    // The colour is folded from the id rather than stored, so this is the
+    // whole of what makes a card keep its colour across a reload.
+    const id = crypto.randomUUID();
+    expect(ideaColour(id)).toBe(ideaColour(id));
+  });
+
+  it("stays inside the grounds globals.css actually declares", () => {
+    for (let i = 0; i < 500; i++) {
+      const n = ideaColour(crypto.randomUUID());
+      expect(n).toBeGreaterThanOrEqual(1);
+      expect(n).toBeLessThanOrEqual(IDEA_COLOURS);
+    }
+  });
+
+  it("uses all six rather than crowding onto one", () => {
+    // A fold that answered 3 for everything would look like a bug in the CSS.
+    const seen = new Set<number>();
+    for (let i = 0; i < 500; i++) seen.add(ideaColour(crypto.randomUUID()));
+    expect(seen.size).toBe(IDEA_COLOURS);
+  });
+});
+
+describe("matchIdeas", () => {
+  const lot = [
+    idea({ id: "a", text: "A lighthouse keeper vanishes", at: 3 }),
+    idea({ id: "b", text: "Twins who swap CITIES for a year", at: 2 }),
+    idea({ id: "c", text: "The cartographer's daughter", at: 1 }),
+  ];
+
+  it("gives the board back when the box is empty", () => {
+    // Clearing the field is not a filter that matches nothing.
+    expect(matchIdeas(lot, "")).toHaveLength(3);
+    expect(matchIdeas(lot, "   ")).toHaveLength(3);
+  });
+
+  it("does not care about case in either direction", () => {
+    expect(matchIdeas(lot, "LIGHTHOUSE").map((i) => i.id)).toEqual(["a"]);
+    expect(matchIdeas(lot, "cities").map((i) => i.id)).toEqual(["b"]);
+  });
+
+  it("matches inside a word, not only at its start", () => {
+    expect(matchIdeas(lot, "grapher").map((i) => i.id)).toEqual(["c"]);
+  });
+
+  it("keeps the order it was given, newest first", () => {
+    expect(matchIdeas(lot, "e").map((i) => i.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("answers nothing found with nothing, not with everything", () => {
+    expect(matchIdeas(lot, "submarine")).toEqual([]);
+  });
+});
+
+describe("editIdea", () => {
+  const lot = [
+    idea({ id: "a", text: "A lighthouse keeper vanishes", at: 300, from: "b1" }),
+    idea({ id: "b", text: "The cartographer's daughter", at: 200 }),
+  ];
+
+  it("replaces the words and leaves everything else alone", () => {
+    // `at` staying put is what keeps the card where it is on a board ordered
+    // newest first — a typo fixed should not send it to the front reading
+    // "just now".
+    const [first] = editIdea(lot, "a", "A lighthouse keeper walks into the sea");
+    expect(first.text).toBe("A lighthouse keeper walks into the sea");
+    expect(first.at).toBe(300);
+    expect(first.id).toBe("a");
+    expect(first.from).toBe("b1");
+  });
+
+  it("does not move the card it edited", () => {
+    expect(editIdea(lot, "b", "Her father's maps").map((i) => i.id)).toEqual([
+      "a",
+      "b",
+    ]);
+  });
+
+  it("touches nothing but the idea asked for", () => {
+    expect(editIdea(lot, "a", "Something else")[1]).toEqual(lot[1]);
+  });
+
+  it("trims and caps, exactly as parking one does", () => {
+    const [first] = editIdea(lot, "a", `   ${"z".repeat(IDEA_MAX + 50)}   `);
+    expect(first.text).toHaveLength(IDEA_MAX);
+  });
+
+  it("leaves the idea alone when the box is emptied", () => {
+    // Select-all then a stray key should not delete somebody's idea. Forgetting
+    // one is what the bin is for.
+    expect(editIdea(lot, "a", "")).toEqual(lot);
+    expect(editIdea(lot, "a", "   \n  ")).toEqual(lot);
+  });
+
+  it("does nothing, and throws nothing, for an id that is not there", () => {
+    expect(editIdea(lot, "gone", "anything")).toEqual(lot);
   });
 });

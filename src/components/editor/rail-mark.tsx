@@ -70,7 +70,11 @@ export type MarkName =
   | "share"
   /* The body card's two, since its buttons lost their labels. */
   | "collapse"
-  | "new-page";
+  | "new-page"
+  /* The idea card's three, since its buttons lost their labels too. `trash` is
+     already above and is the third. */
+  | "book"
+  | "edit";
 
 type IconComponent = React.ForwardRefExoticComponent<
   AnimatedIconProps & React.RefAttributes<AnimatedIconHandle>
@@ -104,6 +108,11 @@ const ICONS: Partial<Record<MarkName, IconComponent>> = {
   share: UsersGroupIcon,
   collapse: ChevronDownIcon,
   "new-page": FilePlusIcon,
+  /* The same drawing as `chapters`, under a second name. An idea card's button
+     starts a *book*; pointing it at `chapters` would have worked and would have
+     been a lie about what the press does, and the next person reading the card
+     would have had to go and check. */
+  book: BookIcon,
 };
 
 /** The two the set above cannot draw, on the app's own 20-unit grid. */
@@ -133,6 +142,16 @@ const DRAWN: Partial<Record<MarkName, React.ReactNode>> = {
     <>
       <path d="M8.6 11.4a3.4 3.4 0 0 0 5 .3l2-2a3.4 3.4 0 0 0-4.8-4.8l-1.1 1.1" />
       <path d="M11.4 8.6a3.4 3.4 0 0 0-5-.3l-2 2a3.4 3.4 0 0 0 4.8 4.8l1.1-1.1" />
+    </>
+  ),
+  /* A pencil on its nib, for editing an idea in place. There is no pencil in
+     the itshover set either — same as `link` above, and the same conclusion: a
+     right metaphor sitting still beats a wrong one that animates. */
+  edit: (
+    <>
+      <path d="M13.2 3.6a1.8 1.8 0 0 1 2.5 2.5l-8 8-3.3.8.8-3.3 8-8Z" />
+      <path d="M12.1 4.7 14.6 7.2" />
+      <path d="M4 17.4h12" />
     </>
   ),
   /* A microphone on its stand, for dictation. */

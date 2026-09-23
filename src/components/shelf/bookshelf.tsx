@@ -5083,10 +5083,30 @@ function IdeasArea() {
       {/* Full width, like the banner above it and the tool areas beside it.
           It was `max-w-2xl`, which left the right half of the area empty;
           the deck keeps its measure because that is a line length, not a
-          layout. */}
-      <section className="overflow-hidden rounded-2xl border border-line bg-panel">
+          layout.
+
+          **No panel around it any more.** The ideas are cards now, and a board
+          of cards inside a bordered panel is boxes inside a box. It is also
+          the wrong ground: each card is its hue washed into `--color-panel`,
+          so on a `bg-panel` wrapper the cards had no tone behind them to sit
+          against. On the dashboard's own surface they read as what they
+          are.
+
+          **Wrapped in a plain block, and that is load-bearing.** The panel's
+          root is `flex min-h-0 flex-1 flex-col`, which fills the editor rail's
+          tab box and is inert anywhere that is not a flex container. This area
+          *is* one, so without the wrapper the board would be a flex item that
+          grows — and the banner above it would lose the argument. An ordinary
+          `<div>` insulates it: the board grows to its content and the
+          dashboard does the scrolling.
+
+          The panel used to say `h-full` instead, and that was the squashed
+          banner: the board claimed the area's whole height and `min-h-52` on
+          the banner could not win it back. Fixed in the panel rather than
+          undone here — see the note above its `return`. */}
+      <div>
         <IdeasPanel />
-      </section>
+      </div>
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { seedIndex } from "./default-covers";
+
 /**
  * The idea parking lot.
  *
@@ -98,6 +100,36 @@ export function addIdea(
   ];
 }
 
+/**
+ * One idea's words replaced, in place.
+ *
+ * **`at` is carried through untouched, and that is the whole design.** The time
+ * on a card means *parked then*, and the board is ordered newest first — so
+ * bumping it would send a card a writer had only fixed a typo on to the front
+ * of the board and make it read "just now". Nothing moves while you tidy up
+ * wording. There is no `editedAt` either: this is a parking lot, not a record
+ * of anything, and a second date on every card would be a field to validate in
+ * `parseIdeas` for a line nobody needs.
+ *
+ * Trimmed and capped exactly as `addIdea` does, so pasting three paragraphs
+ * into an edit is treated the same as pasting them into the capture box.
+ *
+ * **Blank leaves the idea alone.** Clearing the box and pressing save is a
+ * mis-press; forgetting an idea is what the bin is for, and it would be a poor
+ * app that deleted somebody's idea because they selected all and hit a key.
+ */
+export function editIdea(
+  ideas: readonly Idea[],
+  id: string,
+  text: string,
+): Idea[] {
+  const clean = text.trim().slice(0, IDEA_MAX);
+  if (!clean) return [...ideas];
+  return ideas.map((idea) =>
+    idea.id === id ? { ...idea, text: clean } : idea,
+  );
+}
+
 export function removeIdea(ideas: readonly Idea[], id: string): Idea[] {
   return ideas.filter((idea) => idea.id !== id);
 }
@@ -115,4 +147,56 @@ export function titleFromIdea(text: string, words = 6): string {
   const source = first || text.trim();
   const parts = source.split(/\s+/).slice(0, words);
   return parts.join(" ") || "Untitled Book";
+}
+
+/**
+ * How many grounds the board has.
+ *
+ * The count `--idea-1` … `--idea-6` in `globals.css` declares, stated here so
+ * the picker below cannot reach past the last one. `idea-colours.test.ts`
+ * fails if the CSS and this number disagree, which is the only way the two
+ * would ever be found out of step — a seventh hue nobody reaches is invisible,
+ * and a sixth that does not exist is a card with no ground at all.
+ */
+export const IDEA_COLOURS = 6;
+
+/**
+ * Which of the six grounds this idea wears, from `1`.
+ *
+ * **Folded from the id, not stored.** Nothing is written, so there is no field
+ * on `Idea`, nothing for `parseIdeas` to validate and nothing to migrate — and
+ * an idea keeps its colour for as long as it keeps its id, which is for as
+ * long as it exists. `seedIndex` is the same fold that picks a book's default
+ * jacket; using it twice rather than writing a second hash is the point of it
+ * being exported.
+ *
+ * A colour the writer chose would be a better feature and a much more
+ * expensive one: a stored field, a picker on every card, and a choice that
+ * does not travel, because the ideas store is one of the ones that does not
+ * sync.
+ */
+export function ideaColour(id: string): number {
+  return seedIndex(id, IDEA_COLOURS) + 1;
+}
+
+/**
+ * The parked ideas matching what was typed in the search box.
+ *
+ * Plain substring, case-folded, and normalised to NFC on both sides — an idea
+ * typed on a Mac and a query typed on Windows can be the same word in two
+ * encodings, which is the same trap `canonicalText` in `provenance.ts`
+ * normalises for.
+ *
+ * **An empty query is not a filter.** It returns the list as it stands rather
+ * than nothing, so clearing the box gives the board back.
+ */
+export function matchIdeas(
+  ideas: readonly Idea[],
+  query: string,
+): Idea[] {
+  const needle = query.trim().toLowerCase().normalize("NFC");
+  if (!needle) return [...ideas];
+  return ideas.filter((idea) =>
+    idea.text.toLowerCase().normalize("NFC").includes(needle),
+  );
 }
