@@ -1,8 +1,10 @@
 import { Plans } from "@/components/upgrade/plans";
 import { paddleClientConfig } from "@/lib/billing/paddle";
+import { asPeriod } from "@/lib/billing/plans";
 import { activeProvider } from "@/lib/billing/provider";
 import { currentSubscription } from "@/lib/billing/server";
 import { planTierOf } from "@/lib/billing/subscription";
+import { asPaidTier } from "@/lib/billing/tiers";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 /**
@@ -26,9 +28,25 @@ export const metadata = {
 };
 
 export default async function UpgradePage(props: PageProps<"/upgrade">) {
-  const { cancelled } = await props.searchParams;
+  const { cancelled, buy, period } = await props.searchParams;
   const provider = activeProvider();
   const paddle = provider === "paddle" ? paddleClientConfig() : undefined;
+
+  /* **What the writer pressed before they were asked to sign in.**
+     `upgradeTo()` builds this on the landing page, `next` carries it through
+     the door, and the two values are narrowed here rather than cast: a query
+     string is whatever somebody typed, which is the rule `areas.ts` states for
+     `?from=`. Anything unrecognised reads as no intent at all and the page is
+     the ordinary pricing page.
+
+     Decided on the server with the other three, for the reason above: the
+     cycle is the first figure a reader sees, and seeding it in the browser
+     would show them the annual price and then swap it. */
+  const wanted = asPaidTier(buy);
+  const wantedPeriod = asPeriod(period);
+  const intent = wanted && wantedPeriod
+    ? { tier: wanted, period: wantedPeriod }
+    : null;
 
   // No project configured means no accounts at all; the sign-up screen the
   // button points at says so itself, so there is nothing to branch on here.
@@ -39,6 +57,7 @@ export default async function UpgradePage(props: PageProps<"/upgrade">) {
         provider={provider}
         paddle={paddle}
         current={null}
+        intent={intent}
       />
     );
   }
@@ -73,6 +92,7 @@ export default async function UpgradePage(props: PageProps<"/upgrade">) {
             }
       }
       cancelled={cancelled === "1"}
+      intent={intent}
     />
   );
 }

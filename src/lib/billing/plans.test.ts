@@ -12,8 +12,10 @@ import {
   priceOf,
   recurrenceOf,
   uniformAnnualSaving,
+  upgradeTo,
 } from "./plans";
-import { PAID_TIERS, TIER_NAMES } from "./tiers";
+import { PAID_TIERS, TIER_NAMES, asPaidTier } from "./tiers";
+import { safeNext } from "../auth-redirect";
 
 describe("prices", () => {
   it("charges a year up front at twelve times the annual monthly rate", () => {
@@ -194,6 +196,56 @@ describe("annualSavingPercent", () => {
  * whose saving differs makes the badge disappear rather than lie, and this
  * test says so out loud.
  */
+/**
+ * **The whole "press Upgrade, sign in, land in the checkout" flow rests on this
+ * string surviving a round trip**, and every hop is somewhere it could be lost:
+ * `encodeURIComponent` into `?next=`, `safeNext`'s open-redirect allowlist, and
+ * two narrowing functions on the far side. A parameter renamed at one end fails
+ * silently — the writer lands on the plain pricing page having lost what they
+ * pressed — so the agreement is pinned here rather than left to two call sites
+ * spelling it the same way by luck.
+ */
+describe("upgradeTo", () => {
+  it("survives the trip through ?next= and back", () => {
+    for (const tier of PAID_TIERS) {
+      for (const period of ["monthly", "annual"] as const) {
+        const target = upgradeTo(tier, period);
+
+        // The door: the landing page and the pricing card both encode it.
+        const next = encodeURIComponent(target);
+        // …and `safeNext` is what decides whether it is allowed back out.
+        expect(safeNext(decodeURIComponent(next))).toBe(target);
+
+        // The far side reads it with the same two narrowing functions the page
+        // uses, not by splitting the string by hand.
+        const params = new URL(target, "https://openchapterapp.com").searchParams;
+        expect(asPaidTier(params.get("buy"))).toBe(tier);
+        expect(asPeriod(params.get("period"))).toBe(period);
+      }
+    }
+  });
+
+  it("is refused by the narrowing when somebody types their own", () => {
+    // A query string is whatever somebody put there. Both halves have to be
+    // recognised or the page shows its ordinary self and starts nothing.
+    const params = new URL(
+      "/upgrade?buy=wizard&period=fortnightly",
+      "https://openchapterapp.com",
+    ).searchParams;
+    expect(asPaidTier(params.get("buy"))).toBeNull();
+    expect(asPeriod(params.get("period"))).toBeNull();
+  });
+
+  it("cannot be turned into an off-site redirect", () => {
+    // `upgradeTo` is rooted and same-site by construction; this is the guard
+    // that keeps it that way if anyone ever templates a host into it.
+    for (const tier of PAID_TIERS) {
+      expect(upgradeTo(tier, "annual").startsWith("/upgrade?")).toBe(true);
+      expect(safeNext(upgradeTo(tier, "annual"))).not.toBe("/");
+    }
+  });
+});
+
 describe("uniformAnnualSaving", () => {
   it("is the one figure the period toggle may print", () => {
     expect(uniformAnnualSaving()).toBe(17);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PaidTier } from "@/lib/billing/tiers";
 import type { Period } from "@/lib/billing/plans";
 
@@ -34,6 +34,7 @@ export function PaddleUpgradeButton({
   period,
   onTransaction,
   className,
+  autoStart = false,
 }: {
   /** Which plan the press is buying. Re-narrowed server-side. */
   tier: PaidTier;
@@ -41,6 +42,15 @@ export function PaddleUpgradeButton({
   /** Handed the transaction to check out. The page decides where to show it. */
   onTransaction: (transactionId: string) => void;
   className: string;
+  /**
+   * Start without waiting to be pressed, because the press already happened.
+   *
+   * Set only when the writer pressed Upgrade while signed out and came back
+   * through `?buy=`. `plans.tsx` decides it — see the note there for why this
+   * one surface is allowed to open itself when the house rule is that
+   * money-moving things open on a press.
+   */
+  autoStart?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +83,41 @@ export function PaddleUpgradeButton({
       setBusy(false);
     }
   }
+
+  /**
+   * The returning writer's checkout, opened once.
+   *
+   * **One ref, never reset, and no cancellation flag** — the shape
+   * `paddle-inline-checkout.tsx` was fixed for on 2026-09-17. React runs
+   * effects twice in development; a guard ref *plus* a `cancelled` flag set by
+   * the cleanup between the two passes leaves the work unreachable, silently,
+   * with nothing thrown and nothing on screen. Read that file's header before
+   * touching this. The ref alone is enough: one mount, one transaction.
+   *
+   * **And the query goes as it fires.** `?buy=` is a record of a press, not a
+   * standing instruction — left in the URL, a reload or a back button or a
+   * pasted link would ask Paddle for a second transaction against the same
+   * intent. `replaceState` keeps it out of history rather than adding an entry
+   * the Back button would land on.
+   */
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (!autoStart || started.current) return;
+    started.current = true;
+
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("buy") || url.searchParams.has("period")) {
+      url.searchParams.delete("buy");
+      url.searchParams.delete("period");
+      window.history.replaceState(null, "", url.pathname + url.search);
+    }
+
+    void upgrade();
+    // `upgrade` is stable for a given tier and period, and re-running this on
+    // any change would be a second transaction rather than a correction.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart]);
 
   return (
     <div>

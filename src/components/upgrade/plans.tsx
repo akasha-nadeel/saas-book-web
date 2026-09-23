@@ -8,6 +8,7 @@ import {
   displayPrice,
   perMonthOf,
   priceOf,
+  upgradeTo,
 } from "@/lib/billing/plans";
 import { PaddleUpgradeButton } from "@/components/upgrade/paddle-checkout";
 import { ChangePlanButton } from "@/components/upgrade/change-plan-button";
@@ -89,6 +90,13 @@ export function Plans({
   current,
   /** Set when the gateway sent the writer back without taking anything. */
   cancelled = false,
+  /**
+   * What this writer pressed before they were asked to sign in, off `?buy=`.
+   *
+   * Narrowed on the server (`app/upgrade/page.tsx`) so the cycle is right in
+   * the first paint rather than corrected in the browser a frame later.
+   */
+  intent = null,
 }: {
   signedIn: boolean;
   provider: "paddle" | "payhere" | null;
@@ -100,11 +108,16 @@ export function Plans({
     provider: "paddle" | "payhere";
   } | null;
   cancelled?: boolean;
+  intent?: { tier: PaidTier; period: Period } | null;
 }) {
   /* **Annual, not monthly.** The toggle's own badge says what a year saves, and
      opening on the cycle that badge is about means the first figure a reader
-     sees is the one being recommended. Switching to monthly is one press. */
-  const [period, setPeriod] = useState<Period>("annual");
+     sees is the one being recommended. Switching to monthly is one press.
+
+     Unless they already chose. A writer who pressed Upgrade on the monthly card
+     and signed in is shown monthly — being handed the annual price after
+     picking the other one reads as a switch somebody made on their behalf. */
+  const [period, setPeriod] = useState<Period>(intent?.period ?? "annual");
 
   /*
    * The transaction being paid for, once there is one.
@@ -120,6 +133,36 @@ export function Plans({
 
   /** Whether the "not on sale" dialog is open. */
   const [soon, setSoon] = useState(false);
+
+  /**
+   * Whether to open the checkout without waiting to be pressed.
+   *
+   * **This is the one place in the app where a money-moving surface opens from
+   * an effect, and the house rule says it should not.** `LimitDialog` fires on
+   * the press that is refused; `ExportDoneDialog` opens on the press that
+   * finished the file; neither is allowed to appear on its own. The rule is
+   * there because a form that arrives unasked is a form nobody consented to.
+   *
+   * What makes this different is that **the press already happened.** The
+   * writer pressed Upgrade, was sent to sign in because they had no account,
+   * and came back — one gesture with an interruption in the middle, not a fresh
+   * arrival. `?buy=` is that press, carried. Refusing to act on it would mean
+   * asking somebody to press the same button twice and calling it consent.
+   *
+   * The exception is kept narrow so it cannot spread:
+   *
+   * - only when `intent` names the paid tier this card sells, so a stray
+   *   `?buy=` for anything else does nothing;
+   * - only while signed in, since the whole point is the return trip;
+   * - never over an existing paid subscription — `current` means the card says
+   *   "Your plan", and charging that writer again is the thing
+   *   `/api/billing/paddle/checkout` refuses with a 409 anyway;
+   * - never while `PLANS_ON_SALE` is false, which is the gate over every other
+   *   money-moving arm in this ladder;
+   * - and the button strips `?buy=` as it fires, so a reload cannot repeat it.
+   */
+  const autoStart =
+    PLANS_ON_SALE && signedIn && !current && intent?.tier === PRO;
 
   const [state, checkout, pending] = useActionState<CheckoutState, FormData>(
     startCheckout,
@@ -313,12 +356,32 @@ export function Plans({
                       Your plan
                     </Link>
                   )
+                ) : !signedIn ? (
+                  /* **A signed-out press goes to the door, not to a 401.**
+                     `/api/billing/paddle/checkout` answers "Sign in to
+                     subscribe", and that used to arrive as red text under the
+                     button — the writer said they wanted to pay and was told
+                     no, with no way on. The press is carried instead: the tier
+                     and cycle travel in `next`, and `?buy=` opens the checkout
+                     on the other side.
+
+                     Sign-in rather than sign-up, the opposite of the landing
+                     page's button: somebody already this far into the app
+                     usually has an account, and the form offers the other with
+                     `next` intact either way. */
+                  <Link
+                    href={`/signin?next=${encodeURIComponent(upgradeTo(PRO, period))}`}
+                    className={planButton(true)}
+                  >
+                    Get {TIER_NAMES[PRO]}
+                  </Link>
                 ) : provider === "paddle" && paddle ? (
                   <PaddleUpgradeButton
                     tier={PRO}
                     period={period}
                     onTransaction={setCheckoutTransaction}
                     className={planButton(true)}
+                    autoStart={autoStart}
                   />
                 ) : provider === "payhere" ? (
                   <form action={checkout}>

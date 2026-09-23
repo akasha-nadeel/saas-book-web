@@ -226,3 +226,25 @@ export function periodEnd(from: Date, period: Period): Date {
 export function asPeriod(value: unknown): Period | null {
   return value === "monthly" || value === "annual" ? value : null;
 }
+
+/**
+ * `/upgrade`, carrying what the writer pressed.
+ *
+ * **One function so the URL is spelled once.** It is built on the landing page
+ * and read on `/upgrade`, with a sign-in or sign-up in between, and the two
+ * ends have to agree about the parameter names down to the letter — a mismatch
+ * would not fail, it would silently drop the writer on the plain pricing page
+ * having lost the thing they pressed.
+ *
+ * It lives here rather than beside `signupTo` in `file-check.ts`, which is the
+ * other "carry the intent through the door" helper: that module pulls in
+ * `checkup`, `import/split` and `library-store` for the landing page's file
+ * check, and none of that belongs in the bundle behind a price. Both call
+ * sites already import `Period` from this file.
+ *
+ * Read it back with `asPaidTier` and `asPeriod`. A query string is whatever
+ * somebody typed.
+ */
+export function upgradeTo(tier: PaidTier, period: Period): string {
+  return `/upgrade?buy=${tier}&period=${period}`;
+}

@@ -32,9 +32,11 @@ import {
   displayPrice,
   perMonthOf,
   priceOf,
+  upgradeTo,
   type Period,
 } from "@/lib/billing/plans";
 import { TIER_NAMES } from "@/lib/billing/tiers";
+import { signupTo } from "@/lib/file-check";
 import { notePlanInterest } from "@/lib/plan-interest";
 
 export function PricingCards() {
@@ -96,9 +98,18 @@ export function PricingCards() {
                visitor expects of something that navigates — for a signal a
                beacon can carry without touching any of it. `notePlanInterest`
                uses `sendBeacon` precisely so it survives the navigation this
-               same press starts. */
+               same press starts.
+
+               **It carries the cycle through the door, and the door is
+               sign-up.** This went to a bare `/upgrade` and dropped both: the
+               visitor arrived on the annual default whatever they had been
+               reading, pressed Upgrade, and got "Sign in to subscribe" in red
+               under the button. Nobody on this page has an account — that is
+               what the page is for — so the destination after signing up is
+               the checkout they were already asking for. Someone who does have
+               one switches to sign-in on that same form, which keeps `next`. */
             <Link
-              href="/upgrade"
+              href={signupTo(upgradeTo("pro", period))}
               onClick={() => notePlanInterest("pro", period, "landing")}
               className={planButton(true)}
             >
