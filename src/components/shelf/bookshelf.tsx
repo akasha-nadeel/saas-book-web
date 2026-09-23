@@ -777,7 +777,22 @@ export function Bookshelf({
             sidebarCollapsed ? "w-16 overflow-visible" : "w-56"
           }`}
         >
-          <div className={`scroll-slim min-h-0 flex-1 px-2 pt-4 pb-2 ${sidebarCollapsed ? "overflow-visible" : "overflow-y-auto"}`}>
+          {/* **The bar is only there while the pointer is**, which is the
+              editor rail's arrangement (`icon-rail.tsx`) applied to this one
+              for the same reason. `scroll-slim` alone painted a grey line down
+              the right of ten nav buttons at every window height, for an
+              overflow most writers reach on a short laptop and never
+              otherwise — furniture rather than an affordance. `oc-rail-scroll`
+              layers over it, so the bar keeps the app's own thin shape and
+              only its *visibility* is conditional; nothing about the layout
+              changes either way, so the rows do not shift as it appears. Its
+              rule carries `:focus-within` too, so tabbing into the nav brings
+              the bar back for somebody with no pointer at all.
+
+              **The drawer below (`md` and under) deliberately does not get
+              this.** A bar that waits for a hover on a touch screen is a bar
+              that never appears. */}
+          <div className={`oc-rail-scroll scroll-slim min-h-0 flex-1 px-2 pt-4 pb-2 ${sidebarCollapsed ? "overflow-visible" : "overflow-y-auto"}`}>
             <div className="flex min-h-full flex-col">
               {sidebarCollapsed ? (
                 <div className="mb-6 flex items-center justify-center">
@@ -2949,16 +2964,23 @@ function ResumeSlot({
         className="absolute inset-0 -z-20 bg-cover"
         style={{
           backgroundImage: "url('/resume-card-background.webp')",
-          /* The same crop as the written card — see the note there. */
-          /* Held right of centre, which slides the figure left in the frame.
-             `cover` on a card this shape crops the sides, so the X is the pan.
-             The written card in `resume-card.tsx` carries the same pair. */
-          backgroundPosition: "70% 78%",
+          /* The same crop as the written card — see the note in
+             `resume-card.tsx`, which is where the reasoning lives. In short:
+             the Y is at the foot because everything in this picture is in its
+             bottom third, and the X is inert on a portrait source under
+             `cover` in a frame this shape. The two states of this card are
+             held to one another, so the pair moves together. */
+          backgroundPosition: "50% 100%",
         }}
       />
+      {/* Eased with the written card's, and for the reason spelled out there —
+          the photograph under both went from dark to pale, and the old 0.74
+          turned it into a texture. The two states of this card are held to one
+          another, so the three alphas move together or they stop being one
+          card. */}
       <div
         aria-hidden
-        className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(0,0,0,0.74)_0%,rgba(0,0,0,0.58)_48%,rgba(0,0,0,0.24)_100%)]"
+        className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(0,0,0,0.62)_0%,rgba(0,0,0,0.42)_52%,rgba(0,0,0,0.06)_100%)]"
       />
       {/* A second, flat veil at night — see the note on the upgrade card. The
           gradient above it is a *reading* scrim, angled so the words at the

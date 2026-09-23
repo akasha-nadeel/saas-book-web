@@ -4,9 +4,10 @@ import Link from "next/link";
  * The picture band at the head of a section.
  *
  * **A photograph with the words on it, not a card with a picture beside it.**
- * Every one of these is a 2200×1228 WebP — the same shape and the same job as
- * `resume-card-background.webp` — so the picture is the ground and the type
- * sits on it, the way `ResumeCard` is built.
+ * Every one of these is a 2200×1228 WebP, so the picture is the ground and the
+ * type sits on it, the way `ResumeCard` is built. The *construction* is what
+ * the two share; the shape is not, since the resume card's picture stopped
+ * being landscape on 2026-09-23 and is cropped to its own foot.
  *
  * **This was `OverviewBanner` and became a component on its third use.** There
  * are five now — Overview, and one for each of the four lists in Write — and

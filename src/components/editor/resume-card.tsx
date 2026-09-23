@@ -131,20 +131,40 @@ export function ResumeCard({
         className="absolute inset-0 -z-20 bg-cover"
         style={{
           backgroundImage: "url('/resume-card-background.webp')",
-          /* **78%, so the figure stands in the frame rather than being cut off
-             at the neck.** The picture is 2200×1228 and the figure runs from
-             about 58% to 85% of its height; `cover` on a card this wide and
-             this short crops a band out of the middle, and at 48% that band
-             stopped at the top of his head. Down here the whole of him lands
-             inside it, with a little floor left under his feet. */
-          /* Held right of centre, which slides the figure left in the frame:
-             `cover` on a card this shape crops the sides, so the X is the pan. */
-          backgroundPosition: "70% 78%",
+          /* **Pinned to the foot, because everything in this picture is in the
+             bottom third.** It is 736×920: the top three-fifths are an empty
+             pale sky, the subject sits at about 62–70% of the height and the
+             ground runs from there to the bottom edge. A card this wide and
+             this short shows roughly the bottom third of it, and anywhere
+             above 100% starts cutting the ground off under the subject.
+
+             **The X does nothing here, and is 50% to say so.** `cover` crops
+             on whichever axis overflows, and this frame is wider than the
+             source's 0.8 aspect at every width the card is drawn at — so the
+             picture is scaled to the card's width and the whole of the
+             overflow is vertical. The previous photograph was landscape and
+             the X was a real pan; on a portrait source it is inert. */
+          backgroundPosition: "50% 100%",
         }}
       />
+      {/* **Eased on 2026-09-23, because the photograph under it changed from a
+          dark one to a pale one.** It was 0.74 → 0.58 → 0.24, which is the
+          right weight over a night scene and the wrong one over a cream
+          keyboard: at three-quarters black the picture stopped being a picture
+          and became a grey texture behind the words. These figures are the
+          owner's choice between the two things this layer cannot both have —
+          the artwork legible, and a full reading ground all the way to the
+          right edge. The prose lines run nearly the card's width, so their
+          tails now sit at roughly 2:1 against white where they overhang the
+          lit keys. That is the accepted cost, not an oversight.
+
+          **Its shape is still the argument**: angled, so the words at the left
+          keep a ground while the picture is still a picture at the right. Only
+          the three alphas moved. A darker photograph put here later wants the
+          old numbers back. */}
       <div
         aria-hidden
-        className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(0,0,0,0.74)_0%,rgba(0,0,0,0.58)_48%,rgba(0,0,0,0.24)_100%)]"
+        className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(0,0,0,0.62)_0%,rgba(0,0,0,0.42)_52%,rgba(0,0,0,0.06)_100%)]"
       />
       {/* A second, flat veil at night, matching the empty state of this card in
           `bookshelf.tsx` — the two are deliberately indistinguishable in shape,
