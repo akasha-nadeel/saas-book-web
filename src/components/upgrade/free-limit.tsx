@@ -512,215 +512,198 @@ export function LimitDialog({
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      /* Capped and scrollable: on a short window the picture's caption and the
-         reassurance line were both below the fold, and a dialog whose buttons
-         cannot be reached is a dialog nobody can answer. */
-      /* **A dark frame with a white card floating in it**, which is the shape
-         of the reference and the thing that makes it read as one object rather
-         than as two panels butted together. The frame is the picture's own
-         darkest navy, so the artwork on the left runs into it instead of
-         ending at a seam — **re-matched when the picture was swapped, and it
-         has to be again if it changes**, the way the landing page's hero framing has to be
-         re-measured against its backdrop. It is stated literally rather than
-         as a token for the same reason the type over the image is: it belongs
-         to a photograph, and a photograph does not follow the theme.
+      /* **A light card with the picture set into it**, rather than a dark
+         frame with a white panel floating on a photograph. The picture is
+         inset on all four sides and given its own rounding, so the card is
+         plainly the object and the painting is plainly mounted in it — which
+         is what stops the two reading as a panel stuck on top of a background.
 
-         Capped and scrollable: on a short window the caption and the
-         reassurance line were both below the fold, and a dialog whose buttons
-         cannot be reached is a dialog nobody can answer. */
-      /* **No scrollbar, because there is nothing to scroll.** The content is
-         cut to fit an ordinary window rather than made scrollable — a
-         scrolling dialog is a dialog that is too long, and the answer to too
-         long is fewer words. `overflow-hidden` is what keeps the picture
-         inside the rounded corners; the height cap is a floor under a very
-         short window rather than something the layout relies on. */
-      className="m-auto max-h-[calc(100dvh-2rem)] w-[46rem]
-                 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-3xl sm:overflow-hidden
-                 bg-[#050a18] p-0 text-fg shadow-2xl backdrop:bg-black/70"
+         **Wider than it is tall, and the picture is why.** Stacked — picture
+         over words — the card came out a tall narrow column; beside them, the
+         same content lands in a landscape card, and the picture gets a
+         portrait slot instead of a letterbox crop of a painting that is very
+         nearly square.
+
+         **The card does not follow the theme, and that is deliberate.** It is
+         a frame around a painting: the warm off-white is lifted out of the
+         picture's own highlights so the two meet without a seam, and the ink
+         on it is stated against that white rather than against whichever of
+         the eight palettes is on. Same reasoning as the type over the old
+         photograph — swap the picture and these values are re-matched with it.
+
+         No scrollbar in the ordinary case: the content is cut to fit rather
+         than made scrollable, and the height cap is a floor under a very short
+         window rather than something the layout relies on. */
+      className="m-auto max-h-[calc(100dvh-2rem)] w-[44rem]
+                 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-[1.75rem]
+                 bg-[#f3f1ec] p-2.5 text-[#15171c] shadow-2xl
+                 backdrop:bg-black/70"
     >
-      {/* The picture sits behind everything rather than inside the left half,
-          so the frame around the white card *is* the artwork — the border and
-          the panel are one image, which is what stops the card reading as a
-          rectangle stuck on top of a photograph. The wrapper is what `fill`
-          measures itself against, and it grows with the content, so a dialog
-          that has to scroll is covered to its full height rather than to one
-          viewport of it. */}
-      <div className="relative">
-        {/* **The filename carries the picture, not the slot.** Swapping the
-            artwork under one name looks like it has not worked: `next/image`
-            caches the optimised copy by URL, so the old picture keeps being
-            served from `.next/cache/images` however many times the file is
-            replaced. A new picture gets a new name — that busts the
-            optimiser, the browser and anything in front of them at once. */}
-        <Image
-          src="/upgrade-panel-blur.jpg"
-          alt=""
-          aria-hidden
-          fill
-          sizes="(min-width: 640px) 46rem, 100vw"
-          className="object-cover"
-        />
-        {/* **One veil over the whole picture, rather than a gradient on the
-            left half.** The gradient made the two visible parts of the same
-            photograph — the panel and the strip framing the card — read as two
-            different pictures: near-black on the left, bright cyan down the
-            right edge. An even wash puts them at one tone, which is what makes
-            the frame and the panel obviously one image, and it is the same
-            navy as the fallback under it so there is no edge where the picture
-            has not loaded yet. It is 45% rather than 60% since the artwork
-            went darker: the veil is there to even the picture out, and past a
-            point it stops being a veil and becomes a paint. */}
-        <div aria-hidden="true" className="absolute inset-0 bg-[#050a18]/45" />
+      <div className="grid gap-2.5 sm:grid-cols-[18rem_1fr]">
+        {/* ---- The picture -------------------------------------------------
 
-        <div className="relative grid sm:grid-cols-[1fr_1.1fr]">
-          {/* ---- The picture ------------------------------------------------
+          **A painting rather than a screenshot.** The landing page's rule is
+          that figures are drawn, because a picture of the product goes stale
+          in silence while the product moves; a painting satisfies it the other
+          way — it makes no claim about anything, so there is nothing in it
+          that can stop being true.
 
-            **A photograph of nothing, which is the point.** The landing page's
-            rule is that figures are drawn rather than screenshotted, because a
-            picture of the product goes stale in silence while the product
-            moves. Abstract artwork is the other way of satisfying that: it is
-            not a claim about anything, so there is nothing in it that can stop
-            being true.
+          **The filename carries the picture, not the slot.** Swapping the
+          artwork under one name looks like it has not worked: `next/image`
+          caches the optimised copy by URL, so the old picture keeps being
+          served from `.next/cache/images` however many times the file is
+          replaced. A new picture gets a new name — that busts the optimiser,
+          the browser and anything in front of them at once.
 
-            Hidden below `sm`, where the dialog is one column and the writer
-            needs the words rather than the mood. */}
-          <div className="relative hidden sm:block">
-            <div className="relative flex h-full flex-col p-7">
-              {/* The mark, where the reference puts its logo — the one place in
-                the app it is drawn over a picture, so both halves are white
-                rather than the sidebar's two tones: `--color-wordmark` is the
-                indigo of a white page and would sink into this navy. */}
-              <p className="font-sans text-lg font-bold tracking-tight text-white">
-                Open<span className="text-white/70">Chapter</span>
-              </p>
+          Below `sm` the column stacks and the picture takes a landscape slot
+          of its own, because at that width a full-height painting would be the
+          whole screen and the writer needs the words. */}
+        <div
+          className="relative aspect-4/3 overflow-hidden rounded-[1.25rem]
+                     sm:aspect-auto sm:h-full"
+        >
+          <Image
+            src="/upgrade-reader.jpg"
+            alt=""
+            aria-hidden
+            fill
+            sizes="(min-width: 640px) 18rem, 100vw"
+            /* Off-centre on purpose. The painting is square and the slot is
+               portrait, so half its width is cropped away — centred, that cut
+               takes the book she is reading, which is the one thing in the
+               picture that has anything to do with this product. A focal point
+               just right of centre keeps her face and the book both. */
+            className="object-cover object-[56%_46%]"
+            priority
+          />
 
-              <div className="mt-auto">
-                {/* Literal white and a literal sky, not tokens: this is type on a
-                photograph, and a photograph does not invert with the theme.
-                Same reasoning as the landing page's drawn book covers. */}
-                <p className="font-display text-3xl leading-tight font-bold text-white">
-                  Unlock
-                  <br />
-                  <span className="text-[#7dd3fc]">every tool</span>
-                </p>
-                <p className="mt-3 max-w-[16rem] font-sans text-sm leading-relaxed text-white/70">
-                  Every search, every import, nothing counted.
-                </p>
-              </div>
-            </div>
-          </div>
+          {/* The badge rides on the picture, where the reference puts its
+              own: the column beside it is then nothing but the argument. It
+              carries its own ground, because it sits over paint whose tone is
+              not ours to predict. */}
+          <p
+            className="absolute top-3 left-3 rounded-full bg-black/55 px-2.5
+                       py-1 font-sans text-xs font-medium text-white
+                       backdrop-blur-sm"
+          >
+            Free plan
+          </p>
+        </div>
 
-          {/* ---- What happened, and what changes ------------------------- */}
-          <div className="relative m-2.5 rounded-2xl bg-panel p-6 sm:ml-0">
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="absolute top-4 right-4 flex h-8 w-8 items-center
-                       justify-center rounded-full text-muted outline-none
-                       transition-colors hover:bg-raised hover:text-fg
-                       focus-visible:ring-2 focus-visible:ring-accent/50"
+        {/* ---- What happened, and what changes ---------------------------- */}
+        <div className="relative px-3.5 pt-4 pb-2.5 sm:pr-4">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute top-2 right-2 flex h-8 w-8 items-center
+                       justify-center rounded-full text-[#6b7280] outline-none
+                       transition-colors hover:bg-black/5 hover:text-[#15171c]
+                       focus-visible:ring-2 focus-visible:ring-[#15171c]/30"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              className="h-4 w-4"
             >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                className="h-4 w-4"
-              >
-                <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" />
-              </svg>
-            </button>
+              <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" />
+            </svg>
+          </button>
 
-            <p
-              className="inline-block rounded-full bg-linear-to-r
-                       from-upgrade-from to-upgrade-to px-2.5 py-1 font-sans
-                       text-xs font-medium text-white"
-            >
-              Free plan
-            </p>
+          <h2
+            id="limit-dialog-title"
+            className="pr-9 font-sans text-xl leading-snug font-bold
+                       text-[#15171c]"
+          >
+            {reachedHeadline(action)}
+          </h2>
 
-            <h2
-              id="limit-dialog-title"
-              className="mt-3.5 font-serif text-2xl leading-tight text-fg"
-            >
-              {reachedHeadline(action)}
-            </h2>
+          {/* **The deck is gone, and that is what makes the dialog fit.** It
+              read "the free plan runs 10 title checks and you have used them.
+              Pro takes the ceiling off this and the three beside it" — the
+              first half is the headline directly above it, the second half is
+              the list directly below, so it was the same thing three times and
+              eighty pixels of height. A dialog that has to scroll is a dialog
+              with too many words in it; the count moved into the headline,
+              where it was going to be read anyway. What stands in its place is
+              a label for the group under it, not a second statement of the
+              same thing. */}
+          <p className="mt-1.5 font-sans text-sm text-[#6b7280]">
+            Here is what Pro adds
+          </p>
 
-            {/* **The deck is gone, and that is what makes the dialog fit.** It
-                read "the free plan runs 10 title checks and you have used them.
-                Pro takes the ceiling off this and the three beside it" — the
-                first half is the headline directly above it, the second half is
-                the list directly below, so it was the same thing three times
-                and eighty pixels of height. A dialog that has to scroll is a
-                dialog with too many words in it; the count moved into the
-                headline, where it was going to be read anyway. */}
-            <ul className="mt-3.5 space-y-1.5">
-              {proAdds(action).map((item) => (
-                <li key={item} className="flex gap-2.5">
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="mt-0.5 h-4 w-4 shrink-0 text-accent"
-                  >
-                    <path d="m4.5 10.5 3.5 3.5 7.5-8" />
-                  </svg>
-                  <span className="font-sans text-sm leading-snug text-fg">
-                    {item}
-                  </span>
-                </li>
-              ))}
-            </ul>
+          {/* One container for the group of reasons rather than one per line —
+              the grouped-list idea the editor's panels are built on, drawn
+              here in the card's own values. */}
+          <ul
+            className="mt-3 space-y-2.5 rounded-2xl border border-[#e3e0d9]
+                       bg-white p-3.5"
+          >
+            {proAdds(action).map((item) => (
+              <li key={item} className="flex gap-2.5">
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mt-0.5 h-4 w-4 shrink-0 text-[#15171c]"
+                >
+                  <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+                </svg>
+                <span className="font-sans text-sm leading-snug text-[#15171c]">
+                  {item}
+                </span>
+              </li>
+            ))}
+          </ul>
 
-            {/* Read from the price table, never restated — the same rule the
+          {/* Read from the price table, never restated — the same rule the
               pricing page follows, so the two cannot disagree. */}
-            <p className="mt-4 font-sans text-sm text-muted">
-              {displayPrice(priceOf("pro", "monthly"))} a month, or{" "}
-              {displayPrice(priceOf("pro", "annual"))} a year.
-            </p>
+          <p className="mt-3 font-sans text-sm text-[#6b7280]">
+            {displayPrice(priceOf("pro", "monthly"))} a month, or{" "}
+            {displayPrice(priceOf("pro", "annual"))} a year.
+          </p>
 
-            {/* Full width, as the reference has it: at the foot of a column of
+          {/* Full width, as the reference has it: at the foot of a column of
               reasons there is one thing to do, and a button sized to its own
               label reads as one option among several. "Not now" stays a real
               way out — a dialog with no exit but the cross is the pattern this
               product is built to be the opposite of — but it is a quiet line
               rather than a second button competing with the first. */}
-            <Link
-              href="/upgrade"
-              className="mt-5 block rounded-xl bg-linear-to-r from-upgrade-from
+          <Link
+            href="/upgrade"
+            className="mt-4 block rounded-xl bg-linear-to-r from-upgrade-from
                        to-upgrade-to px-5 py-3 text-center font-sans text-sm
                        font-semibold text-white outline-none transition-opacity
                        hover:opacity-90 focus-visible:ring-2
                        focus-visible:ring-upgrade-to/50"
-            >
-              See what Pro adds
-            </Link>
-            <button
-              type="button"
-              onClick={onClose}
-              className="mt-2 block w-full rounded-lg px-3 py-2 text-center
-                       font-sans text-sm text-muted outline-none
-                       transition-colors hover:text-fg focus-visible:ring-2
-                       focus-visible:ring-accent/50"
-            >
-              Not now
-            </button>
+          >
+            See what Pro adds
+          </Link>
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-1.5 block w-full rounded-lg px-3 py-2 text-center
+                       font-sans text-sm text-[#6b7280] outline-none
+                       transition-colors hover:text-[#15171c]
+                       focus-visible:ring-2 focus-visible:ring-[#15171c]/30"
+          >
+            Not now
+          </button>
 
-            <p className="mt-4 font-sans text-xs leading-relaxed text-muted">
-              Nothing you have already found, imported or written is affected,
-              and everything else on the free plan keeps working.
-            </p>
-          </div>
+          <p className="mt-3 font-sans text-xs leading-relaxed text-[#6b7280]">
+            Nothing you have already found, imported or written is affected, and
+            everything else on the free plan keeps working.
+          </p>
         </div>
       </div>
     </dialog>
   );
 }
-
