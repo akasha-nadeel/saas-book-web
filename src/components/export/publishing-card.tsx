@@ -385,7 +385,6 @@ export function StoreReadiness({
  */
 export function ReadinessPanel({ issues }: { issues: readonly ReadinessIssue[] }) {
   const blocking = issues.filter((i) => i.level === "blocking");
-  const advisory = issues.filter((i) => i.level === "advisory");
 
   if (issues.length === 0) {
     return (
@@ -405,28 +404,48 @@ export function ReadinessPanel({ issues }: { issues: readonly ReadinessIssue[] }
     );
   }
 
-  return (
-    <div className="space-y-3">
-      {blocking.length > 0 && (
-        <Verdict
-          tone="stop"
-          title={
-            blocking.length === 1
-              ? "One thing will stop a shop taking this"
-              : `${blocking.length} things will stop a shop taking this`
-          }
-          issues={blocking}
-        />
-      )}
+  /* **The amber "Worth fixing first" rung stood here and is gone**
+     (2026-09-23, the owner's call). It listed the advisories — no ISBN, no
+     blurb, no categories, no publisher — on the last screen of the wizard, at
+     the moment a writer had already decided to make the file, about things no
+     shop will actually refuse.
 
-      {advisory.length > 0 && (
-        <Verdict tone="note" title="Worth fixing first" issues={advisory} />
-      )}
-    </div>
+     **Nothing is lost from the product.** `storeReadiness()` is untouched and
+     the dashboard still turns the same issues into findings through
+     `findingsFrom`, which is where a writer works through readiness. This
+     screen's job is narrower: say what will stop the file. The blocking rung
+     below is that, and it stays.
+
+     **A book with advisories and none blocking now draws nothing**, and
+     deliberately not the green box. "Ready for the shops. Cover, metadata and
+     images are all in order." is false of a book with no ISBN and no blurb,
+     and an empty result is never rendered here as a good one — so the green
+     box stays pinned to `issues.length === 0`, where it is true, and the
+     middle case is silence. */
+  if (blocking.length === 0) return null;
+
+  return (
+    <Verdict
+      tone="stop"
+      title={
+        blocking.length === 1
+          ? "One thing will stop a shop taking this"
+          : `${blocking.length} things will stop a shop taking this`
+      }
+      issues={blocking}
+    />
   );
 }
 
-/** One level of the check, in its own rung of the ladder. */
+/**
+ * One level of the check, in its own rung of the ladder.
+ *
+ * **`"note"` has had no caller since 2026-09-23** and the arm is kept rather
+ * than unpicked. Narrowing the union would mean rewriting the skin and both
+ * mark paths for a change that is about what `ReadinessPanel` *says*, not about
+ * what a verdict may look like — and putting the amber rung back should stay
+ * one line of JSX. See the note in `ReadinessPanel`.
+ */
 function Verdict({
   tone,
   title,

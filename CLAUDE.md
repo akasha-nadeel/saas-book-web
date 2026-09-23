@@ -533,7 +533,14 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   line a writer must replace carries a `[bracket]`** — that is the only mark the
   export has to tell a written page from scaffolding, and it survives a rename
   and a round trip. `isUntouchedMatter` in `export/blocks.ts` is the one rule
-  and the panel calls it too; the export screen **names every page it left out**.
+  and the panel calls it too. **The export screen used to name every page it
+  left out and stopped on 2026-09-23** — the note fired on untouched
+  scaffolding, which is the common case rather than the dangerous one, so a
+  writer who accepted the standard back-matter set met a warning about four
+  pages they had never written in. `skippedMatterPages` still feeds the front
+  matter step's three cards and the final step's count of the pages that *do*
+  go in; nothing names the ones that do not. Putting it back is one block in
+  `export-page.tsx` and this sentence.
 - **The panel lists the sixteen divisions with a switch on each**, not the
   pages the book happens to have — on creates the page (`createMatterPage`),
   off deletes it into the book's trash. **There is no stored "included" flag

@@ -25,8 +25,8 @@ it("suggests only pages that are on the offered list", () => {
  *
  * The screen asks what you will *write*. A tick that arrives already made is
  * not an answer to that — it seeds a page of `[placeholders]`, which the export
- * then has to leave out and explain in its "not going in" note. Advice belongs
- * in the `usual` marker, which is shown rather than acted on.
+ * then leaves out of the file, since 2026-09-23 without saying so. Advice
+ * belongs in the `usual` marker, which is shown rather than acted on.
  */
 it("ticks nothing until the writer does", () => {
   expect(defaultPicked().size).toBe(0);

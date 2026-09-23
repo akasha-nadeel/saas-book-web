@@ -4715,9 +4715,15 @@ function PrepareRow({
           </ul>
 
           {/* Named, so going to the export flow is a decision rather than what
-              happens when you press anything on this row. */}
+              happens when you press anything on this row.
+
+              **No `withReturn` any more** (2026-09-23): the export wizard
+              stopped reading `?from=` when its Cancel became a way back to the
+              manuscript rather than to a dashboard area, so a `?from=prepare`
+              here would be a query string nobody looks at. `withReturn` is
+              still right for every tool that does return to an area. */}
           <Link
-            href={withReturn(`/book/${book.id}/export`, "prepare")}
+            href={`/book/${book.id}/export`}
             className="mt-3 inline-block text-sm font-semibold text-accent"
           >
             Check and export this book →

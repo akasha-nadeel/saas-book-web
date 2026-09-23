@@ -54,7 +54,6 @@ import { chapterMatterOf, findBook, type Book } from "@/lib/library-store";
 import { chapterNumeral } from "@/lib/export/blocks";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 import { type ToolPageProps } from "@/lib/tool-page";
-import { areaLabel } from "@/lib/areas";
 import { LAUNCH_LIMITS, exportAllowed } from "@/lib/launch";
 import { usePlan } from "@/lib/use-plan";
 
@@ -170,6 +169,34 @@ const STEP_IDS = new Set<StepId>([
   "preview",
   "export",
 ]);
+/**
+ * The steps that carry a picture down their left side, and which one.
+ *
+ * **A table rather than a condition per step.** The Export step got the first
+ * of these as a `showTakeaway` flag and a fourth arm on the container's
+ * ternary; three more would have made that chain five deep for what is really
+ * one question with a per-step answer. A fifth picture is a row here now.
+ *
+ * `listing` and `blurb` share one. They are the two halves of the Store listing
+ * group, and because they render the same `<aside>` in the same slot with the
+ * same URL, walking between them leaves the picture standing rather than
+ * repainting it — the property the sheet already has across `template` and
+ * `layout`.
+ *
+ * **No aspect ratio, because the column's height is whatever stands beside
+ * it.** These were fixed-aspect boxes at the top of the column for a day; they
+ * fill it now, so the row decides the shape and `bg-cover` crops the picture to
+ * fit rather than letterboxing it. That also means a source's own proportions
+ * do not matter here — only that it survives being cropped to a tall strip,
+ * which is what `bg-center` is for.
+ */
+const STEP_PICTURES: Partial<Record<StepId, string>> = {
+  frontmatter: "/export-front-matter.webp",
+  listing: "/export-listing.webp",
+  blurb: "/export-listing.webp",
+  export: "/export-step.webp",
+};
+
 const FORMAT_VALUES = new Set<Format>(["markdown", "docx", "epub", "pdf"]);
 
 interface Step {
@@ -376,8 +403,13 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
     STEP_IDS.has(initial as StepId)
       ? (initial as StepId)
       : null;
-  /** Which dashboard area sent the writer here, for the rail's way back. */
-  const from = params.get("from");
+  /* **`?from=` is read by nothing here any more** (2026-09-23). It named the
+     dashboard area that sent the writer in, and Cancel returned them to it —
+     falling back to the tools wall, which in the launch MVP has no row in the
+     side panel, so the one way out of this wizard landed somewhere a writer
+     could not otherwise reach. Cancel goes to the manuscript now, always. A
+     link may still carry the parameter; this screen simply does not look at
+     it. `withReturn` is untouched — the other tools still return to an area. */
 
   /* Was `deepLink ? "epub" : null` — a guess, and the only reason one was
      needed is that the format never reached the URL. It does now. */
@@ -570,20 +602,32 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
      column or two — is a decision about the whole screen. */
   const showSheet = step.id === "template" || step.id === "layout";
 
+  /* The other step that has something to stand beside its column: the writing
+     record, which is a file a writer takes out of here but is not a copy of
+     the book. Its own flag rather than a second arm of `showSheet`, because
+     the two asides are different things at different widths — see the
+     container's note below. */
+  const showRecord = step.id === "format";
+
+  /* The steps whose aside is a picture rather than information — see
+     `STEP_PICTURES`. These are the ones drawn on the *left*. */
+  const picture = STEP_PICTURES[step.id] ?? null;
+
   /**
    * Put the step and the format in the URL, so a reload comes back here.
    *
    * `replace`, never `push`: the wizard's own Back and Continue are how a
    * writer moves through it, and stacking a history entry per step would make
    * the browser's Back walk the wizard instead of leaving it — the same
-   * reasoning the dashboard's `goToArea` follows. `from` is carried through
-   * because the rail's way back is built from it.
+   * reasoning the dashboard's `goToArea` follows.
+   *
+   * `from` used to be carried through here so it survived a step change. It is
+   * dropped with the reader that wanted it — see the note where it was parsed.
    */
   const remember = (nextStep: StepId, nextFormat: Format | null) => {
     const query = new URLSearchParams();
     query.set("step", nextStep);
     if (nextFormat) query.set("format", nextFormat);
-    if (from) query.set("from", from);
     router.replace(`?${query.toString()}`, { scroll: false });
   };
 
@@ -712,7 +756,7 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
           currentIndex={index}
           steps={steps}
           onGo={(id) => go(steps.findIndex((s) => s.id === id))}
-          from={from}
+          editorHref={editorHref}
           embedded={Boolean(embedded)}
         />
 
@@ -735,10 +779,20 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
               so seeing what "Drop caps" did meant scrolling away from the
               control that set it.
 
-              The other steps get the measure they always had. A column of
-              format cards or front-matter switches has nothing to sit beside,
-              and a two-column grid with an empty right half is a page with a
-              hole in it. */}
+              **The format step joins them on a different argument**
+              (2026-09-23). It used to be named here as the case *against* a
+              second column — a column of format cards has nothing to sit
+              beside, and a two-column grid with an empty right half is a page
+              with a hole in it. That was true while the writing record sat
+              underneath the choice; putting it in the right-hand column is
+              what fills the half. The reasoning has not been overturned, it
+              has been answered.
+
+              **Four steps carry a picture instead** (`STEP_PICTURES`), and
+              theirs goes on the left. The split is what each aside *is*: the
+              sheet and the writing record are information about what the
+              controls beside them are doing, so they follow the controls; a
+              picture is not about anything on the page, so it leads. */}
           <div
             className={
               /* The book wants the room: two 340px pages plus the turn arrows
@@ -759,9 +813,60 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
                      is load-bearing for the sticky column: a stretched grid
                      item is already full height, so sticky never engages. */
                   "mx-auto grid w-full max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-10"
+                : showRecord
+                ? /* **20rem, chosen so the format cards do not move.** The
+                     arithmetic: 64rem of container, less a 20rem column, less
+                     the 2.5rem gap, leaves 664px for the choice — against the
+                     672px `max-w-2xl` gives it on every other step. So the
+                     two cards are the size they have always been and the
+                     column is a gain rather than a squeeze. Narrower than the
+                     sheet's 28rem because this aside is a card of two
+                     sentences, not a page shown at true size. */
+                  "mx-auto grid w-full max-w-5xl gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-10"
+                : picture
+                ? /* **The narrow track first**, which is `/book/new`'s own
+                     shape (`new-book-form.tsx`, `[22rem_minmax(0,1fr)]`) — the
+                     screen this wizard already took its band and its Cancel
+                     from. It leaves these steps 664px of content against the
+                     672px `max-w-2xl` gave them, so nothing on them moves.
+
+                     **No `items-start` here, and that is the difference from
+                     the two arms above.** They align to the top because their
+                     asides are a fixed size and one of them is sticky — a
+                     stretched grid item is already full height, so sticky
+                     never engages. This one wants the opposite: the picture
+                     fills the row, so it is as tall as whatever stands beside
+                     it. `stretch` is the grid default, so it is left unsaid
+                     rather than written out. */
+                  "mx-auto grid w-full max-w-5xl gap-8 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-10"
                 : "mx-auto w-full max-w-2xl"
             }
           >
+            {/* **Before the content in source order**, which is what puts it on
+                the left without an `order-*`. It is `aria-hidden` decoration,
+                so reading ahead of the heading costs a screen reader nothing.
+
+                **`hidden lg:block` is a decision, not a default.** Stacked on a
+                narrow window this is several hundred pixels of picture pushed
+                above the controls and the press a step exists for — and this
+                wizard's own rule is that the primary must never have to be
+                hunted for. It appears only where it costs nothing.
+
+                **It has no height of its own.** As a grid item it takes the
+                row's, which is the height of the step beside it, and
+                `bg-cover` crops the picture to whatever shape that leaves —
+                usually a strip taller than it is wide. That is the point
+                rather than a compromise: a picture that stopped at its own
+                proportions left the column half empty under it. `bg-center`
+                is what decides which part survives the crop. */}
+            {picture && (
+              <aside
+                aria-hidden
+                className="hidden w-full rounded-xl bg-cover bg-center lg:block"
+                style={{ backgroundImage: `url('${picture}')` }}
+              />
+            )}
+
             <div className="min-w-0">
               {/* **The way out to the prose, on the step that shows it.**
 
@@ -848,7 +953,6 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
                       chapter: sampleTitle,
                       author: book.author,
                     }}
-                    bookId={bookId}
                     onPick={pick}
                     manuscript={manuscript}
                     onManuscript={setManuscript}
@@ -974,6 +1078,16 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
                   sampleNumeral={sampleNumeral}
                   bookTitle={book.title}
                 />
+              </aside>
+            )}
+
+            {/* The format step's own right-hand column. Not sticky, unlike the
+                sheet above: that one is pinned because the controls beside it
+                scroll past a four-hundred-pixel preview, and this step is a
+                grid of four cards with nothing to scroll away from. */}
+            {showRecord && (
+              <aside className="min-w-0">
+                <WritingRecordCard bookId={bookId} />
               </aside>
             )}
           </div>
@@ -1105,9 +1219,15 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
  *   steps for the top of the screen.
  * - **"All tools" and "Back to writing".** One red Cancel replaces both, for
  *   the reason `/book/new` has one: two quiet escapes at opposite ends of a
- *   band read as chrome, and a wizard needs exactly one obvious way out. It
- *   goes where the writer came from (`?from=`), falling back to the tools
- *   wall.
+ *   band read as chrome, and a wizard needs exactly one obvious way out.
+ *   **That one way out is "Back to writing"** — it goes to the manuscript,
+ *   which is the half of the old pair worth keeping. It went to the dashboard
+ *   area named in `?from=`, falling back to the tools wall, and the fallback
+ *   was the common case: the wall has no row in the launch MVP's side panel,
+ *   so abandoning an export put a writer somewhere they could not otherwise
+ *   get to. The trade is that somebody who opened this from a Prepare
+ *   checklist no longer returns to that list. Cancelling a wizard means going
+ *   back to the thing it was about, and the thing it is about is the book.
  * - **"Mark step done".** Moved to the action bar at the foot, beside Back and
  *   the primary. It is an action on the roadmap rather than a piece of context,
  *   and this band is now only context.
@@ -1128,11 +1248,17 @@ function TopBar({
   currentId,
   currentIndex,
   onGo,
-  from,
+  editorHref,
   embedded,
 }: {
-  /** The dashboard area this was opened from, if the link said so. */
-  from: string | null;
+  /**
+   * Where Cancel goes: the chapter last worked on, or the book.
+   *
+   * Handed down rather than built here, so this and the Preview step's "Open
+   * the editor" cannot disagree about where the book *is* — `ExportPage`
+   * works it out once.
+   */
+  editorHref: string;
   /** How many listing problems a shop would refuse today. */
   groups: { name: string; steps: Step[] }[];
   steps: Step[];
@@ -1180,7 +1306,7 @@ function TopBar({
             Absent in the panel, which has a Close of its own two rows up. */}
         {!embedded && (
           <Link
-            href={areaLabel(from) ? `/?area=${from}` : "/?area=tools"}
+            href={editorHref}
             className="absolute top-3.5 right-5 z-10 rounded-md border border-stop-line
                        bg-stop-bg px-4 py-1.5 font-sans text-sm font-medium text-stop-fg
                        outline-none transition-colors hover:border-stop-fg
@@ -1352,15 +1478,12 @@ function TopBar({
 function FormatStep({
   output,
   book,
-  bookId,
   onPick,
   manuscript,
   onManuscript,
 }: {
   output: Format | null;
   book: PreviewBook;
-  /** For the writing record's link, which belongs to the book, not the preview. */
-  bookId: string;
   onPick: (value: Format) => void;
   manuscript: boolean;
   onManuscript: (on: boolean) => void;
@@ -1454,29 +1577,71 @@ function FormatStep({
         </div>
       )}
 
-      {/* **The writing record, beside the formats rather than among them**
-          (2026-09-15). It is a file a writer takes out of here too, but it is
-          not a copy of the book, so it is not a fourth card to choose between:
-          it is the thing to have ready for when somebody asks whether the book
-          is yours. Below the choice, so it never competes with it. */}
-      <section className="mt-2 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-line bg-panel px-5 py-4">
-        <div className="min-w-0 max-w-prose">
-          <p className="text-sm font-bold text-fg">Writing record</p>
-          <p className="mt-1 text-sm leading-relaxed text-muted">
-            A dated history of how this book was written, for if anyone asks
-            whether you used AI. Evidence, not proof.
-          </p>
-        </div>
+      {/* The writing record used to hang here, under the choice. It is the
+          step's right-hand column now — `WritingRecordCard`, rendered beside
+          this by `ExportPage`. */}
+    </div>
+  );
+}
+
+/**
+ * The writing record, offered beside the formats.
+ *
+ * **"Beside" is now literal** (2026-09-23). It is a file a writer takes out of
+ * here too, but it is not a copy of the book, so it is not a fourth card to
+ * choose between: it is the thing to have ready for when somebody asks whether
+ * the book is yours. It sat full-width under the format cards for that reason —
+ * below the choice, so it never competed with it — and a column to the side
+ * says the same thing about rank without spending the width of the screen on
+ * it.
+ *
+ * **Stacked, because the column is 20rem.** It was a row: words left, button
+ * right. `LimitNote` beside `LimitBanner` in `upgrade/free-limit.tsx` is the
+ * same pair — identical words and treatment, and the width is the whole of
+ * what differs — and the button goes full width under the sentence rather than
+ * beside it, because at 320px a shrink-wrapped button beside two lines of prose
+ * either overflows or wraps into something that looks broken.
+ *
+ * It takes `bookId` rather than the `PreviewBook`: the link belongs to the
+ * book, not to the preview the rest of the step is drawn from.
+ */
+function WritingRecordCard({ bookId }: { bookId: string }) {
+  return (
+    /* `overflow-hidden` is what gives the picture the card's own rounded top
+       corners and clips it inside the border; the padding moved off this box
+       and onto the div below so the picture runs edge to edge. */
+    <section className="overflow-hidden rounded-xl border border-line bg-panel">
+      {/* **A background on a fixed-aspect box, not an `<img>`** — the shape
+          `SectionBanner` and `ResumeCard` already use for a picture that is a
+          ground rather than content, and it keeps this out of the
+          `next/image`-versus-`<img>` question a bare tag would raise.
+
+          **16:9 is the source's own shape, so nothing is cropped**, and it is
+          also the shortest crop that still holds the figure, which runs from
+          about a third of the way down to the bottom edge. `bg-center` states
+          the intent for whoever changes the ratio. No `dark:` treatment: a
+          picture is the same picture in both themes. */}
+      <div
+        aria-hidden
+        className="aspect-[16/9] w-full bg-cover bg-center"
+        style={{ backgroundImage: "url('/writing-record-card.webp')" }}
+      />
+      <div className="px-5 py-4">
+        <p className="text-sm font-bold text-fg">Writing record</p>
+        <p className="mt-1 text-sm leading-relaxed text-muted">
+          A dated history of how this book was written, for if anyone asks
+          whether you used AI. Evidence, not proof.
+        </p>
         <Link
           href={`/book/${bookId}/provenance`}
-          className="shrink-0 rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-fg
-                     transition-colors hover:bg-raised focus-visible:outline-none
-                     focus-visible:ring-2 focus-visible:ring-accent/50"
+          className="mt-3 block rounded-lg border border-line bg-surface px-4 py-2 text-center
+                     text-sm font-semibold text-fg transition-colors hover:bg-raised
+                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
         >
           Open writing record
         </Link>
-      </section>
-    </div>
+      </div>
+    </section>
   );
 }
 
@@ -2062,12 +2227,14 @@ function FrontMatterStep({
    * A page still carrying its `[placeholders]` never reaches `loadChapters`, so
    * `written` cannot see it and ours is generated — right, and silent: the card
    * said "© this year, in the author's name" while the writer had a copyright
-   * page of their own sitting in the book, and the only mention of it was among
-   * the five titles in the note at the foot of the step. That is a writer
+   * page of their own sitting in the book, and the only mention of it was in a
+   * note at the foot of the step, among five other titles. That is a writer
    * looking at three cards and concluding the app cannot see their pages.
    *
-   * Derived from `skipped`, which is that note's own list, so the card and the
-   * note cannot end up disagreeing about which pages were left out.
+   * **These hints are the whole of what says so now.** That note is gone (see
+   * the foot of this step), so the three cards are the only place a writer is
+   * told their own blank page exists. `skippedMatterPages` is the source, the
+   * same list the export filters on, so a card cannot disagree with the file.
    */
   const blank = new Set(
     skipped
@@ -2193,33 +2360,26 @@ function FrontMatterStep({
         />
       )}
 
-      {/* **The filter, said out loud.**
+      {/* **The "N pages are not going in" note stood here and is gone**
+          (2026-09-23, the owner's call). It named every skipped page in an
+          amber panel, on the argument that a page quietly disappearing from
+          somebody's book is the same class of mistake as a template quietly
+          shipping in one.
 
-          A front- or back-matter page still carrying its `[placeholders]` is
-          left out of the file, because the alternative is a reader meeting
-          "For [name]." on the page after the cover. But a page quietly
-          disappearing from somebody's book is the same class of mistake as a
-          template quietly shipping in one — the file does not match the book on
-          screen, and only one of the two is discoverable. So they are named, in
-          the writer's own page titles, with what to do.
+          What it caught in practice was scaffolding. A writer who accepted the
+          standard back-matter set at `/book/new` and has not written an
+          Afterword yet met a warning naming four pages every time they reached
+          this step — for pages they had never written a word in. The hazard it
+          was drawn against is real and rare; what it actually fired on was the
+          common case.
 
-          A note rather than a warning: nothing here is wrong. These are pages
-          the writer has not got to yet, and the export is doing the right thing
-          by them. */}
-      {skipped.length > 0 && (
-        <div className="rounded-xl border border-note-line bg-note-bg px-4 py-3.5">
-          <p className="font-sans text-sm font-semibold text-note-fg">
-            {skipped.length === 1
-              ? "One page is not going in"
-              : `${skipped.length} pages are not going in`}
-          </p>
-          <p className="mt-1 font-sans text-xs leading-relaxed text-note-fg/85">
-            {skipped.join(", ")} — still blank, or still holding the example
-            text in [square brackets]. Fill one in and it joins the book; delete
-            the ones you do not want.
-          </p>
-        </div>
-      )}
+          **The filtering itself is unchanged**: a page still carrying its
+          `[placeholders]` stays out of the file, because the alternative is a
+          reader meeting "For [name]." on the page after the cover. What is
+          gone is the telling. `skipped` is still read — `blank` above derives
+          from it, and `ExportStep` subtracts it so the last step's count of
+          the writer's own pages is of the ones actually going in. Putting the
+          note back is this block and a line in `CLAUDE.md`. */}
     </div>
   );
 }

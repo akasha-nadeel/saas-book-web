@@ -113,6 +113,26 @@ export function ToolHeader({
    * on the page and a filled button there would be the loudest thing in it.
    */
   action,
+  /**
+   * Where this screen goes when nobody said where the writer came from.
+   *
+   * **For a tool whose home is not the launcher.** The Writing record is the
+   * case it was written for: nothing links to it with a `?from=`, so its only
+   * exit was "All tools" — and the wall that lands on has no row in the side
+   * panel, so the control that is supposed to take a writer back was the only
+   * way *to* a screen they could not otherwise reach. It is a file you fetch
+   * on your way out of Export, and Export is where it should return you.
+   *
+   * **It names where the link goes, not where the writer came from**, which is
+   * what lets it sit under `?from=` without lying: a caller that says where
+   * somebody came from still wins, because that is the more specific answer to
+   * a different question.
+   *
+   * Not spelled as a `?from=` value. That carries a dashboard *area* id,
+   * narrowed through `areaLabel`, and a tool screen is not an area —
+   * `AreaId` must not grow a member that is not one.
+   */
+  back,
   /** One line under the heading, if the tool has something to say up front. */
   children,
 }: {
@@ -121,6 +141,7 @@ export function ToolHeader({
   title?: string;
   width?: keyof typeof WIDTHS;
   action?: React.ReactNode;
+  back?: { label: string; href: string };
   children?: React.ReactNode;
 }) {
   const cover = useCover(book.id);
@@ -185,15 +206,21 @@ export function ToolHeader({
               thing in this header and a box gave it the weight of an action —
               which put a second heavy element on the one row that should be
               quiet. */}
-            {/* The way back names where it goes. When a caller said where the
-              writer came from, that wins — returning them to the launcher when
-              they arrived from a list they were working through is the thing
-              this exists to stop. "All tools" stays for everyone else. */}
+            {/* The way back names where it goes, and there are three answers
+              in order of how much the asker knows.
+
+              A caller that said where the writer came from wins — returning
+              them to the launcher when they arrived from a list they were
+              working through is the thing this exists to stop. Failing that,
+              the screen's own `back`, for a tool whose home is somewhere other
+              than the wall. "All tools" is what is left. */}
             <Link
-              href={from ? `/?area=${fromId}` : "/?area=tools"}
+              href={
+                from ? `/?area=${fromId}` : (back?.href ?? "/?area=tools")
+              }
               className="shrink-0 text-xs font-semibold text-muted hover:text-fg"
             >
-              ← {from ? `Back to ${from}` : "All tools"}
+              ← {from ? `Back to ${from}` : (back?.label ?? "All tools")}
             </Link>
           </div>
 

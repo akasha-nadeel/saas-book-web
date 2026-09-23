@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
+import { ProBadge } from "@/components/upgrade/pro-badge";
 import { Spinner } from "@/components/ui/spinner";
 import { parseHistory } from "@/lib/history";
 import {
@@ -222,7 +223,17 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
           test settles the accusation, that the detectors misfire on exactly
           the writers least able to argue back, and that what is offered
           instead is a trail rather than a proof. */}
-      <ToolHeader book={book} tool="Writing record">
+      {/* **Back to Export, not to the tools wall.** Nothing links here with a
+          `?from=`, so this screen's only exit was the launcher — and in the
+          launch MVP that wall has no row in the side panel, which made the way
+          *back* the only way *in* to a screen nobody had asked for. The two
+          real entrances are both on Export: the Format step's card and the
+          export-done dialog. `?from=` still wins where a caller set one. */}
+      <ToolHeader
+        book={book}
+        tool="Writing record"
+        back={{ label: "Back to Export", href: `/book/${book.id}/export` }}
+      >
         No test settles an accusation of AI writing, and the detectors sold for
         the job misfire on plain prose and on writers whose first language is
         not English. What people reach for instead is the trail the work left
@@ -258,13 +269,33 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
             On Free, above the log it limits, so nobody reads "12 days written"
             as the whole story. It names the first day the log actually holds,
             which is the honest reason to want the rest, and nothing more. */}
+        {/* **It wears the upgrade gradient, because purple is what Pro looks
+            like everywhere else.** This was a `bg-panel` box with a blue
+            `bg-accent` button — which is the app's *accent*, the one hue
+            reserved for "this is the way forward", and it said nothing about
+            what was being offered. `LimitBanner` in `upgrade/free-limit.tsx`
+            is the original of this shape and its notes are the reasoning; the
+            fill, the radius, the two type sizes and the white button are
+            copied from it deliberately so the two read as one idea.
+
+            **The ink is literal white, not `accent-ink`.** The two gradient
+            stops are stated identically in both theme blocks, so an ink that
+            inverted with the theme would put black on a ground that had not
+            moved. The button is white with `upgrade-ink` on it for the same
+            reason. `font-sans` is on `LimitBanner` and is not copied — that
+            one also draws inside the editor's rails, where a serif is in
+            force, and this page is already sans.
+
+            Not extracted into a shared component yet: this is the third of
+            these blocks, and things land in `ui/` on the third *copy* rather
+            than the first. A fourth earns it. */}
         {free && from && (
-          <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-line bg-panel px-5 py-4">
+          <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-linear-to-r from-upgrade-from to-upgrade-to px-7 py-6">
             <div className="min-w-0 max-w-prose">
-              <p className="text-sm font-bold text-fg">
+              <p className="text-base font-bold text-white">
                 Showing the last {FREE_RECORD_DAYS} days
               </p>
-              <p className="mt-1 text-sm leading-relaxed text-muted">
+              <p className="mt-1.5 text-sm leading-relaxed text-white/85">
                 {whole.firstDay !== null && whole.firstDay < from
                   ? `Your record goes back to ${whole.firstDay}. ${TIER_NAMES.pro} includes the last 12 months, and the fingerprint.`
                   : `${TIER_NAMES.pro} includes the last 12 months as your record grows, and the fingerprint.`}{" "}
@@ -273,8 +304,8 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
             </div>
             <Link
               href="/upgrade"
-              className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink
-                         outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-accent/50"
+              className="shrink-0 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-upgrade-ink
+                         outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/70"
             >
               See {TIER_NAMES.pro}
             </Link>
@@ -364,13 +395,16 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
               Every draft the app saved{free ? " in those days" : ""}
             </Holds>
             {free ? (
+              /* **The app's badge, not a second drawing of one.** This was a
+                 hand-rolled outlined capsule; `ProBadge` is the marker every
+                 other Pro row in the product wears, and it is markup with no
+                 plan logic inside it — which is what this call site wants,
+                 since `free` was decided once at the top of the screen. Its
+                 shape is deliberately not a capsule: a full pill is a
+                 *control* here, and a label nobody can press must not borrow
+                 the shape of one. */
               <li className="flex items-center gap-2.5 text-sm text-muted">
-                <span
-                  aria-hidden="true"
-                  className="rounded-full border border-line px-1.5 py-0.5 text-[10px] font-bold uppercase"
-                >
-                  {TIER_NAMES.pro}
-                </span>
+                <ProBadge />
                 A fingerprint of the text as it stands
               </li>
             ) : (

@@ -23,8 +23,10 @@ import type { MatterPick } from "./library-store";
  * not the question the screen asks. The deck says *tick only what you will
  * actually write*, and a tick that arrives already made is not something the
  * writer said: it makes a page of `[placeholders]` they never asked for, which
- * then turns up in the export's "not going in" note as a page they have to be
- * told about. Three pages nobody chose, explained back to them later.
+ * the export then leaves out of the file. Three pages nobody chose, quietly
+ * missing from the book later. **The argument got stronger on 2026-09-23**,
+ * when the export's "not going in" note — which used to name them — was
+ * removed: a page seeded here and never filled in is now dropped in silence.
  *
  * The `usual` flag is what carries the advice now — it marks the rows most
  * books have, so the recommendation is *shown* rather than *acted on*, and the
