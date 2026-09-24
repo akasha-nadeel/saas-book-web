@@ -256,8 +256,10 @@ export async function updatePassword(
  * because this one reaches the browser as a hidden input.
  *
  * The parameter is optional so the account menu's plain `<form action={signOut}>`
- * keeps working untouched — a form with no `next` field lands on `/signin`, as
- * it always did.
+ * keeps working untouched. **A form with no `next` field lands on `/`** — the
+ * landing page, since the visitor is now signed out — rather than on `/signin`,
+ * where it used to go (changed 2026-09-24 at the owner's request: somebody who
+ * has just chosen to leave should not be greeted with "Welcome back").
  */
 export async function signOut(formData?: FormData) {
   if (!isSupabaseConfigured()) redirect("/");
@@ -274,7 +276,7 @@ export async function signOut(formData?: FormData) {
 
   revalidatePath("/", "layout");
 
-  if (next === "/") redirect("/signin");
+  if (next === "/") redirect("/");
 
   const query = new URLSearchParams({ next });
   if (typeof email === "string" && email) query.set("email", email);

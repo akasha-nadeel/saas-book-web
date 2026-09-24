@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  AUTH_COOKIE_OPTIONS,
   SUPABASE_PUBLISHABLE_KEY,
   SUPABASE_URL,
   isSupabaseConfigured,
@@ -84,6 +86,7 @@ export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    cookieOptions: AUTH_COOKIE_OPTIONS,
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -110,8 +113,24 @@ export async function proxy(request: NextRequest) {
   // the response is committed cannot write its cookies, and the next request
   // refreshes again. getClaims verifies the JWT signature rather than trusting
   // the cookie, which is why it — not getSession — is what the gate reads.
-  const { data } = await supabase.auth.getClaims();
+  const { data, error } = await supabase.auth.getClaims();
   const signedIn = Boolean(data?.claims);
+
+  /*
+   * **Supabase could not be reached, which is not the same as signed out.**
+   * An access token expires about hourly and this call is what refreshes it;
+   * if the refresh request itself fails — a network blip, a cold start — there
+   * are no claims to read, and the rule below used to send the writer to
+   * `/signin` as though they had signed out. The session cookie is still there
+   * and the next request refreshes it, so the request goes through instead.
+   *
+   * Safe because this gate is for the screens, not the data: row-level
+   * security and each route's own check still decide what can be read or
+   * written, and neither accepts a token that has not been verified. A real
+   * sign-out — no session, a revoked refresh token — is not a retryable fetch
+   * error and still redirects exactly as before.
+   */
+  if (!signedIn && isAuthRetryableFetchError(error)) return response;
 
   if (!signedIn && !isPublic(pathname)) {
     const url = request.nextUrl.clone();

@@ -24,6 +24,32 @@ caches one writer's `Set-Cookie` and serves it to the next reader. A redirect ou
 of the proxy has to carry those cookies too. The gate reads `getClaims()`, which
 verifies the JWT signature — never `getSession()`, which trusts the cookie.
 
+**A session lasts until the writer signs out** (2026-09-24, the owner's rule).
+Three pieces hold it, and a fourth lives outside the code:
+
+- The auth cookies live **400 days**, the ceiling browsers allow —
+  `AUTH_COOKIE_OPTIONS` in `lib/supabase/config.ts`, passed to all three
+  clients. It is `@supabase/ssr`'s default too; it is stated so a library
+  change cannot shorten every session quietly. The refresh token inside does
+  not expire on its own.
+- **A refresh that cannot reach Supabase is not a sign-out.** When
+  `getClaims()` fails with `isAuthRetryableFetchError`, the proxy lets the
+  request through rather than bouncing to `/signin`; the next request
+  refreshes. It used to redirect, which from the writer's side was
+  indistinguishable from being logged out. A missing or revoked session still
+  redirects.
+- **Signing out lands on `/`, the landing page**, not `/signin` — somebody who
+  just chose to leave should not be met with "Welcome back". The
+  switch-account path (a `next` other than `/`, e.g. an invitation) still goes
+  to `/signin?next=…`.
+- **The dashboard can end sessions and the code cannot stop it.**
+  Authentication → Sessions must keep *Time-box user sessions* and *Inactivity
+  timeout* at 0 (never) and *Single session per user* off, or writers are
+  signed out on a timer or by signing in on a second device. Refresh token
+  rotation stays on, with its reuse interval (~10 s) so two tabs refreshing at
+  once do not revoke each other. Check these first when "I got logged out" is
+  reported.
+
 `src/lib/supabase/` holds the three clients (browser, server, and the one the
 proxy builds inline); sign-in/up/out are Server Actions in
 `src/app/auth/actions.ts`, so the session cookie and the redirect land in the

@@ -1,5 +1,9 @@
 import { createBrowserClient } from "@supabase/ssr";
-import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./config";
+import {
+  AUTH_COOKIE_OPTIONS,
+  SUPABASE_PUBLISHABLE_KEY,
+  SUPABASE_URL,
+} from "./config";
 
 /**
  * The Supabase client for code running in the browser.
@@ -13,5 +17,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./config";
  * not something a writer should ever see.
  */
 export function createClient() {
-  return createBrowserClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  return createBrowserClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    cookieOptions: AUTH_COOKIE_OPTIONS,
+  });
 }
