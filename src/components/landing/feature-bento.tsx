@@ -43,12 +43,12 @@ import { ROW_BODY, ROW_TITLE, SECTION_LEAD, SECTION_TITLE } from "./type";
  * nobody touches it reads as a loading state. The lift on hover stays, because
  * that one answers a gesture.
  *
- * **Only what the launch flag leaves reachable may be named here**, which is
- * the rule that shaped the third card. The reference's equivalent is a goals
- * and progress card; `HIDDEN_BOOK_TOOL_PATHS` gates that tool, so this one is
- * about the counts the shelf and the editor actually show — summed from the
- * manuscript on every read — and says nothing about targets. Check that list in
- * `src/lib/launch.ts` before adding a sentence to any card.
+ * **Only what the launch flag leaves reachable may be named here.** The third
+ * card said nothing about targets while the progress tool was gated; the word
+ * target itself is live now — set in `/book/new`, drawn as the dial on the
+ * Write area's book card — so the card shows it. The fifth names every live
+ * tool. Every sentence was re-checked against `HIDDEN_BOOK_TOOL_PATHS` in
+ * `src/lib/launch.ts` on 2026-09-24; check it again before adding one.
  */
 
 /* --------------------------------------------------------------------------
@@ -234,31 +234,47 @@ function OrganiseVisual() {
 }
 
 /**
- * The counts.
+ * The counts, and the target.
  *
- * **No goal, no percentage, no target.** The tool that would carry those is
- * behind the launch flag, and a bar filling toward a number the product cannot
- * set would be the invented figure this page refuses everywhere else. What is
- * drawn is what the shelf and the editor actually show.
+ * **The target is the writer's own number**, set when the book is started and
+ * drawn as the dial on the Write area's book card — so a bar towards it is a
+ * fact about their book, not a figure this page made up. It was left out while
+ * the progress tool was gated; the target itself is live. There is still no
+ * score and no percentage worn as a grade: the bar, the words written and the
+ * words to go are the three things the real card shows.
+ *
+ * **Every figure is derived from the two constants**, so the bar, "to go" and
+ * the headline cannot disagree with one another.
  */
+const WRITTEN = 61204;
+const TARGET = 90000;
+
 function CountsVisual() {
+  const share = Math.min(WRITTEN / TARGET, 1);
   return (
     <>
-      <Chip className="absolute top-10 left-6 w-[80%] p-4">
+      <Chip className="absolute top-5 left-6 w-[80%] p-4">
         <p className="text-[0.625rem] font-semibold tracking-wide text-lp-faint uppercase">
           This book
         </p>
         <p className="mt-1.5 text-[1.5rem] leading-none font-semibold text-lp-ink">
-          61,204
+          {WRITTEN.toLocaleString("en-GB")}
         </p>
         <p className="mt-1.5 text-[0.6875rem] text-lp-faint">
           words across 18 chapters
         </p>
+        <div aria-hidden="true" className="mt-3 h-1.5 overflow-hidden rounded-full bg-lp-raised">
+          <div className="h-full rounded-full bg-lp-ink" style={{ width: `${share * 100}%` }} />
+        </div>
+        <p className="mt-1.5 text-[0.6875rem] text-lp-faint">
+          {(TARGET - WRITTEN).toLocaleString("en-GB")} to go of{" "}
+          {TARGET.toLocaleString("en-GB")}
+        </p>
       </Chip>
-      <div className="absolute right-4 bottom-7 left-10 flex items-center gap-2 rounded-lg bg-lp-stage px-3.5 py-2.5 shadow-[0_12px_30px_-12px_rgba(15,15,16,0.5)]">
+      <div className="absolute right-4 bottom-4 left-10 flex items-center gap-2 rounded-lg bg-lp-stage px-3.5 py-2.5 shadow-[0_12px_30px_-12px_rgba(15,15,16,0.5)]">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-lp-stage-accent" />
         <span className="truncate text-[0.6875rem] font-medium text-lp-stage-ink">
-          Saved to this browser
+          Saved as you type
         </span>
       </div>
     </>
@@ -402,7 +418,7 @@ export function FeatureBento() {
             tone="bright"
             span="sm:col-span-1 lg:col-span-2"
             title="Watch the book add up"
-            body="Words and chapters are counted from the manuscript every time the shelf is read, so a card cannot drift from its book."
+            body="Words and chapters counted from the manuscript every time, and a target you set, with how far there is to go. Nothing is guessed."
           >
             <CountsVisual />
           </Card>
@@ -420,7 +436,7 @@ export function FeatureBento() {
             tone="neutral"
             span="order-5 sm:order-4 sm:col-span-1 lg:order-5 lg:col-span-2"
             title="Everything for your book, together"
-            body="Shelf, import, editor, saved versions, the consistency check and export. One workspace, no second account, and no AI."
+            body="Shelf, import, editor, saved versions, the consistency and title checks, a place to park ideas, the writing record and export. One workspace, no second account, and no AI."
           >
             <TogetherVisual />
           </Card>

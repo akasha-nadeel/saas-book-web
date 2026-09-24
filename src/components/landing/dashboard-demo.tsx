@@ -1,31 +1,29 @@
-"use client";
-
-import { useState } from "react";
+import type { ReactNode } from "react";
 import { AppWindow } from "@/components/landing/app-window";
+import { LAUNCH_LIMITS } from "@/lib/launch";
 
 /**
- * The dashboard, drawn, with a sidebar that works.
+ * The dashboard, drawn — Overview, as a writer lands on it.
  *
  * **This is the hero's whole argument.** A visitor who has not signed up
- * cannot open the application, so the page either tells them what it is like
- * or shows them. Every earlier version of this hero showed one still of one
- * screen — true, but inert, and it opened on a chapter rather than on the
- * screen a writer actually lands on. This opens on the shelf and lets them
- * press: the five sections in the rail are the five the app has, and clicking
- * one changes the pane the way it does in the product.
+ * cannot open the application, so the page shows them the screen a writer
+ * actually lands on. The rail is the app's own `RAIL` (`shelf/bookshelf.tsx`)
+ * row for row, with Overview lit.
  *
- * **What is real and what is drawn, because the line matters.** The
- * *navigation* is real — five sections, the counts consistent between the rail
- * and the panes, the addresses genuine routes. The *contents* are drawn: this
- * is markup at a fixed design mapped onto its container, the standing rule for
- * every figure on this page, which is what keeps it sharp at any width and
- * stops it going stale against a bitmap nobody re-shoots. Nothing here reads a
- * visitor's own library and nothing may be added that looks as though it does.
+ * **It is a still, on purpose** (2026-09-24, the owner's call). An earlier
+ * version made the rail clickable and let the pane scroll; the owner wanted
+ * Overview always on screen, no scrollbar and nothing to press in the rail.
+ * So the rail rows are list items rather than buttons, and the pane is cut by
+ * the frame rather than scrolled.
  *
- * **The demo library is not anybody's real one.** It reuses the three books
- * the rest of the page already draws, and the account chip is a placeholder.
- * A marketing page is a bad place for a real person's shelf, and the covers in
- * a real one are somebody else's artwork.
+ * **It is drawn to match the real dashboard, pictures included.** The banner
+ * and the resume card paint the same files under `public/` the app does, at
+ * the same crop, with the same words — so when Overview changes, this file is
+ * the second place to change it.
+ *
+ * **The demo library is not anybody's real one.** Three invented books, and
+ * the account chip and the greeting are placeholders. A marketing page is a
+ * bad place for a real person's shelf.
  *
  * **Everything is sized in `cqw` against a 1000px design**, the convention the
  * other drawn screens use — see the note on `W` in `mvp-screens.tsx`. The
@@ -35,532 +33,453 @@ import { AppWindow } from "@/components/landing/app-window";
 
 const W = 1000;
 
-/** The demo shelf, drawn once and read by every pane so the counts agree. */
+/** The demo shelf, drawn once so the header, the counters and the bars agree. */
 const BOOKS = [
-  { title: "Breathe Again", author: "A. Nadeel", chapters: 12, words: 41208, spine: "#39405b", opened: "2 hours ago" },
-  { title: "The Long Winter", author: "A. Nadeel", chapters: 8, words: 22740, spine: "#5b4a3f", opened: "yesterday" },
-  { title: "Notes on a Quiet Year", author: "A. Nadeel", chapters: 3, words: 6180, spine: "#3f5b4f", opened: "last week" },
+  { title: "Breathe Again", chapters: 12, words: 41208, jacket: 1, opened: "2 hours ago" },
+  { title: "The Long Winter", chapters: 8, words: 22740, jacket: 4, opened: "yesterday" },
+  { title: "Notes on a Quiet Year", chapters: 3, words: 6180, jacket: 6, opened: "last week" },
 ] as const;
 
+type DemoBook = (typeof BOOKS)[number];
+
+/** The rail, in `RAIL`'s order. `null` is a rule between groups. */
 const SECTIONS = [
-  { id: "overview", label: "Overview", count: null, url: "openchapter.app/" },
-  { id: "write", label: "Write", count: null, url: "openchapter.app/?area=write" },
-  { id: "favourites", label: "Favourites", count: 1, url: "openchapter.app/?area=write" },
-  { id: "archived", label: "Archived", count: 1, url: "openchapter.app/?area=write" },
-  { id: "trash", label: "Trash", count: 2, url: "openchapter.app/?area=write" },
+  { id: "overview", label: "Overview", count: null },
+  { id: "write", label: "Write", count: null },
+  { id: "favourites", label: "Favourites", count: 1 },
+  { id: "archived", label: "Archived", count: 1 },
+  null,
+  { id: "title-check", label: "Title check", count: null },
+  { id: "ideas", label: "Ideas", count: null },
+  { id: "paperback", label: "Paperback", count: null, pro: true },
+  null,
+  { id: "trash", label: "Trash", count: 2 },
 ] as const;
-
-type SectionId = (typeof SECTIONS)[number]["id"];
 
 const fmt = (n: number) => n.toLocaleString("en-GB");
 
+const FORMAT_NAMES: Record<string, string> = { epub: "EPUB", pdf: "PDF", docx: "Word" };
+
+/** `overviewBannerLine()` in `bookshelf.tsx`, read off the same list. */
+function formatsLine(): string {
+  const names = LAUNCH_LIMITS.freeExports.map((f) => FORMAT_NAMES[f] ?? f);
+  const list =
+    names.length <= 1
+      ? (names[0] ?? "")
+      : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return `${list} — free on every plan, and the file is yours.`;
+}
+
 export function DashboardDemo() {
-  const [active, setActive] = useState<SectionId>("overview");
-  const current = SECTIONS.find((s) => s.id === active)!;
+  const chapters = BOOKS.reduce((n, b) => n + b.chapters, 0);
 
   return (
     <AppWindow
-      chrome={{ url: current.url }}
+      chrome={{ url: "openchapter.app/" }}
       screenStyle={{ aspectRatio: `${W} / 620` }}
-      screenClassName="@container flex overflow-hidden bg-lp-tint leading-[1.35]"
+      screenClassName="@container flex overflow-hidden bg-lp-ground leading-[1.35]"
     >
       {/* ---- The rail ------------------------------------------------- */}
-      <aside className="flex w-[21cqw] shrink-0 flex-col border-r border-lp-line bg-lp-ground px-[1.6cqw] py-[1.8cqw]">
-        <p className="px-[0.8cqw] text-[1.9cqw] font-bold tracking-tight text-lp-ink">
-          Open<span className="text-lp-wordmark">Chapter</span>
-        </p>
+      <aside className="flex w-[19cqw] shrink-0 flex-col border-r border-lp-line bg-lp-tint px-[1cqw] py-[1.6cqw]">
+        <div className="flex items-center gap-[0.6cqw] px-[0.6cqw]">
+          <p className="text-[1.75cqw] font-bold tracking-tight text-lp-ink">
+            Open<span className="text-lp-wordmark">Chapter</span>
+          </p>
+          <span className="text-lp-body">
+            <Glyph name="search" />
+          </span>
+          <span className="ml-auto text-lp-faint">
+            <Glyph name="collapse" />
+          </span>
+        </div>
 
         {/* **The label, and it is not decoration.** A demo that looks exactly
             like the product is only honest while it says which it is — so the
-            badge sits where the account's own state would sit, inside the
-            drawing, and travels with every screenshot anyone takes of this
-            page. It is the same device the reference this page follows uses,
-            for the same reason: the shelf below is three invented books, and a
-            visitor must never be left to wonder whether it is theirs. */}
-        <span className="mt-[0.9cqw] ml-[0.8cqw] w-fit rounded-full bg-lp-raised px-[0.8cqw] py-[0.3cqw] text-[1cqw] font-medium text-lp-body">
+            badge sits inside the drawing and travels with every screenshot
+            anyone takes of this page. */}
+        <span className="mt-[0.7cqw] ml-[0.6cqw] w-fit rounded-full bg-lp-raised px-[0.8cqw] py-[0.25cqw] text-[0.95cqw] font-medium text-lp-body">
           Demo data
         </span>
 
-        <ul className="mt-[2.2cqw] space-y-[0.35cqw]">
-          {SECTIONS.map((section) => {
-            const on = section.id === active;
+        <ul className="mt-[1.4cqw] space-y-[0.2cqw]">
+          {SECTIONS.map((section, i) => {
+            if (!section)
+              return <li key={`rule-${i}`} aria-hidden="true" className="mx-[0.8cqw] my-[0.8cqw] border-t border-lp-line" />;
+            const on = section.id === "overview";
             return (
-              <li key={section.id}>
-                <button
-                  type="button"
-                  aria-current={on ? "page" : undefined}
-                  onClick={() => setActive(section.id)}
-                  className={`flex w-full items-center gap-[0.9cqw] rounded-[0.7cqw] px-[0.8cqw] py-[0.72cqw] text-left text-[1.32cqw] transition-colors ${
-                    on
-                      ? "bg-lp-accent/10 font-semibold text-lp-accent-text"
-                      : "text-lp-body hover:bg-lp-raised"
-                  }`}
-                >
-                  <Glyph name={section.id} />
-                  <span className="flex-1">{section.label}</span>
-                  {section.count !== null && (
-                    <span className="text-[1.15cqw] text-lp-faint">
-                      {section.count}
-                    </span>
-                  )}
-                </button>
+              <li
+                key={section.id}
+                aria-current={on ? "page" : undefined}
+                className={`flex items-center gap-[0.9cqw] rounded-[0.7cqw] px-[0.8cqw] py-[0.6cqw] text-[1.25cqw] text-lp-ink ${
+                  on ? "bg-lp-accent/12 font-semibold" : ""
+                }`}
+              >
+                <Glyph name={section.id} />
+                <span className="flex-1">{section.label}</span>
+                {"pro" in section && section.pro && <ProBadge />}
+                {section.count !== null && (
+                  <span className="text-[1.1cqw] text-lp-body">{section.count}</span>
+                )}
               </li>
             );
           })}
         </ul>
 
-        <div className="my-[1.5cqw] border-t border-lp-line" />
+        <div className="mx-[0.8cqw] my-[0.8cqw] border-t border-lp-line" />
 
-        <ul className="space-y-[0.35cqw]">
-          {["Support", "Send feedback", "Pricing"].map((name) => (
+        <ul className="space-y-[0.2cqw]">
+          {(["How it works", "Support"] as const).map((name) => (
             <li
               key={name}
-              className="flex items-center gap-[0.9cqw] rounded-[0.7cqw] px-[0.8cqw] py-[0.72cqw] text-[1.32cqw] text-lp-body"
+              className="flex items-center gap-[0.9cqw] rounded-[0.7cqw] px-[0.8cqw] py-[0.6cqw] text-[1.25cqw] text-lp-ink"
             >
-              <Glyph name="dot" />
+              <Glyph name={name === "Support" ? "support" : "help"} />
               {name}
             </li>
           ))}
         </ul>
 
         {/* The account chip, pinned to the foot the way the app pins it. */}
-        <div className="mt-auto flex items-center gap-[0.8cqw] border-t border-lp-line pt-[1.2cqw]">
-          <span className="flex h-[2.4cqw] w-[2.4cqw] items-center justify-center rounded-full bg-lp-raised text-[1.15cqw] font-semibold text-lp-body">
+        <div className="mt-auto flex items-center gap-[0.8cqw] border-t border-lp-line px-[0.6cqw] pt-[1.1cqw]">
+          <span className="flex h-[2.6cqw] w-[2.6cqw] shrink-0 items-center justify-center rounded-full bg-[#1f5e3a] text-[1.2cqw] font-semibold text-white">
             A
           </span>
-          <span className="min-w-0">
+          <span className="min-w-0 flex-1">
             <span className="block truncate text-[1.2cqw] font-medium text-lp-ink">
               Your account
             </span>
-            <span className="block text-[1.05cqw] text-lp-faint">Pro plan</span>
+            <span className="block text-[1cqw] text-lp-body">Free plan</span>
           </span>
+          <span className="text-[1.3cqw] leading-none text-lp-body">⋯</span>
         </div>
       </aside>
 
-      {/* ---- The pane -------------------------------------------------- */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* The top bar: search on the left, the one filled action on the right. */}
-        <div className="flex shrink-0 items-center gap-[1.2cqw] border-b border-lp-line bg-lp-ground px-[1.8cqw] py-[1.1cqw]">
-          <span className="flex h-[2.9cqw] flex-1 items-center gap-[0.7cqw] rounded-[0.7cqw] border border-lp-line px-[0.9cqw] text-[1.2cqw] text-lp-faint">
-            <Glyph name="search" />
-            Search your books…
-            <span className="ml-auto rounded-[0.35cqw] border border-lp-line px-[0.45cqw] text-[1cqw]">
-              /
-            </span>
-          </span>
-          <span className="flex h-[2.9cqw] items-center rounded-[0.7cqw] bg-lp-accent px-[1.2cqw] text-[1.2cqw] font-semibold text-lp-accent-ink">
+      {/* ---- The pane --------------------------------------------------
+          Cut by the frame, never scrolled: Overview is the one screen this
+          shows, and the hero carries no scrollbar. */}
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden px-[2.4cqw] pt-[2.4cqw]">
+        <div className="flex items-start gap-[1.2cqw] border-b border-lp-line pb-[1.6cqw]">
+          <div className="min-w-0 flex-1">
+            <p className="text-[2.3cqw] font-extrabold tracking-tight text-lp-ink">Hello there !</p>
+            <p className="mt-[0.3cqw] text-[1.3cqw] text-lp-body">
+              Welcome back — {BOOKS.length} books, {chapters} chapters on the shelf.
+            </p>
+          </div>
+          <span className="flex items-center gap-[0.6cqw] rounded-[0.7cqw] bg-lp-accent px-[1.3cqw] py-[0.75cqw] text-[1.3cqw] font-semibold text-lp-accent-ink">
             + New book
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-[1.2cqw] w-[1.2cqw]">
+              <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </span>
         </div>
-
-        {/* **It scrolls, and that is not a detail.** The window is cut by the
-            hero's bottom edge, so without this a visitor sees the top of one
-            pane and has no way to reach the rest — the demo would be a picture
-            again. The app's own panes scroll here too, which is why the bar
-            belongs inside the frame rather than on the page. */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {active === "overview" && <Overview />}
-          {active === "write" && <Write />}
-          {active === "favourites" && <Favourites />}
-          {active === "archived" && <Archived />}
-          {active === "trash" && <Trash />}
+        <div className="mt-[2cqw]">
+          <Overview />
         </div>
       </div>
     </AppWindow>
   );
 }
 
-/* ---- The five panes ------------------------------------------------- */
+/* ---- Overview --------------------------------------------------------- */
 
 function Overview() {
   const words = BOOKS.reduce((n, b) => n + b.words, 0);
   const chapters = BOOKS.reduce((n, b) => n + b.chapters, 0);
+  const top = Math.max(...BOOKS.map((b) => b.words));
   return (
-    <div>
-      <Banner
-        crumb="Overview"
-        title="Good afternoon"
-        lead={`Last open: ${BOOKS[0]!.title}, ${BOOKS[0]!.opened}.`}
-        bgImage="/banner-bg.png"
-      />
-      <div className="px-[1.8cqw] py-[1.6cqw]">
-        <h3 className="text-[1.9cqw] font-semibold text-lp-ink">Overview</h3>
-        <div className="mt-[1.2cqw] grid grid-cols-3 gap-[1cqw]">
+    <div className="grid grid-cols-[minmax(0,1fr)_24cqw] gap-[1.6cqw]">
+      <div className="flex min-w-0 flex-col gap-[1.6cqw]">
+        <Banner
+          image="/overview-banner.webp"
+          eyebrow="Write it, then leave with it"
+          title="Your book, in the shops’ own formats"
+          subtitle={formatsLine()}
+          ink="dark"
+          action="Start a book"
+        />
+        <div className="grid grid-cols-3 gap-[1.6cqw]">
           {([
-            ["books", String(BOOKS.length)],
-            ["words", fmt(words)],
-            ["chapters", String(chapters)],
+            ["Books", String(BOOKS.length)],
+            ["Words", fmt(words)],
+            ["Chapters", String(chapters)],
           ] as const).map(([label, value]) => (
             <div
               key={label}
-              className="flex items-center gap-[0.9cqw] rounded-[0.8cqw] border border-lp-line bg-lp-ground px-[1.1cqw] py-[1cqw]"
+              className="flex min-h-[11cqw] flex-col justify-center rounded-[0.8cqw] border border-lp-line px-[2cqw]"
             >
-              <span className="flex h-[2.6cqw] w-[2.6cqw] shrink-0 items-center justify-center rounded-full bg-lp-accent/10 text-lp-accent-text">
-                <Glyph name={label === "books" ? "overview" : label === "words" ? "write" : "archived"} />
-              </span>
-              <span>
-                <span className="block text-[1.1cqw] text-lp-faint">{label}</span>
-                <span className="block text-[1.9cqw] font-semibold text-lp-ink">
-                  {value}
-                </span>
+              <span className="text-[1.3cqw] font-semibold text-lp-ink">{label}</span>
+              <span className="mt-[0.3cqw] text-[3cqw] leading-tight font-extrabold text-lp-ink tabular-nums">
+                {value}
               </span>
             </div>
           ))}
         </div>
-        <div className="mt-[1cqw] grid grid-cols-2 gap-[1cqw]">
-          <Card title="Writing" note="Last 14 days">
-            <span className="flex items-center gap-[0.9cqw]">
-              <span className="flex h-[2.6cqw] w-[2.6cqw] shrink-0 items-center justify-center rounded-full bg-lp-accent/10 text-lp-accent-text">
-                <Glyph name="calendar" />
-              </span>
-              <span>
-                <span className="block text-[1.1cqw] text-lp-faint">This week</span>
-                <span className="block text-[1.9cqw] font-semibold text-lp-ink">
-                  {fmt(4820)}
-                </span>
-              </span>
-            </span>
-            <span className="mt-[0.5cqw] block text-[1.05cqw] text-lp-faint">
-              words across 6 days · 6 days running
-            </span>
-            <span className="mt-[0.9cqw] block border-t border-lp-line pt-[0.9cqw] text-[1.15cqw] text-lp-body">
-              Net words a day
-            </span>
-            <Spark />
-          </Card>
-          <Card title="Target" note={BOOKS[0]!.title}>
-            <Gauge written={BOOKS[0]!.words} target={60000} />
-            <span className="mt-[0.9cqw] flex gap-[1.6cqw] border-t border-lp-line pt-[0.9cqw]">
+        <div className="rounded-[0.8cqw] border border-lp-line px-[2.2cqw] py-[2cqw]">
+          <p className="text-[1.6cqw] font-semibold text-lp-ink">Your writing</p>
+          <p className="mt-[0.3cqw] text-[1.25cqw] text-lp-body">
+            Whether the writing is moving. Counted across every book, over the last 30 days.
+          </p>
+          <div className="mt-[1.6cqw] overflow-hidden rounded-[0.8cqw] border border-lp-line">
+            <div className="flex bg-lp-raised/40">
               {([
-                ["written", fmt(BOOKS[0]!.words), "write"],
-                ["to go", fmt(60000 - BOOKS[0]!.words), "archived"],
-              ] as const).map(([label, value, mark]) => (
-                <span key={label} className="flex items-center gap-[0.6cqw]">
-                  <span className="text-lp-accent-text">
-                    <Glyph name={mark} />
+                ["Written", "last 30 days", `+${fmt(4820)}`],
+                ["Manuscript", "every book", fmt(words)],
+              ] as const).map(([name, note, value], i) => (
+                <span
+                  key={name}
+                  className={`flex-1 px-[1.6cqw] py-[1.1cqw] ${i === 0 ? "border-r border-lp-line bg-lp-ground" : ""}`}
+                >
+                  <span className="block text-[1cqw] font-medium text-lp-body">
+                    {name} · {note}
                   </span>
-                  <span>
-                    <span className="block text-[1.05cqw] text-lp-faint">{label}</span>
-                    <span className="block text-[1.35cqw] font-semibold text-lp-ink">
-                      {value}
-                    </span>
+                  <span className="mt-[0.2cqw] block text-[1.9cqw] font-bold text-lp-ink tabular-nums">
+                    {value}
                   </span>
                 </span>
               ))}
-            </span>
-            <span className="mt-[0.9cqw] block rounded-[0.6cqw] bg-lp-raised py-[0.6cqw] text-center text-[1.2cqw] font-medium text-lp-ink">
-              Open book
-            </span>
-          </Card>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Write() {
-  return (
-    <div>
-      <Banner
-        crumb="Books"
-        title={`${BOOKS.length} books on the shelf`}
-        lead="Open one to carry on, start the next, or bring in a manuscript you already have."
-      />
-      <div className="px-[1.8cqw] py-[1.6cqw]">
-        <div className="flex items-baseline justify-between">
-          <h3 className="text-[1.9cqw] font-semibold text-lp-ink">Books</h3>
-          <Sort />
-        </div>
-        <div className="mt-[1.2cqw] space-y-[0.8cqw]">
-          {BOOKS.slice(0, 2).map((book) => (
-            <div
-              key={book.title}
-              className="flex items-center gap-[1.2cqw] rounded-[0.8cqw] border border-lp-line bg-lp-ground p-[1cqw]"
-            >
-              <Cover book={book} w={4.4} />
-              <span className="min-w-0 flex-1">
-                <span className="block font-code text-[0.95cqw] tracking-[0.12em] text-lp-faint uppercase">
-                  Drafting
-                </span>
-                <span className="block text-[1.6cqw] font-semibold text-lp-ink">
-                  {book.title}
-                </span>
-                <span className="block text-[1.15cqw] text-lp-faint">
-                  {book.chapters} chapters · {fmt(book.words)} words · Opened{" "}
-                  {book.opened}
-                </span>
-                <span className="mt-[0.7cqw] flex gap-[0.6cqw]">
-                  <Pill>Open book</Pill>
-                  <Pill>Export</Pill>
-                </span>
-              </span>
             </div>
-          ))}
+            <div className="px-[1.6cqw] py-[1.4cqw]">
+              <Spark />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex min-w-0 flex-col gap-[1.6cqw]">
+        <Resume book={BOOKS[0]!} />
+        <div className="rounded-[0.8cqw] border border-lp-line px-[1.6cqw] py-[1.5cqw]">
+          <div className="flex items-center justify-between">
+            <span className="text-[1.3cqw] font-semibold text-lp-ink">Words by book</span>
+            <span className="text-[1cqw] font-medium text-lp-body">Now</span>
+          </div>
+          <div className="mt-[1.2cqw] space-y-[0.7cqw]">
+            {BOOKS.map((book) => (
+              <Bar key={book.title} share={book.words / top} value={fmt(book.words)}>
+                <Cover book={book} w={1.7} />
+                <span className="truncate">{book.title}</span>
+              </Bar>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-[0.8cqw] border border-lp-line px-[1.6cqw] py-[1.5cqw]">
+          <div className="flex items-center justify-between">
+            <span className="text-[1.3cqw] font-semibold text-lp-ink">Days of the week</span>
+            <span className="text-[1cqw] font-medium text-lp-body">30 days</span>
+          </div>
+          <div className="mt-[1.2cqw] space-y-[0.7cqw]">
+            {([
+              ["Tuesday", 2140],
+              ["Saturday", 1310],
+              ["Thursday", 860],
+              ["Monday", 510],
+            ] as const).map(([day, n]) => (
+              <Bar key={day} share={n / 2140} value={`+${fmt(n)}`}>
+                <span>{day}</span>
+              </Bar>
+            ))}
+          </div>
         </div>
       </div>
     </div>
   );
-}
-
-function Favourites() {
-  return (
-    <div>
-      <Banner
-        crumb="Favourites"
-        title="1 book starred"
-        lead="A star is a filter rather than a folder: the book stays on the shelf with the rest."
-      />
-      <ShelfPane heading="Favourites" books={BOOKS.slice(0, 1)} star />
-    </div>
-  );
-}
-
-function Archived() {
-  return <ShelfPane heading="Archived" books={BOOKS.slice(1, 2)} action="Restore" pad />;
-}
-
-function Trash() {
-  return <ShelfPane heading="Trash" books={BOOKS.slice(0, 3)} action="Restore" pad />;
 }
 
 /* ---- The furniture --------------------------------------------------- */
 
-function Banner({ crumb, title, lead, bgImage }: { crumb: string; title: string; lead: string; bgImage?: string }) {
+type BannerProps = {
+  image: string;
+  title: string;
+  subtitle: string;
+  eyebrow?: string;
+  ink: "light" | "dark";
+  crop?: string;
+  scrim?: boolean;
+  action?: string;
+};
+
+/** `INK` in `section-banner.tsx`: decided by the picture, not the theme. */
+const INK = {
+  light: { title: "#f6f6f8", body: "#e4e4ea", eyebrow: "#c9c9d2" },
+  dark: { title: "#141310", body: "#2c2a24", eyebrow: "#3d3a33" },
+} as const;
+
+/** `SectionBanner`, drawn: the picture is the ground and the type sits on it. */
+function Banner({ image, title, subtitle, eyebrow, ink, crop = "center", scrim, action }: BannerProps) {
+  const colour = INK[ink];
   return (
     <div
-      className="relative overflow-hidden px-[1.8cqw] py-[1.8cqw]"
-      style={
-        bgImage
-          ? {
-              backgroundImage: `url('${bgImage}')`,
-              backgroundSize: "100% auto",
-              backgroundPosition: "center 65%",
-              backgroundRepeat: "no-repeat",
-            }
-          : { backgroundColor: "var(--color-lp-card-1)" }
-      }
+      className={`relative isolate flex min-h-[25cqw] flex-col justify-center overflow-hidden rounded-[0.8cqw] border px-[3cqw] py-[2.6cqw] shadow-sm ${
+        ink === "light" ? "border-white/15" : "border-black/10"
+      }`}
     >
-      {bgImage && <span aria-hidden="true" className="absolute inset-0 bg-black/20" />}
-      <p className={`relative text-[1.1cqw] ${bgImage ? "text-white/90" : "text-lp-body"}`}>
-        Dashboard <span className={bgImage ? "text-white/50" : "text-lp-faint"}>›</span> {crumb}
-      </p>
-      <p className={`relative mt-[0.5cqw] text-[2.5cqw] font-bold tracking-tight ${bgImage ? "text-white" : "text-lp-ink"}`}>
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 -z-20 bg-cover"
+        style={{ backgroundImage: `url('${image}')`, backgroundPosition: crop }}
+      />
+      {scrim && (
+        <div
+          aria-hidden="true"
+          className={`absolute inset-0 -z-10 ${
+            ink === "light"
+              ? "bg-[linear-gradient(105deg,rgba(0,0,0,0.72)_0%,rgba(0,0,0,0.5)_30%,rgba(0,0,0,0)_55%)]"
+              : "bg-[linear-gradient(105deg,rgba(255,255,255,0.72)_0%,rgba(255,255,255,0.5)_30%,rgba(255,255,255,0)_55%)]"
+          }`}
+        />
+      )}
+      {eyebrow && (
+        <p
+          className="text-[1.05cqw] font-semibold tracking-[0.08em] uppercase"
+          style={{ color: colour.eyebrow }}
+        >
+          {eyebrow}
+        </p>
+      )}
+      <p
+        className={`max-w-[34cqw] text-[2.5cqw] leading-tight font-bold text-balance ${eyebrow ? "mt-[0.6cqw]" : ""}`}
+        style={{ color: colour.title }}
+      >
         {title}
       </p>
-      <p className={`relative mt-[0.4cqw] max-w-[38cqw] text-[1.25cqw] ${bgImage ? "text-white/90" : "text-lp-body"}`}>{lead}</p>
-      <span className="relative mt-[1cqw] flex gap-[0.7cqw]">
-        <span className="rounded-[0.6cqw] bg-lp-accent px-[1.1cqw] py-[0.6cqw] text-[1.2cqw] font-semibold text-lp-accent-ink">
-          Start a book
+      <p
+        className="mt-[0.7cqw] max-w-[29cqw] text-[1.3cqw] leading-relaxed"
+        style={{ color: colour.body }}
+      >
+        {subtitle}
+      </p>
+      {action && (
+        <span className="mt-[1.6cqw] inline-flex w-fit items-center gap-[0.6cqw] rounded-[0.7cqw] bg-[#febc8c] px-[1.4cqw] py-[0.8cqw] text-[1.3cqw] font-semibold text-[#2a1a0e] shadow-md">
+          {action}
+          <span aria-hidden="true">→</span>
         </span>
-        <span className="rounded-[0.6cqw] border border-lp-line bg-lp-ground px-[1.1cqw] py-[0.6cqw] text-[1.2cqw] font-semibold text-lp-ink">
-          Import a manuscript
-        </span>
+      )}
+    </div>
+  );
+}
+
+/** "Where you left off", over the resume card's own photograph. */
+function Resume({ book }: { book: DemoBook }) {
+  return (
+    <div className="relative isolate flex min-h-[25cqw] flex-col justify-center overflow-hidden rounded-[0.8cqw] border border-white/15 px-[1.8cqw] py-[1.8cqw] text-white shadow-sm">
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 -z-20 bg-cover"
+        style={{ backgroundImage: "url('/resume-card-background.webp')", backgroundPosition: "50% 100%" }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(0,0,0,0.62)_0%,rgba(0,0,0,0.42)_52%,rgba(0,0,0,0.06)_100%)]"
+      />
+      <div className="flex items-baseline justify-between gap-[0.6cqw]">
+        <span className="shrink-0 text-[1.4cqw] font-bold">Where you left off</span>
+        <span className="min-w-0 truncate text-[0.95cqw] text-white/70">{book.title}</span>
+      </div>
+      <p className="mt-[1cqw] text-[1.2cqw] leading-relaxed text-white/85">
+        …and when the tide went out she walked the length of the bay without
+        once looking back at the house, because she already knew it would still
+        be standing.
+      </p>
+      <span className="mt-[1.4cqw] w-fit rounded-[0.7cqw] bg-neutral-950 px-[1.6cqw] py-[0.8cqw] text-[1.25cqw] font-semibold text-white shadow-sm">
+        Open book
       </span>
     </div>
   );
 }
 
-function ShelfPane({
-  heading,
-  books,
-  action,
-  pad,
-  star,
-}: {
-  heading: string;
-  books: readonly (typeof BOOKS)[number][];
-  action?: string;
-  pad?: boolean;
-  star?: boolean;
-}) {
-  return (
-    <div className={`px-[1.8cqw] ${pad ? "pt-[1.8cqw]" : "pt-[1.6cqw]"} pb-[1.6cqw]`}>
-      <h3 className="text-[1.9cqw] font-semibold text-lp-ink">{heading}</h3>
-      <div className="mt-[0.9cqw] flex justify-end">
-        <Sort />
-      </div>
-      <div className="mt-[1cqw] grid grid-cols-4 gap-[1cqw]">
-        {books.map((book) => (
-          <div
-            key={book.title}
-            className="rounded-[0.8cqw] border border-lp-line bg-lp-ground p-[0.9cqw] text-center"
-          >
-            <span className="relative block">
-              <Cover book={book} w={9} />
-              {star && (
-                <span className="absolute top-[0.5cqw] right-[0.9cqw] flex h-[1.9cqw] w-[1.9cqw] items-center justify-center rounded-[0.45cqw] bg-lp-ground text-[1.1cqw] text-danger">
-                  ♥
-                </span>
-              )}
-            </span>
-            <span className="mt-[0.7cqw] block text-[1.25cqw] font-semibold text-lp-ink">
-              {book.title}
-            </span>
-            <span className="block font-code text-[0.95cqw] tracking-[0.1em] text-lp-faint uppercase">
-              {book.chapters} chapters · {fmt(book.words)} words
-            </span>
-            <span className="block text-[1.05cqw] text-lp-faint">
-              Opened {book.opened}
-            </span>
-            <span className="mt-[0.7cqw] flex items-center justify-center gap-[0.5cqw]">
-              <Pill>{action ?? "Write"}</Pill>
-              <span className="rounded-[0.5cqw] border border-lp-line px-[0.7cqw] py-[0.45cqw] text-[1.1cqw] leading-none text-lp-body">
-                ⋯
-              </span>
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Cover({ book, w }: { book: (typeof BOOKS)[number]; w: number }) {
+/** A book's default jacket, as `BookThumb` draws one in "Words by book". */
+function Cover({ book, w }: { book: DemoBook; w: number }) {
   return (
     <span
       aria-hidden="true"
-      style={{ width: `${w}cqw`, aspectRatio: "2 / 3", background: book.spine }}
-      className="inline-flex shrink-0 flex-col justify-center gap-[0.3cqw] rounded-[0.4cqw] px-[0.7cqw]"
-    >
-      <span className="block h-[0.28cqw] rounded-full bg-white/70" />
-      <span className="block h-[0.28cqw] w-3/4 rounded-full bg-white/45" />
-    </span>
+      style={{
+        width: `${w}cqw`,
+        aspectRatio: "2 / 3",
+        backgroundImage: `url('/default-covers/jacket-${book.jacket}.jpg')`,
+      }}
+      className="inline-block shrink-0 rounded-l-[0.1cqw] rounded-r-[0.3cqw] bg-cover bg-center shadow-sm"
+    />
   );
 }
 
-function Card({
-  title,
-  note,
-  children,
-}: {
-  title: string;
-  note: string;
-  children: React.ReactNode;
-}) {
+/** One row of a Tremor `BarList`: a tinted bar under the name, value right. */
+function Bar({ share, value, children }: { share: number; value: string; children: ReactNode }) {
   return (
-    <div className="rounded-[0.8cqw] border border-lp-line bg-lp-ground px-[1.1cqw] py-[1cqw]">
-      <div className="flex items-baseline justify-between">
-        <span className="text-[1.35cqw] font-semibold text-lp-ink">{title}</span>
-        <span className="text-[1.05cqw] text-lp-faint">{note}</span>
+    <div className="flex items-center gap-[1cqw]">
+      <div className="relative min-w-0 flex-1">
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-0 left-0 rounded-[0.35cqw] bg-[#bfe9f4]"
+          style={{ width: `${Math.max(share, 0.08) * 100}%` }}
+        />
+        <span className="relative flex h-[2.3cqw] items-center gap-[0.6cqw] px-[0.6cqw] text-[1.05cqw] text-lp-ink">
+          {children}
+        </span>
       </div>
-      <div className="mt-[0.8cqw]">{children}</div>
+      <span className="text-[1.05cqw] text-lp-ink tabular-nums">{value}</span>
     </div>
   );
 }
 
-function Pill({ children }: { children: React.ReactNode }) {
+function ProBadge() {
   return (
-    <span className="inline-block rounded-[0.5cqw] border border-lp-line px-[0.9cqw] py-[0.45cqw] text-[1.1cqw] font-medium text-lp-ink">
-      {children}
-    </span>
-  );
-}
-
-function Sort() {
-  return (
-    <span className="flex items-center gap-[0.6cqw] text-[1.15cqw] text-lp-faint">
-      Sort
-      <span className="rounded-[0.5cqw] border border-lp-line px-[0.8cqw] py-[0.4cqw] text-lp-body">
-        Recently opened
-      </span>
+    <span className="rounded-[0.4cqw] bg-linear-to-r from-upgrade-from to-upgrade-to px-[0.6cqw] py-[0.15cqw] text-[0.85cqw] font-bold tracking-wide text-white uppercase">
+      Pro
     </span>
   );
 }
 
 /**
- * Net words a day — the shape the real card draws, not a number.
+ * Words written a day — the shape the real chart draws, not a number.
  *
- * A flat run and one spike, which is what a writer's fortnight actually looks
- * like and what the app's own chart shows on this demo shelf. It carries **no
- * axis figures**: a drawn chart with numbers on it is a measurement nobody
- * made, and the card above already states the only figure this pane is
- * entitled to.
+ * It carries **no axis figures**: a drawn chart with numbers on it is a
+ * measurement nobody made, and the tab above already states the only figure
+ * this pane is entitled to.
  */
 function Spark() {
+  const line =
+    "M0 50 H40 C48 50 52 38 58 38 C64 38 66 50 72 50 H110 C120 50 126 20 134 20 C142 20 146 44 152 44 C160 44 166 10 176 10 C186 10 192 46 200 50";
   return (
-    <svg
-      viewBox="0 0 200 54"
-      preserveAspectRatio="none"
-      aria-hidden="true"
-      className="mt-[0.7cqw] block h-[5cqw] w-full"
-    >
-      <path
-        d="M0 50 H120 C132 50 138 48 144 30 C150 10 156 4 162 4 C168 4 174 12 180 30 C186 46 192 50 200 50"
-        fill="none"
-        stroke="var(--color-lp-accent)"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M0 50 H120 C132 50 138 48 144 30 C150 10 156 4 162 4 C168 4 174 12 180 30 C186 46 192 50 200 50 V54 H0 Z"
-        fill="var(--color-lp-accent)"
-        opacity="0.12"
-      />
+    <svg viewBox="0 0 200 54" preserveAspectRatio="none" aria-hidden="true" className="block h-[9cqw] w-full">
+      <defs>
+        <linearGradient id="oc-demo-spark" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="#06b6d4" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`${line} V54 H0 Z`} fill="url(#oc-demo-spark)" />
+      <path d={line} fill="none" stroke="#06b6d4" strokeWidth="1.6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }
 
-/**
- * The target dial.
- *
- * A semicircle, the swept part drawn to the share actually written. The
- * percentage is **derived from the two figures beside it** rather than typed,
- * so the dial, the caption and the arc cannot disagree — the same rule the
- * rest of the page holds every figure to.
- */
-function Gauge({ written, target }: { written: number; target: number }) {
-  const share = Math.min(written / target, 1);
-  /* Half of a circle of r=42: pi * 42, to the pixel the browser will use. */
-  const arc = Math.PI * 42;
-  return (
-    <span className="relative block">
-      <svg viewBox="0 0 100 56" aria-hidden="true" className="block h-[6cqw] w-full">
-        <path
-          d="M8 50 A42 42 0 0 1 92 50"
-          fill="none"
-          stroke="var(--color-lp-raised)"
-          strokeWidth="9"
-          strokeLinecap="round"
-        />
-        <path
-          d="M8 50 A42 42 0 0 1 92 50"
-          fill="none"
-          stroke="var(--color-lp-ink)"
-          strokeWidth="9"
-          strokeLinecap="round"
-          strokeDasharray={`${arc * share} ${arc}`}
-        />
-      </svg>
-      <span className="absolute inset-x-0 bottom-0 text-center text-[2.1cqw] font-bold text-lp-ink">
-        {Math.round(share * 100)}%
-      </span>
-    </span>
-  );
-}
-
-/** The rail's marks. Drawn rather than imported: five shapes, one file. */
+/** The rail's marks, on `shelf-icons`' 24-grid with its 1.75 stroke. */
 function Glyph({ name }: { name: string }) {
-  const common = "h-[1.5cqw] w-[1.5cqw] shrink-0";
-  if (name === "search")
-    return (
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-[1.4cqw] w-[1.4cqw] shrink-0">
-        <circle cx="7" cy="7" r="4.5" />
-        <path d="M10.5 10.5 14 14" strokeLinecap="round" />
-      </svg>
-    );
-  if (name === "dot")
-    return <span aria-hidden="true" className={`${common} rounded-full bg-lp-raised`} />;
   const paths: Record<string, string> = {
-    calendar: "M3 4h10v9H3zM3 7h10M6 2v3M10 2v3",
-    overview: "M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z",
-    write: "M3 13l1-3 7-7 2 2-7 7-3 1z",
-    favourites: "M8 13.5S2.5 10 2.5 6.4A2.9 2.9 0 018 5a2.9 2.9 0 015.5 1.4c0 3.6-5.5 7.1-5.5 7.1z",
-    archived: "M2 4h12v3H2zM3 7h10v6H3z",
-    trash: "M3 4h10M6 4V2.5h4V4M4.5 4l.6 9h5.8l.6-9",
+    overview: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
+    write: "M4 20l1.5-5L16 4.5a2.1 2.1 0 013 3L8.5 18 4 20zM14 7l3 3",
+    favourites:
+      "M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0112 7.3 4.3 4.3 0 0119.5 10c0 5.4-7.5 10-7.5 10z",
+    archived: "M3.5 5h17v4h-17zM5 9h14v10H5zM10 13h4",
+    "title-check": "M10.5 17a6.5 6.5 0 100-13 6.5 6.5 0 000 13zM15.5 15.5L20 20",
+    search: "M10.5 17a6.5 6.5 0 100-13 6.5 6.5 0 000 13zM15.5 15.5L20 20",
+    ideas: "M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z",
+    paperback: "M14.5 4.5l5 5L9 20H4v-5L14.5 4.5zM12 7l5 5M7.5 12.5l2 2",
+    trash: "M4 6h16M9 6V4h6v2M6 6l1 14h10l1-14M10 10v6M14 10v6",
+    help: "M12 21a9 9 0 100-18 9 9 0 000 18zM9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1.1-1.5 2.2M12 17h.01",
+    support: "M4 19l1.3-3.6A8 8 0 1112 20a8 8 0 01-3.6-.9L4 19z",
+    collapse: "M4 5h16v14H4zM9 5v14M15 10l-2 2 2 2",
   };
   return (
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" className={common}>
-      <path d={paths[name] ?? paths.overview!} strokeLinejoin="round" />
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-[1.6cqw] w-[1.6cqw] shrink-0"
+    >
+      <path d={paths[name] ?? paths.overview!} />
     </svg>
   );
 }

@@ -110,14 +110,15 @@ export function Plans({
   cancelled?: boolean;
   intent?: { tier: PaidTier; period: Period } | null;
 }) {
-  /* **Annual, not monthly.** The toggle's own badge says what a year saves, and
-     opening on the cycle that badge is about means the first figure a reader
-     sees is the one being recommended. Switching to monthly is one press.
+  /* **Monthly first, by the owner's choice (2026-09-24)**, the same default
+     as the landing page's cards. It was annual, on the argument that the
+     toggle's "Save" badge is about the year; the annual saving is still one
+     press away.
 
-     Unless they already chose. A writer who pressed Upgrade on the monthly card
-     and signed in is shown monthly — being handed the annual price after
+     Unless they already chose. A writer who pressed Upgrade on the annual card
+     and signed in is shown annual — being handed the monthly price after
      picking the other one reads as a switch somebody made on their behalf. */
-  const [period, setPeriod] = useState<Period>(intent?.period ?? "annual");
+  const [period, setPeriod] = useState<Period>(intent?.period ?? "monthly");
 
   /*
    * The transaction being paid for, once there is one.

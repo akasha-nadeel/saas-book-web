@@ -6,6 +6,7 @@ import { MAX_SNAPSHOTS } from "@/lib/history";
 import { IMPORT_FORMATS } from "@/lib/import";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 import { plural } from "@/lib/plural";
+import { RECORD_FORMAT } from "@/lib/provenance";
 
 /**
  * The launch MVP's drawn screens — the shelf, the editor, the versions a
@@ -578,6 +579,179 @@ export function ImportScreen({ chrome }: ScreenProps = {}) {
             PDF and old .doc files cannot be read here — export or save your
             manuscript as .docx first.
           </p>
+        </div>
+      </div>
+    </AppWindow>
+  );
+}
+
+/**
+ * The New book menu, open — the three ways a book starts.
+ *
+ * **Drawn, not the screenshot it was taken from.** The source is a 388px crop
+ * of the menu; at row width a bitmap that small would blur, and a figure on
+ * this page is markup anyway (see the note on `W`). The words are the menu's
+ * own (`shelf/bookshelf.tsx`, under "Start a book"), and all three rows are
+ * live entries — Blank book, Local file and Paste text each open `/book/new`.
+ *
+ * The dashboard behind it is dimmed on purpose: it is there to say *where*
+ * the menu is, and the menu is the subject.
+ */
+export function NewBookMenuScreen({ chrome }: ScreenProps = {}) {
+  const rows = [
+    { label: "Blank book", icon: "M12 5v14M5 12h14" },
+    { label: "Local file", icon: "M12 15V4M7.5 8.5 12 4l4.5 4.5M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" },
+    {
+      label: "Paste text",
+      icon: "M9 4h6v3H9zM9 5.5H7a2 2 0 00-2 2V19a2 2 0 002 2h10a2 2 0 002-2V7.5a2 2 0 00-2-2h-2M9 12h6M9 16h4",
+    },
+  ] as const;
+
+  return (
+    <AppWindow
+      chrome={chrome}
+      label="The New book button with its menu open under the heading Start a book, offering three ways in: Blank book, Local file and Paste text."
+      screenStyle={{ aspectRatio: `${W} / 600` }}
+      screenClassName="@container relative overflow-hidden bg-lp-ground leading-[1.35]"
+    >
+      {/* The dashboard, held back. */}
+      <div aria-hidden="true" className="px-[5cqw] pt-[5cqw] opacity-45">
+        <p className="text-[3.4cqw] font-extrabold tracking-tight text-lp-ink">Hello there !</p>
+        <p className="mt-[0.6cqw] text-[1.8cqw] text-lp-body">
+          Welcome back — 3 books, 23 chapters on the shelf.
+        </p>
+        <div className="mt-[3cqw] border-t border-lp-line" />
+        <div className="mt-[3cqw] grid grid-cols-[2fr_1fr] gap-[2cqw]">
+          <div className="h-[28cqw] rounded-[1.2cqw] bg-lp-raised" />
+          <div className="h-[28cqw] rounded-[1.2cqw] bg-lp-raised" />
+        </div>
+      </div>
+
+      {/* The button and its menu, at the header's right edge. */}
+      <div className="absolute top-[4.6cqw] right-[5cqw] flex flex-col items-end">
+        <span className="flex items-center gap-[1cqw] rounded-[1.1cqw] bg-lp-accent px-[2.4cqw] py-[1.3cqw] text-[2.2cqw] font-semibold text-lp-accent-ink shadow-sm">
+          <Icon d="M12 5v14M5 12h14" />
+          New book
+          <Icon d="M6 9l6 6 6-6" />
+        </span>
+        <div className="mt-[1.2cqw] w-[36cqw] rounded-[1.6cqw] border border-lp-line bg-lp-ground px-[1.2cqw] py-[1.6cqw] shadow-[0_1.2cqw_3.6cqw_rgba(0,0,0,0.14)]">
+          <p className="px-[1.6cqw] text-[1.55cqw] font-bold tracking-[0.06em] text-lp-faint uppercase">
+            Start a book
+          </p>
+          <ul className="mt-[0.8cqw]">
+            {rows.map((row, i) => (
+              <li
+                key={row.label}
+                className={`flex items-center gap-[1.8cqw] rounded-[0.9cqw] px-[1.6cqw] py-[1.3cqw] text-[2.2cqw] text-lp-ink ${
+                  i === 0 ? "bg-lp-raised" : ""
+                }`}
+              >
+                <Icon d={row.icon} />
+                {row.label}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </AppWindow>
+  );
+}
+
+function Icon({ d }: { d: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-[2.4cqw] w-[2.4cqw] shrink-0"
+    >
+      <path d={d} />
+    </svg>
+  );
+}
+
+/**
+ * The writing record — its card, and the document it opens.
+ *
+ * Built from the two pieces of the real screen: `WritingRecordCard` in
+ * `export/export-page.tsx` (the painting, its sentence and its button) and the
+ * provenance page's "The document" panel. **The record's wording is the
+ * generator's own** (`writingRecord` in `lib/provenance.ts`), line for line,
+ * with `RECORD_FORMAT` imported so the format number cannot drift. Only the
+ * figures are demo data — the same Breathe Again the other screens draw, and
+ * a placeholder author rather than anybody's name.
+ */
+const RECORD_LINES = [
+  "WRITING RECORD — Breathe Again",
+  "Author: A. Writer",
+  "Generated 2026-09-24T09:34:44.010Z by OpenChapter",
+  `Record format ${RECORD_FORMAT}. Author's clock: UTC+00:00.`,
+  "",
+  "WHAT THIS IS",
+  "A record of this manuscript being written: which days work happened on,",
+  "how the word count moved on each of them, and the intermediate drafts the",
+  "app saved along the way. It is the same kind of evidence as a word",
+  "processor's edit history.",
+  "",
+  "THIS BOOK",
+  "Chapters:            12",
+  "Words:               41,208",
+  "Saved drafts:        at least 86, on at least 31 separate days",
+  "Oldest kept draft:   2026-06-02T07:41:18.221Z",
+  "Newest kept draft:   2026-09-24T08:12:05.904Z",
+] as const;
+
+export function WritingRecordScreen({ chrome }: ScreenProps = {}) {
+  return (
+    <AppWindow
+      chrome={chrome}
+      label="The writing record: a card with a painting of a woman reading at a desk, saying it is a dated history of how the book was written, for if anyone asks whether you used AI — evidence, not proof — beside the record itself, a plain-text document with Download and Copy buttons listing the book's chapters, words and saved drafts."
+      screenStyle={{ aspectRatio: `${W} / 640` }}
+      screenClassName="@container flex gap-[2.6cqw] overflow-hidden bg-lp-raised px-[3cqw] py-[3.4cqw] leading-[1.35]"
+    >
+      {/* The card, as the export wizard shows it. */}
+      <div className="flex w-[33cqw] shrink-0 flex-col self-start overflow-hidden rounded-[1.4cqw] border border-lp-edge bg-lp-ground">
+        <div
+          aria-hidden="true"
+          className="aspect-[16/9] w-full bg-cover bg-center"
+          style={{ backgroundImage: "url('/writing-record-card.webp')" }}
+        />
+        <div className="px-[2.2cqw] py-[2cqw]">
+          <p className="text-[1.9cqw] font-bold text-lp-ink">Writing record</p>
+          <p className="mt-[0.6cqw] text-[1.7cqw] leading-[1.55] text-lp-body">
+            A dated history of how this book was written, for if anyone asks
+            whether you used AI. Evidence, not proof.
+          </p>
+          <span className="mt-[1.6cqw] block rounded-[0.9cqw] border border-lp-edge-strong py-[1cqw] text-center text-[1.7cqw] font-semibold text-lp-ink">
+            Open writing record
+          </span>
+        </div>
+      </div>
+
+      {/* The document it opens. */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[1.4cqw] border border-lp-edge bg-lp-ground">
+        <div className="flex items-center gap-[1cqw] border-b border-lp-edge px-[2.2cqw] py-[1.6cqw]">
+          <p className="flex-1 text-[1.9cqw] font-bold text-lp-ink">The document</p>
+          <span className="rounded-[0.9cqw] bg-lp-accent px-[1.8cqw] py-[0.9cqw] text-[1.6cqw] font-semibold text-lp-accent-ink">
+            Download
+          </span>
+          <span className="rounded-[0.9cqw] border border-lp-edge-strong px-[1.8cqw] py-[0.9cqw] text-[1.6cqw] font-semibold text-lp-ink">
+            Copy
+          </span>
+        </div>
+        <div className="relative min-h-0 flex-1 overflow-hidden px-[2.2cqw] py-[1.8cqw]">
+          <pre className="font-code text-[1.32cqw] leading-[1.75] whitespace-pre text-lp-ink">
+            {RECORD_LINES.join("\n")}
+          </pre>
+          {/* Cut by the window rather than finished: the record goes on. */}
+          <span
+            aria-hidden="true"
+            className="absolute inset-x-0 bottom-0 h-[9cqw] bg-linear-to-t from-lp-ground to-transparent"
+          />
         </div>
       </div>
     </AppWindow>

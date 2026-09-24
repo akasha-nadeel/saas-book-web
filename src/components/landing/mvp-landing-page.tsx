@@ -3,7 +3,6 @@ import { AppWindow } from "@/components/landing/app-window";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CtaBanner } from "@/components/landing/cta-banner";
-import { ExportScreen } from "@/components/landing/export-screen";
 import { FeatureRow, ROW_GROUNDS } from "@/components/landing/feature-row";
 import {
   LandingFooter,
@@ -20,7 +19,10 @@ import { FeatureBento } from "@/components/landing/feature-bento";
    `VersionsScreen` stay in `mvp-screens.tsx`: they are finished, tested and
    cannot go stale the way a bitmap can, which makes them the thing to come
    back to rather than to delete. */
-import { ImportScreen } from "@/components/landing/mvp-screens";
+import {
+  NewBookMenuScreen,
+  WritingRecordScreen,
+} from "@/components/landing/mvp-screens";
 import {
   LEAD_EM,
   HERO_TITLE,
@@ -226,7 +228,7 @@ const FOOTER_COLUMNS: FooterColumn[] = [
     links: [
       { href: "#inside", label: "The shelf" },
       { href: "#inside", label: "The editor" },
-      { href: "#inside", label: "Importing" },
+      { href: "#inside", label: "Starting a book" },
       { href: "#faq", label: "No AI" },
     ],
   },
@@ -460,11 +462,11 @@ const ROWS: Row[] = [
     title: "Every book you have, on one shelf",
     figure: (
       <Shot
-        src="/shot-shelf.webp"
-        width={1999}
-        height={1003}
+        src="/shot-write.webp"
+        width={1894}
+        height={948}
         url="openchapter.app/?area=write"
-        alt="The Write area of the shelf: a search field, a New book button, and a grid of book cards, each with its cover, its chapter and word counts, when it was last opened, and a Write button."
+        alt="The Write area of the dashboard: the book being written, with its cover, its chapter and word counts, Open book and Export buttons and a target dial beside it, above a row of every book on the shelf by its cover."
       />
     ),
   },
@@ -474,19 +476,22 @@ const ROWS: Row[] = [
     lead: `Prose set on a real page, saved as you type, with your last ${MAX_SNAPSHOTS} versions one press away.`,
     figure: (
       <Shot
-        src="/shot-editor.webp"
-        width={1999}
-        height={989}
-        url="openchapter.app/book/breathe-again/chapter/two"
-        alt="A chapter open in the editor: the book navigator listing front matter, forty-five body chapters and back matter on the left, the running word count and a Saved marker along the top, and the chapter set as a page in the book's own typeface."
+        src="/shot-chapter.webp"
+        width={1919}
+        height={947}
+        url="openchapter.app/book/breathe-again/chapter/one"
+        alt="A chapter open in the editor: a top bar with the File menu, undo and redo, a Saved marker, the word count and Import and Export buttons; a rail of Chapters, Find, Check, Notes, Tools, Versions and Trash; the book navigator with front matter, ten body chapters and back matter; and Chapter One set as a page in the book's own typeface."
       />
     ),
   },
   {
-    badge: "Import",
-    title: "Bring the manuscript you already have",
-    lead: `${IMPORT_FORMATS.length} formats in, split into chapters, with what survived the trip named before anything is added.`,
-    figure: <ImportScreen chrome={{ url: "openchapter.app/book/import" }} />,
+    /* Rewritten around the New book menu (2026-09-24): importing is one of
+       three ways in, and the menu is where a writer actually meets it. All
+       three are real entries — see the menu in `shelf/bookshelf.tsx`. */
+    badge: "Start a book",
+    title: "Start blank, from a file, or from pasted text",
+    lead: `One button, three ways in: an empty book, a manuscript in any of the ${IMPORT_FORMATS.length} formats it reads, or text pasted straight in. Nothing is added to your shelf until you have seen what came through.`,
+    figure: <NewBookMenuScreen chrome={{ url: "openchapter.app/" }} />,
   },
   {
     /* **The export was a band of its own and is a row now**, which is the
@@ -512,7 +517,29 @@ const ROWS: Row[] = [
         <FormatCards />
       </div>
     ),
-    figure: <ExportScreen chrome={{ url: "openchapter.app/book/breathe-again/export" }} />,
+    figure: (
+      <Shot
+        src="/shot-export-formats.webp"
+        width={926}
+        height={686}
+        url="openchapter.app/book/breathe-again/export"
+        alt="The export wizard's first question, How do you want it?, with a card for each format: EPUB (store-ready, for e-readers and ebook shops), PDF typeset to your trim size, and Word for agents, editors and backup."
+      />
+    ),
+  },
+  {
+    /* **Last, after the export**, because that is where a writer meets it:
+       the record is opened from the export wizard's Format step and from the
+       done dialog. It also closes the section on the "No AI" the hero opens
+       with. The Free figure is imported so it cannot outlive the limit. */
+    badge: "Writing record",
+    title: "A dated record of how the book was written",
+    lead: `Which days you wrote, how the word count moved, and the drafts saved along the way, as a plain file you can download. For if anyone asks whether you used AI: evidence, not proof. Free covers the last ${FREE_RECORD_DAYS} days.`,
+    figure: (
+      <WritingRecordScreen
+        chrome={{ url: "openchapter.app/book/breathe-again/provenance" }}
+      />
+    ),
   },
 ];
 
@@ -778,8 +805,8 @@ export function MvpLandingPage() {
         <section className="bg-lp-ground px-6 py-14 sm:py-16">
           <div className="mx-auto flex max-w-[88rem] flex-col items-center">
             <p className="text-center text-[1.125rem] font-semibold text-lp-ink sm:text-[1.25rem]">
-              Trusted by <span className="text-[#f97316]">2,500+</span>{" "}
-              authors &amp; writers worldwide
+              Made for authors &amp; writers,{" "}
+              <span className="text-[#f97316]">wherever they publish</span>
             </p>
 
             <ul className="mt-10 grid w-full max-w-6xl grid-cols-2 place-items-center gap-x-8 gap-y-6 max-sm:[&>li:last-child]:col-span-2 sm:grid-cols-3 lg:flex lg:items-center lg:justify-between lg:gap-x-6">

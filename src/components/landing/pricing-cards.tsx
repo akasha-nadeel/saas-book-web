@@ -40,10 +40,11 @@ import { signupTo } from "@/lib/file-check";
 import { notePlanInterest } from "@/lib/plan-interest";
 
 export function PricingCards() {
-  /* **Annual, not monthly.** The toggle's own badge says what a year saves,
-     and opening on the cycle that badge is about means the first figure a
-     reader sees is the one being recommended. Monthly is one press away. */
-  const [period, setPeriod] = useState<Period>("annual");
+  /* **Monthly first, by the owner's choice (2026-09-24).** It was annual, on
+     the argument that the toggle's "Save" badge is about the year; the owner
+     wants the first price a visitor reads to be the plain monthly one. The
+     annual saving is still one press away, and its badge still says so. */
+  const [period, setPeriod] = useState<Period>("monthly");
 
   return (
     <>
@@ -102,7 +103,7 @@ export function PricingCards() {
 
                **It carries the cycle through the door, and the door is
                sign-up.** This went to a bare `/upgrade` and dropped both: the
-               visitor arrived on the annual default whatever they had been
+               visitor arrived on the default cycle whatever they had been
                reading, pressed Upgrade, and got "Sign in to subscribe" in red
                under the button. Nobody on this page has an account — that is
                what the page is for — so the destination after signing up is
