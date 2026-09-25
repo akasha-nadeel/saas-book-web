@@ -39,8 +39,9 @@ export default function PrivacyPage() {
         <p>
           OpenChapter stores your books so you can return later and keep
           writing. There is no AI in OpenChapter: your writing is never sent to
-          a language model, and we do not sell your data, run advertising
-          trackers, or use your writing to train anything.
+          a language model, and we do not sell your data or use your writing to
+          train anything. We do run one advertising measurement tag, described
+          below; it never sees a word of your manuscript.
         </p>
         <Note>
           PDF export sends the full book to our server for layout. Word and
@@ -121,6 +122,16 @@ export default function PrivacyPage() {
               our database.
             </>,
             <>
+              <Term>Advertising measurement</Term> — we run search ads, and
+              every page carries Google&rsquo;s conversion tag so we can tell
+              which advert brought somebody who went on to make an account. It
+              reports the page address and the usual details a web request
+              carries, and nothing else: not your books, not your chapters, not
+              a word you have written. It is the site&rsquo;s only third-party
+              script, and it is switched off entirely on any deployment that
+              does not set the key for it.
+            </>,
+            <>
               <Term>Payment</Term> — when you subscribe, checkout is handled by
               the payment provider. Card details are entered there, not in
               OpenChapter.
@@ -149,7 +160,11 @@ export default function PrivacyPage() {
       <Section title="Cookies">
         <p>
           If you have an account, authentication cookies keep you signed in.
-          There are no advertising cookies.
+          The advertising tag above sets one of its own, in our name rather
+          than a third party&rsquo;s, to carry the identifier of the advert you
+          clicked from the page you landed on to the page where you sign up —
+          which is the whole of what it is for. We run no other advertising
+          cookies, and none that follow you to anybody else&rsquo;s site.
         </p>
       </Section>
 

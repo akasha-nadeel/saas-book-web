@@ -7,6 +7,7 @@ import {
   Poppins,
   Roboto,
 } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { LibrarySync } from "@/components/library-sync";
 import { StorageAlert } from "@/components/storage-alert";
@@ -36,6 +37,29 @@ import { ViewportController } from "@/components/viewport-controller";
  * and it is left off entirely rather than set empty when there is none.
  */
 const THEME_BOOTSTRAP = `try{var M={parchment:'light',tawny:'light',olive:'light',copper:'dark',aubergine:'dark',charcoal:'dark'};var t=JSON.parse(localStorage.getItem('openchapter:prefs')||'{}').theme;var n=M[t];if(!n&&t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}var d=document.documentElement;d.dataset.theme=n||t;if(n){d.dataset.tint=t;}else{delete d.dataset.tint;}}catch(e){document.documentElement.dataset.theme='dark';}`;
+
+/**
+ * The Google Ads conversion tag, and the one reason it is here.
+ *
+ * **Optional, like every other key in `.env.local.example`** — unset, nothing
+ * is rendered and the app behaves exactly as it did before. That is what keeps
+ * it out of `npm run dev` and out of a fork somebody else is running.
+ *
+ * It sits in the root layout rather than on the two pages that need it because
+ * a Google Ads conversion is two halves: the click's `gclid` is caught on the
+ * page the ad lands on (`/`), and the conversion fires on the page the writer
+ * reaches afterwards (`/signup`). Sitelinks land on `/upgrade` too. Naming
+ * three routes and hoping a fourth never joins them is how attribution goes
+ * quietly wrong, so the tag goes everywhere and costs the editor a script it
+ * does not use.
+ *
+ * **This is an advertising tracker and `/privacy` says so.** That page names
+ * every route that sends anything; it also used to say there were no
+ * advertising trackers and no advertising cookies, and both sentences were
+ * rewritten in the commit that added this. Removing the variable is not enough
+ * to make them true again — the page has to change back with it.
+ */
+const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -155,6 +179,20 @@ export default function RootLayout({
             manuscript that has stopped saving is the app's problem wherever the
             writer happens to be standing. */}
         <StorageAlert />
+        {/* After hydration, deliberately: nothing here is needed for a first
+            paint, and the writing surface should not queue behind a third
+            party's script. */}
+        {GOOGLE_ADS_ID ? (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ADS_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-ads-tag" strategy="afterInteractive">
+              {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GOOGLE_ADS_ID}');`}
+            </Script>
+          </>
+        ) : null}
         {/* `AppLoader` stood here and is gone, at the owner's request. It held
             the loading screen up for a second on every route but `/` so the
             logo's fill animation had time to play — a delay the product
