@@ -45,8 +45,10 @@ export interface SectionBannerProps {
   ink: BannerInk;
   /** `background-position`. The pan, since `cover` crops the sides. */
   crop?: string;
-  /** A ground under the words, for a picture with a bright passage in it. */
-  scrim?: boolean;
+  /** A ground under the words, for a picture with a bright passage in it.
+      `"deep"` is a heavier, wider veil for light ink on a mid-tone picture
+      that the ordinary one leaves near 4:1 (Paperback's). */
+  scrim?: boolean | "deep";
   /** The one banner with something to press. */
   action?: { label: string; href: string };
 }
@@ -89,7 +91,9 @@ export function SectionBanner({
         <div
           aria-hidden
           className={`absolute inset-0 -z-10 ${
-            ink === "light"
+            scrim === "deep"
+              ? "bg-[linear-gradient(105deg,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.65)_35%,rgba(0,0,0,0)_65%)]"
+              : ink === "light"
               ? "bg-[linear-gradient(105deg,rgba(0,0,0,0.72)_0%,rgba(0,0,0,0.5)_30%,rgba(0,0,0,0)_55%)]"
               : "bg-[linear-gradient(105deg,rgba(255,255,255,0.72)_0%,rgba(255,255,255,0.5)_30%,rgba(255,255,255,0)_55%)]"
           }`}

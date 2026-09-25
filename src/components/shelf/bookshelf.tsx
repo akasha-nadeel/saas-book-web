@@ -1115,15 +1115,6 @@ export function Bookshelf({
                         : meta.label}
                   </h1>
                   {!meta.live && <Badge>Not built yet</Badge>}
-
-                  {/* Only where there is no rail to hold them. The wordmark and
-                      the account both live in the sidebar from `md` up; below it
-                      this is the one way to reach sign-out, and dropping it
-                      would strand exactly the writers least able to work
-                      around it. */}
-                  <div className="ml-auto flex items-center gap-2 md:hidden">
-                    <AccountMenu account={account} />
-                  </div>
                 </div>
 
                 {/* **Counted, never flattering.** "You are doing great" is the
@@ -1144,62 +1135,92 @@ export function Bookshelf({
                 )}
               </div>
 
-              <div className="flex items-stretch sm:ml-auto">
-  <Menu
-                    label="New book"
-                    align="end"
-                    width={248}
-                    triggerClassName="flex h-10 w-10 items-center justify-center gap-1.5 whitespace-nowrap
-                                      rounded-lg bg-accent text-sm font-semibold text-accent-ink
-                                      transition-colors hover:bg-accent-strong active:bg-accent-strong
-                                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50
-                                      sm:w-auto sm:py-1.5 sm:pr-2 sm:pl-3 md:h-9"
-                    trigger={
-                      <>
-                        {shelfIcons.plus}
-                        <span className="hidden sm:inline">New book</span>
-                        {/* Kept, and it is the whole of what tells a writer
-                              this opens rather than acts. */}
-                        <span className="hidden sm:block">{shelfIcons.chevron}</span>
-                      </>
-                    }
-                  >
-                    {/* **Four ways in, and all four are the same road.**
-                          "Import a file…" used to open a dialog that parsed the
-                          manuscript, asked for a title and made the book there
-                          and then — a second, shorter creation path, so an
-                          imported book arrived with no author, no genre and no
-                          word-count goal while a blank one was asked for all
-                          three. The three tabs that were inside that dialog are
-                          named here instead, and each carries the writer into
-                          `/book/new` with the source it names. */}
-                    {(close) => (
-                      <>
-                        <MenuLabel>Start a book</MenuLabel>
-                        <MenuLink
-                          href="/book/new"
-                          icon={shelfIcons.plus}
-                          onNavigate={close}
-                        >
-                          Blank book
-                        </MenuLink>
-                        <MenuLink
-                          href="/book/new?source=file"
-                          icon={shelfIcons.upload}
-                          onNavigate={close}
-                        >
-                          Local file
-                        </MenuLink>
-                        <MenuLink
-                          href="/book/new?source=paste"
-                          icon={shelfIcons.paste}
-                          onNavigate={close}
-                        >
-                          Paste text
-                        </MenuLink>
-                      </>
-                    )}
-                  </Menu>
+              {/* ---- The account, then the action ------------------------
+
+                  Only where there is no rail to hold them: the wordmark and
+                  the account both live in the sidebar from `md` up, and below
+                  it this is the one way to reach sign-out, so dropping it
+                  would strand exactly the writers least able to work around
+                  it.
+
+                  **It sits beside New book rather than beside the heading**,
+                  where it was until 2026-09-26. It was pinned there with
+                  `ml-auto` inside the title column, which only bites while
+                  the header is stacked: from `sm` the row turns, that column
+                  shrinks to its own content, and there is no free space left
+                  to push against — so the chip came to rest wherever the
+                  greeting happened to end, in the middle of the row, on every
+                  tablet.
+
+                  The chip goes *before* New book. Crossing `md` it folds back
+                  into the sidebar, and with the button last that button keeps
+                  the same corner throughout rather than jumping sideways as
+                  the window resizes. `ml-auto` is unconditional because the
+                  phone's header is stacked, where the group would otherwise
+                  stretch and leave the button at the left. `items-center`
+                  puts the 40px chip and the 40px button on one centreline,
+                  and `shrink-0` makes the heading truncate first at the
+                  narrow end of the band rather than the controls squeezing. */}
+              <div className="ml-auto flex shrink-0 items-center gap-3">
+                <div className="flex md:hidden">
+                  <AccountMenu account={account} />
+                </div>
+
+                <Menu
+                  label="New book"
+                  align="end"
+                  width={248}
+                  triggerClassName="flex h-10 w-10 items-center justify-center gap-1.5 whitespace-nowrap
+                                    rounded-lg bg-accent text-sm font-semibold text-accent-ink
+                                    transition-colors hover:bg-accent-strong active:bg-accent-strong
+                                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50
+                                    sm:w-auto sm:py-1.5 sm:pr-2 sm:pl-3 md:h-9"
+                  trigger={
+                    <>
+                      {shelfIcons.plus}
+                      <span className="hidden sm:inline">New book</span>
+                      {/* Kept, and it is the whole of what tells a writer
+                            this opens rather than acts. */}
+                      <span className="hidden sm:block">{shelfIcons.chevron}</span>
+                    </>
+                  }
+                >
+                  {/* **Four ways in, and all four are the same road.**
+                        "Import a file…" used to open a dialog that parsed the
+                        manuscript, asked for a title and made the book there
+                        and then — a second, shorter creation path, so an
+                        imported book arrived with no author, no genre and no
+                        word-count goal while a blank one was asked for all
+                        three. The three tabs that were inside that dialog are
+                        named here instead, and each carries the writer into
+                        `/book/new` with the source it names. */}
+                  {(close) => (
+                    <>
+                      <MenuLabel>Start a book</MenuLabel>
+                      <MenuLink
+                        href="/book/new"
+                        icon={shelfIcons.plus}
+                        onNavigate={close}
+                      >
+                        Blank book
+                      </MenuLink>
+                      <MenuLink
+                        href="/book/new?source=file"
+                        icon={shelfIcons.upload}
+                        onNavigate={close}
+                      >
+                        Local file
+                      </MenuLink>
+                      <MenuLink
+                        href="/book/new?source=paste"
+                        icon={shelfIcons.paste}
+                        onNavigate={close}
+                      >
+                        Paste text
+                      </MenuLink>
+                    </>
+                  )}
+                </Menu>
               </div>
             </div>
 
@@ -5170,16 +5191,18 @@ function PaperbackArea({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* **Light ink with the scrim, and the scrim is required here.** The
-          left of this picture is a wall of coloured spines at 0.26 mean
-          luminance under the type band, which puts `#f6f6f8` near 3:1 on its
-          own; the scrim's 0.72-to-0.5 veil is what lifts it past 4.5:1. The
-          hand and the basket sit from about 40% to 100% of the height, so
-          55% holds the hand at the spines and the top of the basket. */}
+      {/* **Light ink with the deep scrim — white type is the owner's call.**
+          Under the type is a blue-grey wall above the dark edge of the desk,
+          0.02 to 0.31 luminance: no ink clears 4.5:1 on it bare, and light
+          ink under the ordinary veil only reaches ~4:1. The deep veil
+          (0.85 → 0.65 at 35% → clear at 65%) puts the body text at ~4.6:1
+          over 95% of the region; the quill's highlights are the only pixels
+          under it. 55% keeps the desk top — the leather books, the ink pot
+          and the green book — in the band. */}
       <SectionBanner
         image="/paperback-banner.webp"
         ink="light"
-        scrim
+        scrim="deep"
         crop="center 55%"
         title="Know the numbers before the printer does"
         subtitle="Spine, gutter and cover size from your page count."
