@@ -32,10 +32,20 @@
  * book a spine too wide by about a twentieth of an inch at 300 pages.
  */
 export const PAPER = {
-  white: { label: "White", perPage: 0.002252 },
-  cream: { label: "Cream", perPage: 0.0025 },
-  standardColour: { label: "Standard colour", perPage: 0.002252 },
-  premiumColour: { label: "Premium colour", perPage: 0.002347 },
+  white: { label: "White", perPage: 0.002252, minPages: 24, maxPages: 828 },
+  cream: { label: "Cream", perPage: 0.0025, minPages: 24, maxPages: 776 },
+  standardColour: {
+    label: "Standard colour",
+    perPage: 0.002252,
+    minPages: 72,
+    maxPages: 600,
+  },
+  premiumColour: {
+    label: "Premium colour",
+    perPage: 0.002347,
+    minPages: 24,
+    maxPages: 828,
+  },
 } as const;
 
 export type PaperStock = keyof typeof PAPER;
@@ -67,10 +77,12 @@ export const OUTSIDE_MARGIN_MIN = 0.25;
 export const OUTSIDE_MARGIN_BLEED_MIN = 0.375;
 
 /**
- * The fewest and most pages KDP will bind.
+ * The fewest and most pages KDP will bind on any paper.
  *
- * 828 is the ceiling of KDP's margin table; its trim-size table lowers it for
- * some sizes and papers, so the problem below says "at most", not "exactly".
+ * Each stock narrows it (`minPages`/`maxPages` on `PAPER`, from KDP's "Set
+ * Trim Size, Bleed, and Margins" page, checked 2026-09-25): cream stops at
+ * 776, and standard colour runs only 72 to 600. The problems below read the
+ * stock's own range, not these.
  */
 export const MIN_PAGES = 24;
 export const MAX_PAGES = 828;
@@ -78,10 +90,19 @@ export const MAX_PAGES = 828;
 /**
  * The fewest pages a spine may carry text on.
  *
- * KDP's own rule: below 79 pages a cover with spine text is rejected. It
- * replaces a guess drawn from how wide the spine looked on screen.
+ * KDP: "We only print spine text on books with more than 79 pages" — so 80.
+ * This read 79 until 2026-09-25, which let the one odd count on the line
+ * through. It replaces a guess drawn from how wide the spine looked on screen.
  */
-export const SPINE_TEXT_MIN_PAGES = 79;
+export const SPINE_TEXT_MIN_PAGES = 80;
+
+/**
+ * The trim sizes KDP will print a paperback at, in inches. Anything between
+ * these is accepted as a custom trim; the app's page setup also offers office
+ * sizes (Legal, Tabloid, A3, B4) that fall outside them.
+ */
+export const TRIM_MIN = { width: 4, height: 6 } as const;
+export const TRIM_MAX = { width: 8.5, height: 11.69 } as const;
 
 export interface PaperbackSpec {
   pages: number;
@@ -113,20 +134,33 @@ export function paperbackSpec(
   stock: PaperStock = "white",
 ): PaperbackSpec {
   const problems: string[] = [];
+  const paper = PAPER[stock];
   if (!Number.isFinite(pages) || pages <= 0) {
     problems.push("No page count yet, so none of these numbers can be worked out.");
-  } else if (pages < MIN_PAGES) {
+  } else if (pages < paper.minPages) {
     problems.push(
-      `${pages} pages. A paperback needs at least ${MIN_PAGES}, so this would be refused as it stands.`,
+      `${pages} pages. A paperback on ${paper.label.toLowerCase()} paper needs at least ${paper.minPages}, so this would be refused as it stands.`,
     );
-  } else if (pages > MAX_PAGES) {
+  } else if (pages > paper.maxPages) {
     problems.push(
-      `${pages} pages. KDP binds at most ${MAX_PAGES}, and fewer at some trim sizes and papers; past that a book has to become two volumes.`,
+      `${pages} pages. KDP binds at most ${paper.maxPages} on ${paper.label.toLowerCase()} paper; past that a book has to become two volumes${
+        paper.maxPages < MAX_PAGES ? ` or move to a paper that takes up to ${MAX_PAGES}` : ""
+      }.`,
+    );
+  }
+  if (
+    trimWidth < TRIM_MIN.width ||
+    trimHeight < TRIM_MIN.height ||
+    trimWidth > TRIM_MAX.width ||
+    trimHeight > TRIM_MAX.height
+  ) {
+    problems.push(
+      `A ${trimWidth}″ × ${trimHeight}″ page is not a size KDP prints a paperback at — it takes ${TRIM_MIN.width}–${TRIM_MAX.width}″ wide and ${TRIM_MIN.height}–${TRIM_MAX.height}″ tall. Change the trim in page setup; these numbers are for the size you have now.`,
     );
   }
 
   const safePages = Math.max(0, Math.round(pages) || 0);
-  const spine = safePages * PAPER[stock].perPage;
+  const spine = safePages * paper.perPage;
   const gutter = gutterFor(safePages);
 
   return {

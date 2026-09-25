@@ -9,6 +9,7 @@ import {
   PAPER,
   paperbackSpec,
   SPINE_TEXT_MIN_PAGES,
+  TRIM_MAX,
 } from "./paperback";
 
 describe("gutterFor", () => {
@@ -79,10 +80,28 @@ describe("paperbackSpec", () => {
     );
   });
 
-  /** KDP rejects a cover with spine text below 79 pages. */
+  /** KDP: "We only print spine text on books with more than 79 pages." */
   it("allows spine text only from KDP's minimum", () => {
+    expect(paperbackSpec(79, 6, 9).spineText).toBe(false);
     expect(paperbackSpec(SPINE_TEXT_MIN_PAGES - 1, 6, 9).spineText).toBe(false);
     expect(paperbackSpec(SPINE_TEXT_MIN_PAGES, 6, 9).spineText).toBe(true);
+  });
+
+  /** KDP's page ranges by paper, checked 2026-09-25. */
+  it("reads the page range of the paper chosen", () => {
+    expect(paperbackSpec(800, 6, 9, "white").problems).toEqual([]);
+    expect(paperbackSpec(800, 6, 9, "cream").problems[0]).toContain("776");
+    expect(paperbackSpec(60, 6, 9, "standardColour").problems[0]).toContain("72");
+    expect(paperbackSpec(650, 6, 9, "standardColour").problems[0]).toContain("600");
+    expect(paperbackSpec(60, 6, 9, "premiumColour").problems).toEqual([]);
+  });
+
+  /** Page setup offers office sizes KDP will not print a paperback at. */
+  it("says when the trim is not one KDP prints", () => {
+    expect(paperbackSpec(300, 8.5, 14).problems[0]).toContain(String(TRIM_MAX.height));
+    expect(paperbackSpec(300, 8.5, 11).problems).toEqual([]);
+    expect(paperbackSpec(300, 8.27, 11.69).problems).toEqual([]);
+    expect(paperbackSpec(300, 5.83, 8.27).problems).toEqual([]);
   });
 
   it("says when there is no page count at all", () => {
