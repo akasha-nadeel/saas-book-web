@@ -126,13 +126,15 @@ export default function PrivacyPage() {
               OpenChapter.
             </>,
             <>
-              <Term>Pressing a paid plan</Term> — Pro is not on sale yet, so
-              pressing it records the plan and billing cycle you pressed, and
-              where you pressed it. That is how we decide what
-              to switch on first. If you are signed in, your account and email
-              address are recorded with it; if you are not, nothing that
-              identifies you is. No other detail is taken, and the record is not
-              shared with anybody.
+              <Term>Choosing a plan on the public pricing page</Term> —
+              pressing Choose Pro there records the plan, the billing cycle you
+              had selected, and which page you pressed it on. That is how we
+              tell whether people want the monthly or the annual price before
+              they have an account to ask. If you are signed in, your account
+              and email address are recorded with it; if you are not, nothing
+              that identifies you is. No other detail is taken, and the record
+              is not shared with anybody. Pressing the same button from inside
+              your account records nothing — it goes straight to checkout.
             </>,
           ]}
         />
