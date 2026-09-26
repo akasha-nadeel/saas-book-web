@@ -676,10 +676,24 @@ export function TitleCheckPage({
               usually a control in the wrong place; this one is in the right
               place, so the paragraph was just words. */}
 
-          {/* No View control on this one: it is what is on screen *before* a
-              check, and the menu belongs on the answer. It follows the same
-              stored setting. */}
-          {showShelf && <Shelf books={genreShelf} layout={layout} />}
+          {/* **The View control is on this shelf too, since 2026-09-27.** It
+              used to be withheld until there was an answer, on the reasoning
+              that the menu belongs on the result — but this is a wall of a
+              hundred covers a writer may sit with for a while before typing
+              anything, and a control that governs what is on screen should be
+              reachable while it is on screen. The setting was always shared;
+              only the way to reach it was late.
+
+              Still one menu per screen: this shelf shows only while `asking`
+              and the result's shelves only once answered, so the two never
+              appear together. */}
+          {showShelf && (
+            <Shelf
+              books={genreShelf}
+              layout={layout}
+              onLayout={(next) => setPref("researchLayout", next)}
+            />
+          )}
 
           {/* **The browsing shelf is a five-page sweep, so its wait is real.**
               It arrives on mount and used to leave the whole space under the
@@ -1179,14 +1193,30 @@ function Shelf({
           that matched it would leave the screen with two things claiming to
           be its name. The count stays a step down and in the muted grey — it
           is a figure about the heading, not part of it. */}
-      {heading && (
-        <div className="mt-10 flex items-center justify-between gap-3">
-          <h2 className="text-2xl font-bold tracking-tight text-fg">
-            {heading}
-            <span className="ml-3 text-lg font-normal text-muted">
-              {books.length}
-            </span>
-          </h2>
+      {/* **The row draws for either reason**, a heading or the control, so a
+          shelf with no name of its own can still carry the View menu. The
+          browsing shelf is that case: the box above already names it, and
+          `justify-between` puts the menu on the right of an empty row exactly
+          as it does beside a heading.
+
+          Less top margin without a heading — `mt-10` is the air a section
+          title wants above it, and on a bare control row it reads as a gap. */}
+      {(heading || onLayout) && (
+        <div
+          className={`flex items-center justify-between gap-3 ${
+            heading ? "mt-10" : "mt-6"
+          }`}
+        >
+          {heading ? (
+            <h2 className="text-2xl font-bold tracking-tight text-fg">
+              {heading}
+              <span className="ml-3 text-lg font-normal text-muted">
+                {books.length}
+              </span>
+            </h2>
+          ) : (
+            <span />
+          )}
           {onLayout && <ViewMenu value={layout} onChange={onLayout} />}
         </div>
       )}
