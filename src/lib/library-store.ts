@@ -24,6 +24,7 @@ import type { CollabRole } from "./collab";
 import { clampZoom } from "@/lib/editor/zoom";
 import { isPanelTab, type PanelTab } from "./panel-tabs";
 import {
+  DEFAULT_RESEARCH_LAYOUT,
   DEFAULT_SHELF_LAYOUT,
   isShelfLayout,
   type ShelfLayout,
@@ -3501,9 +3502,9 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   panelTab: "search",
   // The grid the shelf has always drawn; a writer who wants another says so.
   shelfLayout: DEFAULT_SHELF_LAYOUT,
-  // Covers, like the shelf. A search answers with jackets, and the eye reads a
-  // wall of them faster than it reads a column of titles.
-  researchLayout: DEFAULT_SHELF_LAYOUT,
+  // Denser than the shelf: these walls are a hundred strangers' books rather
+  // than a writer's own handful. See `DEFAULT_RESEARCH_LAYOUT`.
+  researchLayout: DEFAULT_RESEARCH_LAYOUT,
   // Black by default, because the chrome around it is. A white sheet on a black
   // app is the one combination that glares, and a writer arriving for the first
   // time should not have to go and fix that. The other four sheets are still
@@ -3587,7 +3588,7 @@ function parsePrefs(raw: string | null): Prefs {
         : DEFAULT_SHELF_LAYOUT,
       researchLayout: isShelfLayout(parsed.researchLayout)
         ? parsed.researchLayout
-        : DEFAULT_SHELF_LAYOUT,
+        : DEFAULT_RESEARCH_LAYOUT,
       paper: paperFrom(parsed),
       theme: THEMES.includes(parsed.theme as Theme)
         ? (parsed.theme as Theme)

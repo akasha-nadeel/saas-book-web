@@ -28,6 +28,22 @@ export const SHELF_LAYOUTS: readonly { id: ShelfLayout; label: string }[] = [
 export const DEFAULT_SHELF_LAYOUT: ShelfLayout = "covers";
 
 /**
+ * What the research tools open on — the comps shelf, the title check's walls,
+ * the price check's list.
+ *
+ * **A second default rather than a shared one, and the difference is what is
+ * being looked at.** `DEFAULT_SHELF_LAYOUT` dresses a writer's own handful of
+ * books, where a larger jacket is worth the room and the whole shelf fits on
+ * the screen anyway. These tools draw a hundred strangers' books, where the
+ * question is how many can be taken in at once — so they open denser.
+ *
+ * They are deliberately not the same constant. Collapsing them back into one
+ * would move the shelf as a side effect of a decision about search results,
+ * which is why `shelf-layout.test.ts` asserts they differ.
+ */
+export const DEFAULT_RESEARCH_LAYOUT: ShelfLayout = "small";
+
+/**
  * The container's classes, **written out in full and never interpolated**.
  *
  * Tailwind v4 finds its utilities by scanning the source for complete strings.

@@ -1299,7 +1299,7 @@ export function Bookshelf({
             )}
 
             {area === "title-check" && <TitleCheckArea />}
-      {area === "price-check" && <PriceCheckArea />}
+            {area === "price-check" && <PriceCheckArea />}
 
             {area === "ideas" && <IdeasArea />}
 

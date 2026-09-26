@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_RESEARCH_LAYOUT,
   DEFAULT_SHELF_LAYOUT,
   gridClassFor,
   isGrid,
@@ -37,6 +38,22 @@ describe("SHELF_LAYOUTS", () => {
 
   it("offers the default as one of its own options", () => {
     expect(SHELF_LAYOUTS.some((l) => l.id === DEFAULT_SHELF_LAYOUT)).toBe(true);
+    expect(SHELF_LAYOUTS.some((l) => l.id === DEFAULT_RESEARCH_LAYOUT)).toBe(
+      true,
+    );
+  });
+
+  /*
+   * **The two defaults are deliberately different and this is what says so.**
+   * The shelf dresses a writer's own handful of books, where a larger jacket
+   * is worth the room; the research tools draw a hundred strangers' books,
+   * where the question is how many fit on the screen. Folding them back into
+   * one constant would move the shelf as a side effect of a decision about
+   * search results, and nothing else in the suite would notice.
+   */
+  it("keeps the research default apart from the shelf's", () => {
+    expect(DEFAULT_RESEARCH_LAYOUT).not.toBe(DEFAULT_SHELF_LAYOUT);
+    expect(DEFAULT_RESEARCH_LAYOUT).toBe("small");
   });
 });
 

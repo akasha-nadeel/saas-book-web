@@ -19,6 +19,7 @@ import {
   useLimitGate,
 } from "@/components/upgrade/free-limit";
 import { findBook, setPref } from "@/lib/library-store";
+import { remember, recall } from "@/lib/comps/search-memory";
 import { useHydrated, usePrefs, useShelf } from "@/lib/use-library";
 import { ViewMenu } from "@/components/ui/view-menu";
 import {
@@ -76,6 +77,33 @@ function randomShelf(): string {
   return BROWSE_SHELVES[i] ?? BROWSE_SHELVES[0] ?? "Fiction";
 }
 
+/** This tool's slots in the tab's memory. See `search-memory.ts`. */
+const MEMORY = "title-check";
+/**
+ * The browsing shelf is kept apart from the answer, on purpose: it arrives on
+ * its own schedule seconds after mount, and folding it into the one snapshot
+ * would let that late write carry mount-time values back over whatever the
+ * writer had typed since.
+ */
+const MEMORY_SHELF = "title-check:shelf";
+
+/** Everything worth having back when a writer leaves the area and returns. */
+interface Kept {
+  title: string;
+  clashes: TitleClash[] | null;
+  sources: { google: boolean; openLibrary: boolean } | null;
+  depth: { scanned: number; reported: number | null } | null;
+  keyRefused: boolean;
+  suggestion: string | null;
+  checked: string | null;
+}
+
+/** The wall shown before anything has been checked. */
+interface KeptShelf {
+  books: CompTitle[];
+  name: string;
+}
+
 export function TitleCheckPage({
   bookId,
   embedded,
@@ -89,8 +117,18 @@ export function TitleCheckPage({
      are switched between by one control, so one setting between them. */
   const layout = usePrefs().researchLayout;
 
-  const [title, setTitle] = useState("");
-  const [clashes, setClashes] = useState<TitleClash[] | null>(null);
+  /* Read once at mount. The dashboard throws this component away on an area
+     switch, so without it a writer who glanced at their shelf came back to an
+     empty box — and the browsing sweep ran again. See `search-memory.ts`. */
+  const [kept] = useState(() => recall<Kept>(MEMORY));
+  const [keptShelf] = useState(() => recall<KeptShelf>(MEMORY_SHELF));
+  /** Whether the writer has asked for the box back after an answer. */
+  const [editing, setEditing] = useState(false);
+
+  const [title, setTitle] = useState(() => kept?.title ?? "");
+  const [clashes, setClashes] = useState<TitleClash[] | null>(
+    () => kept?.clashes ?? null,
+  );
   /** How many records the two catalogues actually handed over. */
   /**
    * Which catalogues answered.
@@ -104,7 +142,7 @@ export function TitleCheckPage({
   const [sources, setSources] = useState<{
     google: boolean;
     openLibrary: boolean;
-  } | null>(null);
+  } | null>(() => kept?.sources ?? null);
 
   /**
    * What the sweep actually read, and what the catalogue says is there.
@@ -120,10 +158,10 @@ export function TitleCheckPage({
   const [depth, setDepth] = useState<{
     scanned: number;
     reported: number | null;
-  } | null>(null);
+  } | null>(() => kept?.depth ?? null);
 
   /** Set when a catalogue refused our API key, which is nobody's weather. */
-  const [keyRefused, setKeyRefused] = useState(false);
+  const [keyRefused, setKeyRefused] = useState(() => kept?.keyRefused ?? false);
 
   /**
    * A published title the writer may have been reaching for, or null.
@@ -131,7 +169,9 @@ export function TitleCheckPage({
    * Only ever set when a check found **nothing at all**, and only ever a title
    * a catalogue handed back. See `suggestSpelling`.
    */
-  const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [suggestion, setSuggestion] = useState<string | null>(
+    () => kept?.suggestion ?? null,
+  );
 
   /**
    * Real published titles to look at while the box is still empty.
@@ -149,8 +189,12 @@ export function TitleCheckPage({
    * changes on every visit, and is named on screen so nobody mistakes it for
    * a search they ran.
    */
-  const [genreShelf, setGenreShelf] = useState<CompTitle[]>([]);
-  const [shelfName, setShelfName] = useState<string | null>(null);
+  const [genreShelf, setGenreShelf] = useState<CompTitle[]>(
+    () => keptShelf?.books ?? [],
+  );
+  const [shelfName, setShelfName] = useState<string | null>(
+    () => keptShelf?.name ?? null,
+  );
   /**
    * The title the result on screen belongs to.
    *
@@ -160,9 +204,11 @@ export function TitleCheckPage({
    * it is unattached, which is worse, because there is nothing to tell the
    * reader it is stale.
    */
-  const [checked, setChecked] = useState<string | null>(null);
+  const [checked, setChecked] = useState<string | null>(
+    () => kept?.checked ?? null,
+  );
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">(
-    "idle",
+    () => (kept?.clashes ? "done" : "idle"),
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -201,9 +247,12 @@ export function TitleCheckPage({
    * screen depends on it.
    */
   const askedShelf = useRef(false);
-  const [shelfLoading, setShelfLoading] = useState(true);
+  const [shelfLoading, setShelfLoading] = useState(() => !keptShelf);
   useEffect(() => {
-    if (askedShelf.current) return;
+    /* `askedShelf` guards a second fetch within one mount; `keptShelf` guards
+       it across mounts, which is the expensive half — this is a five-page
+       sweep, and the dashboard remounts this component on every area switch. */
+    if (askedShelf.current || keptShelf) return;
     askedShelf.current = true;
 
     const shelf = randomShelf();
@@ -228,6 +277,7 @@ export function TitleCheckPage({
         if (books.length === 0) return;
         setGenreShelf(books);
         setShelfName(shelf);
+        remember<KeptShelf>(MEMORY_SHELF, { books, name: shelf });
       })
       .catch(() => {
         // Nothing to say: the box is still there and still works.
@@ -236,7 +286,7 @@ export function TitleCheckPage({
          was — which means the placeholders have to stop, or a failed fetch
          would pulse under the box for ever. */
       .finally(() => setShelfLoading(false));
-  }, []);
+  }, [keptShelf]);
 
   /*
    * **The box opens empty, and nothing is searched on arrival.**
@@ -368,6 +418,11 @@ export function TitleCheckPage({
          No `sweep`: one page is plenty to find a title two keystrokes away,
          and this fires on the searches that found nothing rather than on every
          check. */
+      /* Held in a local as well as in state, because the snapshot below is
+         written in this same tick: reading the state variable there would
+         capture the value from *before* this line, since a `setState` has not
+         flushed yet. */
+      let offered: string | null = null;
       if (found.length === 0) {
         try {
           const near = await fetch(`/api/comps?q=${encodeURIComponent(asked)}`);
@@ -376,7 +431,8 @@ export function TitleCheckPage({
             const titles = ((data.books ?? []) as CompTitle[]).map(
               (b) => b.title,
             );
-            setSuggestion(suggestSpelling(asked, titles));
+            offered = suggestSpelling(asked, titles);
+            setSuggestion(offered);
           }
         } catch {
           // A suggestion is a courtesy. Its absence is not a failure.
@@ -402,9 +458,35 @@ export function TitleCheckPage({
               ? data.reported
               : null,
       });
-      setKeyRefused(data?.why?.google === "key");
+      const refused = data?.why?.google === "key";
+      const answeredBy =
+        data.sources && typeof data.sources === "object" ? data.sources : null;
+      const reported =
+        typeof data.reportedOpenLibrary === "number"
+          ? data.reportedOpenLibrary
+          : typeof data.reported === "number"
+            ? data.reported
+            : null;
+
+      setKeyRefused(refused);
       setChecked(candidate.trim());
+      // The press that answers is the press that steps the box aside.
+      setEditing(false);
       setState("done");
+
+      /* **Kept here, where the facts are made**, rather than mirrored out of
+         state by an effect — one copy, written once, at the moment there is
+         something worth keeping. `suggestion` is read back out of state
+         because the branch above may have set it a moment earlier. */
+      remember<Kept>(MEMORY, {
+        title: candidate.trim(),
+        clashes: found,
+        sources: answeredBy,
+        depth: { scanned, reported },
+        keyRefused: refused,
+        suggestion: offered,
+        checked: candidate.trim(),
+      });
     } catch {
       setError("Could not reach the search. Check your connection.");
       setState("error");
@@ -456,6 +538,17 @@ export function TitleCheckPage({
 
   /** Nothing has been asked yet, so the box is the whole screen. */
   const asking = !answered && !error && state !== "loading";
+
+  /**
+   * The box steps aside once there is an answer.
+   *
+   * **The same rule the heading above already follows** — the result names
+   * itself, so the control that produced it stops earning the space — and the
+   * same shape the price check uses, so the two sibling tools do not behave
+   * differently. The `Change` press is the way back, and is the whole of what
+   * keeps this from making the tool single-use until a reload.
+   */
+  const showForm = !answered || editing;
 
   /**
    * Whether the browsing shelf is standing in for an answer.
@@ -550,7 +643,7 @@ export function TitleCheckPage({
               on one, which happens long before anything is printed and is not
               a step in any shop's process. `asking` is the whole condition —
               once there is a finding, `Result` names itself. */}
-          {asking && (
+          {showForm && (
             <h2 className="text-2xl font-bold tracking-tight text-fg">
               Check a title before you commit to it
             </h2>
@@ -569,6 +662,31 @@ export function TitleCheckPage({
             asking && <div className="mb-4" />
           )}
 
+          {/* **The collapsed box, and the way back to it.** Naming `checked`
+              rather than what is in the box: the two part company the moment
+              the form reopens and something is typed, and this line sits above
+              the finding that `checked` produced. */}
+          {!showForm && checked && (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted">
+                Showing the check for{" "}
+                <span className="font-semibold text-fg">{checked}</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                /* `text-accent-ink`, never a literal white: the fill is a
+                   bright periwinkle at night and the brand indigo by day, so
+                   the ink on it has to flip with it. */
+                className="rounded-lg bg-accent px-4 py-1.5 text-sm font-semibold
+                           text-accent-ink"
+              >
+                Change
+              </button>
+            </div>
+          )}
+
+          {showForm && (
           <form
             className="flex flex-wrap gap-2"
             onSubmit={(e) => {
@@ -599,6 +717,7 @@ export function TitleCheckPage({
               {state === "loading" ? "Looking…" : "Check it"}
             </button>
           </form>
+          )}
 
           {/* **Which title the finding is about, when the box no longer says.**
               The result now survives an edit, so the box and the answer can
@@ -606,7 +725,7 @@ export function TitleCheckPage({
               "spider ma" would read as a claim about "spider ma". Naming it is
               what keeps the looser rule honest. Same shape as the comps
               screen's "Showing Fantasy, from this book's genre". */}
-          {stale && (
+          {showForm && stale && (
             <p className="mt-3 text-sm text-muted">
               Showing the check for &ldquo;{checked}&rdquo;. Press Check it for
               what is in the box.
@@ -660,7 +779,10 @@ export function TitleCheckPage({
               </VerdictBanner>
             )}
 
-          <LeftPill allowance={checks} className="mt-3" />
+          {/* The badge goes with the control it meters. The banner does not:
+              it is a refusal notice, and one that hid itself because a result
+              was on screen would be a press that silently did nothing. */}
+          {showForm && <LeftPill allowance={checks} className="mt-3" />}
           <LimitBanner allowance={checks} refused={gate.refused} className="mt-4" />
 
           {error && (
