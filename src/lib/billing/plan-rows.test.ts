@@ -72,7 +72,8 @@ it("opens on the row that separates Free from Pro", () => {
 
 /**
  * **Pro is the whole of what is sold, and these are the rows that say what it
- * buys** (seven since 2026-09-16 — colour themes joined the six that afternoon).
+ * buys** (eight since 2026-09-26, when the price check joined the seven —
+ * colour themes had joined the original six on 2026-09-16).
  * Everything else must read the same on both plans. **Paperback setup is the one
  * feature Free does not have at all** — the owner's decision on 2026-09-16 — so
  * it is the only row allowed to say "Not included", and Pro may never say it.
@@ -89,6 +90,7 @@ it("differs between the plans only on the rows Pro sells", () => {
     "Consistency check",
     "Ideas",
     "Paperback setup",
+    "Price check",
     "Title check",
     "Writing record",
   ]);

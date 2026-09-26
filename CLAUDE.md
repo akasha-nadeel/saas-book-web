@@ -56,11 +56,12 @@ assuming a screen or a route is live.
   segment out of `HIDDEN_BOOK_TOOL_PATHS`** — the env var will not do it.
 - **What is live**: the shelf, `/book/new`, `/book/import`, the editor,
   `/book/[bookId]/export`, `/book/[bookId]/consistency`,
-  `/book/[bookId]/title-check`, and since 2026-09-15
+  `/book/[bookId]/title-check`, since 2026-09-15
   `/book/[bookId]/paperback` and `/book/[bookId]/provenance` (the writing
-  record), plus Ideas in the dashboard's side panel, upgrade/billing and the
+  record), and since 2026-09-26 `/book/[bookId]/price-check`, plus Ideas in the
+  dashboard's side panel, upgrade/billing and the
   legal pages — and `/api/comps`, which was un-gated on 2026-09-02 because it is
-  the route the title check runs on.
+  the route the title check runs on, and which the price check runs on too.
   **What is gated**: `/api/comps/subjects` and the twelve other tool screens.
   Advance copies, the Story bible panel and the editor's Ideas tab were live
   for a day on 2026-09-15 and the owner took them back out.
@@ -93,6 +94,7 @@ is the thing to read **before changing that area**, not after.
 | The store, IndexedDB, cross-tab notes, storage limits, React hooks | `docs/architecture/storage.md` |
 | Dashboard, checkup findings, roadmap, the sixteen tool screens, save bars | `docs/architecture/dashboard-and-tools.md` |
 | Why there is no AI, and the Free/Pro decision | `docs/plans/2026-09-14-ai-free-pro-plan-design.md` |
+| The price check — its search shape, and every figure behind it | `docs/plans/2026-09-26-price-check-guided-search-design.md` |
 | Tiptap editor, rails, panels, front/back matter pages, series bible | `docs/architecture/editor.md` |
 | Reading view, pagination, the export wizard's Preview | `docs/architecture/reader.md` |
 | Export (EPUB, PDF, Word, Markdown), typesetting, front matter, covers | `docs/architecture/export.md` |
@@ -321,18 +323,22 @@ wrong with this book, worst first, each carrying the control that fixes it).
 
 **The tool catalogue is declared once** in `src/lib/book-tools.ts` (path, name,
 one-line description, grouped). Nothing in that list is a preview: a tool that
-is not finished does not go in it. **It holds five entries in three groups** —
-the Title check (`LOOK_OUTWARD`), the Consistency check (`READ_IT_BACK`), and
-Export, Paperback setup and the Writing record (`GET_IT_OUT`) — because the
+is not finished does not go in it. **It holds six entries in three groups** —
+the Title check and the Price check (`LOOK_OUTWARD`), the Consistency check
+(`READ_IT_BACK`), and Export, Paperback setup and the Writing record
+(`GET_IT_OUT`) — because the
 list is what the dashboard, the book card's
 ⋯ sheet and the landing page all read, and the MVP may only name what is
 reachable. (`1daca70` cut it to Export alone; the consistency check was added
-on 2026-08-27 as the second live tool, and is the only one of the seventeen
+on 2026-08-27 as the second live tool, and is one of only two of the eighteen
 written *for* the MVP rather than un-gated into it; the title check was
 un-gated on 2026-09-02 as the third; paperback setup and the writing record on
 2026-09-15, ranked first by that day's research into what writers complain
 about — advance copies came in with them and went back behind the gate the
-same day.) **`GET_IT_OUT` is exported by name as
+same day. **The price check is the sixth, on 2026-09-26**, and the other one
+written for the MVP: it needed no un-gating because it never existed to be
+gated, only a field on the `/api/comps` response that nothing had been
+reading.) **`GET_IT_OUT` is exported by name as
 well as through `TOOL_GROUPS`**, because Overview shows that one group on its
 own and a lookup by title would have made the block vanish silently the day
 somebody renamed it. `src/lib/tool-guide.ts` carries one guide per entry. The
@@ -340,14 +346,18 @@ twelve older tool *screens* still hidden are all in the tree under
 `src/app/book/[bookId]/` and `src/components/`; bringing one back is an entry
 here, an entry there, and a line off `HIDDEN_BOOK_TOOL_PATHS`.
 
-**The dashboard's side panel, in the owner's order** (2026-09-15): Overview,
-Write, Favourites, Archived, a rule, Title check, Ideas, Paperback, a rule,
-Trash. No group heading — the rules separate the book lists from the tools, and
+**The dashboard's side panel, in the owner's order** (2026-09-15, with the
+price check added under the title check on 2026-09-26): Overview,
+Write, Favourites, Archived, a rule, Title check, Price check, Ideas,
+Paperback, a rule, Trash. No group heading — the rules separate the book lists from the tools, and
 Trash stays last. `RAIL` holds `{ divider: true }` rows for them. Paperback
 uses the shared frame `BookToolArea` and book picker `WorkingOn` (out of
 `Tools`, where it was first written), mounting `PaperbackPage` with `embedded`
 as a `dynamic` chunk inside the same child override `TitleCheckArea` uses;
-Ideas mounts the editor's `IdeasPanel`. The writing record is reached from the
+Ideas mounts the editor's `IdeasPanel`. **The price check takes neither frame**
+— like the title check it searches a description of a book rather than this
+writer's manuscript, so `PriceCheckArea` is a banner and the tool, with no
+`bookId` and no book picker. The writing record is reached from the
 Export screen's Format step and the export-done dialog rather than from the
 rail. **How it works, Support, Send feedback and Pricing sit at the foot of the
 side panel**, under a rule; they were tried in the top bar beside New book for
@@ -394,13 +404,42 @@ keyless catalogue search.
 server-side for a shared cache and to keep a reader's browser off two third
 parties. Records merge **field by field** on ISBN, or title-plus-author.
 **The manuscript never goes** — what leaves is a query. `/api/comps` is live
-because the title check runs on it; `/api/comps/subjects` is behind the launch
-flag and answers 404.
+because the title check and the price check both run on it;
+`/api/comps/subjects` is behind the launch flag and answers 404.
 
 - `openLibraryQuery()` translates dialects: Google wants `intitle:`, Open
   Library wants `title:`, and **Open Library answers an unknown prefix with zero
   results rather than an error** — which is how the title check silently read
   one catalogue for its whole life while the page claimed two.
+- **The Google call pins `country=US` and it is load-bearing, not cosmetic.**
+  Without a `country` parameter Google marks every record `NOT_FOR_SALE` and
+  returns no `listPrice` at all, so the field the price check is built on did
+  not exist for the whole life of this route. Adding it was measured not to
+  change *which* books come back (2026-09-26, two queries, result sets
+  identical). It is pinned rather than taken from the caller: a price is a fact
+  about a shop, not about the reader, and most countries have no Play Books
+  store — `country=LK` returns nothing, exactly like sending no country.
+- **Prices are Google's alone, ebook-only, and thin.** Open Library carries
+  none, so `fuse` names `price` explicitly or a merge drops it; and coverage
+  runs about a quarter to two-thirds of results depending on the query, which
+  is what `MIN_PRICES` in `comps/price-check.ts` exists for. **Depth does fix
+  most of it, and an earlier version of this line said otherwise** — measured
+  on *two* pages the priced count barely moves, which is where that claim came
+  from; measured on five it roughly triples, and searches too thin to
+  summarise fall from four in ten to one in ten. The medians that move under
+  depth are all small samples moving toward the commercial range, so the
+  shallow figure was the unreliable one. The price check therefore sweeps.
+- **A `subject:` prefix kills prices, and it is the trap in this cluster.**
+  Google answers a field-prefixed query out of its catalogue rather than its
+  store: `subject:"cozy mystery"` returned **0** priced records of 20, every
+  one `NOT_FOR_SALE`. So `buildQuery` cannot be used by the price check (it
+  appends one) and `BROWSE_SHELVES` cannot be its dropdown (the comps screen
+  turns those into one). `PRICE_SHELVES` in `price-check.ts` is the
+  plain-words list that exists for it, and `priceQuery` is the builder.
+- **No recommended price, either**, which is the same rule in the money
+  direction: the price check reports a median, a spread and every book it
+  found, and names no figure a writer should charge. The tool this product is
+  measured against prints one average beside an invented competitive score.
 - **No search volume, no competition score, no rank — anywhere in this
   cluster.** It cannot be had honestly; the modules have tests asserting their
   shape carries no such number, and those tests are not to be "fixed".
@@ -892,9 +931,13 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   by assistant credits, so removing the AI left three identical products; the
   migration folds every retired row into `pro`, and `asTier` refuses the old
   names rather than mapping them.
-- **Pro buys six things since 2026-09-16**, and `plan-rows.test.ts` pins the
+- **Pro buys eight things since 2026-09-26**, and `plan-rows.test.ts` pins the
   list: unlimited books (Free holds **three**); unlimited title checks (Free
-  runs **three a day**, `FREE_LIMITS.titleCheck`); unlimited parked ideas (Free
+  runs **three a day**, `FREE_LIMITS.titleCheck`); unlimited **price checks**
+  (Free runs **three a day** too, `FREE_LIMITS.priceCheck`, and the two are
+  deliberately the same number — the same catalogues, the same free cache, and
+  a writer moving between the two tools should not have to learn two
+  allowances); unlimited parked ideas (Free
   parks **five at a time**, `FREE_LIMITS.ideas` — occupancy, so forgetting one
   makes room); all **11** consistency checks (Free runs **5**, `FREE_CHECKS` in
   `consistency-ids.ts`, and is told how many things the other six found); the
@@ -1050,7 +1093,7 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
 
   | Shape | Tools | Free |
   |---|---|---|
-  | **Per day** | comps, covers, title check | 3 / 3 / 3 a day |
+  | **Per day** | comps, covers, title check, price check | 3 a day each |
   | **Per book** | blurb, prose report, track | 5 / 6 / 2 books |
   | **By occupancy** | ARC readers, seats | 10 a book / 2 a book |
   | **Held, across the library** | parked ideas | 5 at a time |
@@ -1210,13 +1253,14 @@ chapter opened**, not a screen · `/book/[bookId]/chapter/[chapterId]` editor ·
 `/book/[bookId]/read` reading view · `/invite/[token]` (gated, which is what
 makes the link a pointer rather than a credential).
 
-The seventeen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
+The eighteen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
 `paperback`, `listing` · `comps`, `blurb`, `categories`, `covers`,
 `title-check` · `structure`, `prose`, `progress`, `provenance` · `money`,
-`track`, `arc` · and `consistency`, the seventeenth, written for the MVP rather
-than un-gated into it — grouped the way `book-tools.ts` groups them. **Under the
-launch flag the proxy redirects all of them home but `export`, `consistency`,
-`title-check`, `paperback` and `provenance`**, along with
+`track`, `arc` · and `consistency` and `price-check`, the two written for the
+MVP rather than un-gated into it — grouped the way `book-tools.ts` groups them.
+**Under the launch flag the proxy redirects all of them home but `export`,
+`consistency`, `title-check`, `price-check`, `paperback` and `provenance`**,
+along with
 `/book/[bookId]/read`, `/tools` and `/invite/[token]`; `HIDDEN_BOOK_TOOL_PATHS`
 in `launch.ts` is the list, and it holds **thirteen** entries — the twelve
 hidden tools plus `read`. **Read the set rather than this sentence**: `comps`

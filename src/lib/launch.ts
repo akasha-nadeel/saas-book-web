@@ -133,6 +133,14 @@ export const PLANS_ON_SALE: boolean = true;
  * `arc` came off the same day and went back on it: the owner reviewed it in
  * the running app and took it out again. Neither remaining screen links to one
  * still on this list.
+ *
+ * **`price-check` was built live and has never been on this list** (2026-09-26)
+ * — the second of the seventeen written for the MVP rather than un-gated into
+ * it, after the consistency check. It runs on `/api/comps` like the title
+ * check, so the paragraph above covers it: the route was already open, and
+ * what the tool needed was a field on the response nothing had been reading.
+ * Its absence here is deliberate rather than an oversight, which is worth
+ * saying because every other tool in `book-tools.ts` had to be taken off.
  */
 const HIDDEN_BOOK_TOOL_PATHS = new Set([
   "arc",

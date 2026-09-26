@@ -50,6 +50,38 @@ import {
 /** Optional. See the note above: without it, Google answers 429 under load. */
 const GOOGLE_KEY = process.env.GOOGLE_BOOKS_API_KEY;
 
+/**
+ * The store whose prices we read, and it is not optional.
+ *
+ * **Without a `country` parameter Google returns no prices at all** — every
+ * record comes back `saleability: "NOT_FOR_SALE"` with no `listPrice`, whatever
+ * the book is. Measured 2026-09-26: `cozy mystery village murder` returned 0
+ * priced records of 20 with the parameter absent and 10 of 20 with `US`. That
+ * is why `saleInfo` was worth nothing here for the whole life of this route.
+ *
+ * **Adding it does not change which books come back.** The same measurement ran
+ * both spellings of two queries and diffed the result sets: identical, title
+ * for title. So this is safe for the comps screen and the title check, which
+ * read the same response and care only about the records.
+ *
+ * **Pinned rather than taken from the caller**, for two reasons. A price is a
+ * fact about a shop, not about the reader — a writer in Colombo choosing what
+ * to charge on a US store wants the US figure. And most countries have no
+ * Play Books store at all: `country=LK` returns zero prices, exactly like
+ * sending nothing. `plans.ts` is USD-only for the same reason.
+ *
+ * **`filter` is the obvious next idea and it does not work.** Google documents
+ * `filter=paid-ebooks`, which would be exactly the records the price check
+ * wants. Asked for paid ebooks on 2026-09-26 it returned books marked
+ * `saleability: "FREE"` with no price at all — *Catalog of Copyright Entries*,
+ * *Principia Latina* — and `filter=ebooks` and `filter=free-ebooks` both
+ * returned **zero** priced records where the unfiltered call returned three.
+ * The parameter cannot be relied on, so depth is what raises the yield
+ * instead. (`totalItems` is the same story: it answers 300 for almost every
+ * query, which is part of why `reportedTotal` exists.)
+ */
+const PRICE_COUNTRY = "US";
+
 /** How long an answer is worth keeping. Published books do not move quickly. */
 const CACHE_SECONDS = 60 * 60 * 24;
 
@@ -100,7 +132,30 @@ const PER_SOURCE = 40;
  * being conservative; it is wrong, and wrong in the direction that costs a
  * writer the decision the screen exists to inform.
  *
- * So `?sweep=1`, sent by the title check and by nothing else.
+ * So `?sweep=1`, sent by the title check — and, since 2026-09-26, by the price
+ * check, which is a third case again and had to be measured rather than
+ * reasoned about. A median is an order statistic, not a proportion, so the
+ * objection above does not transfer: a looser sample does not drag it toward a
+ * genre-wide fact the way a percentage is dragged. What one page *does* do is
+ * let whichever academic or reference edition Google ranked first set the
+ * figure. Measured over ten genre queries, one page against five:
+ *
+ * | query | priced, 1 page | 5 pages | median |
+ * |---|---|---|---|
+ * | cozy mystery village murder | 10 | 35 | 4.99 → 4.99 |
+ * | small town contemporary romance | 5 | 12 | 9.99 → **5.99** |
+ * | young adult dystopian rebellion | 4 | 9 | 16.79 → **9.99** |
+ * | paranormal romance vampire fated mates | 14 | 62 | 5.49 → 4.99 |
+ * | literary fiction family secrets | 7 | 7 | 4.49 → 4.49 |
+ *
+ * Searches too thin to summarise fell from four in ten to one in ten, and
+ * **the medians that moved were all small samples moving toward the
+ * commercial range** — the four that already had seven or more prices did not
+ * move at all. So the one-page figure was the unreliable one, and depth
+ * corrects it rather than loosening it.
+ *
+ * The price check sends `only=google` with it, because the deep half it wants
+ * is Google's and Open Library has no prices to contribute.
  *
  * **The page counts are each service's own ceiling, not a preference.** Open
  * Library takes `limit` up to 100; Google's `maxResults` stops at 40 and it
@@ -313,9 +368,22 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const query = params.get("q")?.trim() ?? "";
   /* Asked for, never assumed. Comps is deliberately shallow — see
-     `SWEEP_PAGES` — so this is opt-in and the title check is the only caller
-     that opts in. */
+     `SWEEP_PAGES` — so this is opt-in, and the title check and the price
+     check are the two callers that opt in, for different reasons the doc on
+     `SWEEP_PAGES` gives. */
   const sweep = params.get("sweep") === "1";
+  /**
+   * Skip Open Library entirely. Sent by the price check and nothing else.
+   *
+   * **Because Open Library carries no prices, for any book, ever.** Swept, it
+   * is five hundred records fetched and thrown away on every price search,
+   * against a free service that asks to be called politely — and its records
+   * were also inflating the one figure that screen turns on. "3 of 53 books
+   * carried a price" counted thirty-odd records that could never have had
+   * one; asking Google alone makes `books.length` the honest denominator
+   * without anything having to be told about sources.
+   */
+  const googleOnly = params.get("only") === "google";
 
   if (query.length < 2) {
     return NextResponse.json(
@@ -371,7 +439,7 @@ export async function GET(request: Request) {
       `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
         query,
       )}&maxResults=${PER_SOURCE}&startIndex=${page * PER_SOURCE}` +
-      `&printType=books&orderBy=relevance` +
+      `&printType=books&orderBy=relevance&country=${PRICE_COUNTRY}` +
       (GOOGLE_KEY ? `&key=${encodeURIComponent(GOOGLE_KEY)}` : ""),
   );
 
@@ -390,9 +458,21 @@ export async function GET(request: Request) {
       `&fields=key,title,author_name,first_publish_year,publisher,number_of_pages_median,subject,isbn,cover_i`,
   );
 
+  /* Not asked is not the same as failed, and this is the shape that keeps them
+     apart on the wire: an unasked source reports `ok: false` like a broken one,
+     so `asked` below is what tells them apart. */
+  const unasked = {
+    books: [] as CompTitle[],
+    ok: false,
+    reported: null,
+    why: null as SourceFailure,
+  };
+
   const [google, openLibrary] = await Promise.all([
     raced(fetchPages(googlePages, parseGoogle)),
-    raced(fetchPages(openLibraryPages, parseOpenLibrary)),
+    googleOnly
+      ? Promise.resolve(unasked)
+      : raced(fetchPages(openLibraryPages, parseOpenLibrary)),
   ]);
 
   // Across pages as well as across sources: the same book turning up on page
@@ -408,6 +488,12 @@ export async function GET(request: Request) {
       // Named so the screen can say "Open Library did not answer" rather than
       // leaving a writer to conclude that nothing like their book exists.
       sources: { google: google.ok, openLibrary: openLibrary.ok },
+      // **Which sources were called at all**, because `ok: false` cannot carry
+      // both "it failed" and "we never asked" without one of them being read
+      // as the other. The price check asks for Google alone, and a screen
+      // reporting "Open Library did not answer" about a request nobody made
+      // would be a fault invented out of a deliberate choice.
+      asked: { google: true, openLibrary: !googleOnly },
       // Not just *that* a source failed but how, because "wait a minute" and
       // "try again now" are opposite instructions and the wrong one is what
       // makes a writer press the button into a quota.

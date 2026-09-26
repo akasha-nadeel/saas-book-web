@@ -47,6 +47,29 @@ export const TOOL_GUIDES: ToolGuide[] = [
     ],
   },
   {
+    path: "price-check",
+    headline: "What the books beside yours are actually charging",
+    claim: "What comparable ebooks cost",
+    lead: " — the real figures, with no recommended price.",
+    points: [
+      {
+        term: "Every book, not an average",
+        detail:
+          "A genre usually has two clusters in it, one near five dollars and one near twelve, and a single average sits in the empty space between them describing nothing. Each book is drawn where its own price falls, and each one links out to the listing so you can go and look.",
+      },
+      {
+        term: "The median, and how many books it came from",
+        detail:
+          "A search that turned up four prices says so instead of summarising them, because four books are not a shelf. When there are enough, the figure comes with the count it was drawn from and the range the middle half sits in.",
+      },
+      {
+        term: "Nothing is filtered for being awkward",
+        detail:
+          "A reference book at seventy-five dollars stays in the list where you can see it, rather than being quietly dropped for spoiling the shape. Deciding which books are comparable is your judgement about your own genre, not something a search can make for you.",
+      },
+    ],
+  },
+  {
     path: "consistency",
     headline: "The mistakes that only show up when the whole book is read at once",
     claim: "Names, spellings and quotation marks",

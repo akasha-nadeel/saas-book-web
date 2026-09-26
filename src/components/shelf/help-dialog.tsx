@@ -121,6 +121,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "Searches millions of published books for the title you are considering, and shows what a reader would find instead of yours. Titles cannot be copyrighted, so this reports rather than advises.",
       },
       {
+        name: "The price check",
+        desc: `What comparable ebooks are actually charging: every book the search found that had a price, the median of them, and the range the middle half sits in. Google Play's US ebook prices — neither catalogue carries paperback prices, so it says nothing about print. There is no recommended price and there will not be one. ${TIER_NAMES.free} runs ${plural(FREE_LIMITS.priceCheck.free, "check")} a day.`,
+      },
+      {
         name: "The writing record",
         desc: `A dated record of the days you wrote and the drafts that were saved, gathered into a plain-text document you can send if anyone says you used AI. It is evidence, not proof, and the document says so. On the Export screen. ${TIER_NAMES.free} covers the last ${FREE_RECORD_DAYS} days; ${TIER_NAMES.pro} covers the twelve months the app keeps and adds a fingerprint of the text. Every day is kept either way, in this browser.`,
       },
@@ -135,11 +139,11 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     items: [
       {
         name: TIER_NAMES.free,
-        desc: `Free, no card. ${plural(TIER_LIMITS.free.books ?? 0, "book")}, unlimited chapters and words, importing, syncing, every export format, ${plural(FREE_LIMITS.titleCheck.free, "title check")} a day, ${plural(FREE_LIMITS.ideas.free, "parked idea")} at a time, ${FREE_CHECKS.length} consistency checks and the last ${FREE_RECORD_DAYS} days of the writing record.`,
+        desc: `Free, no card. ${plural(TIER_LIMITS.free.books ?? 0, "book")}, unlimited chapters and words, importing, syncing, every export format, ${plural(FREE_LIMITS.titleCheck.free, "title check")} and ${plural(FREE_LIMITS.priceCheck.free, "price check")} a day, ${plural(FREE_LIMITS.ideas.free, "parked idea")} at a time, ${FREE_CHECKS.length} consistency checks and the last ${FREE_RECORD_DAYS} days of the writing record.`,
       },
       {
         name: TIER_NAMES.pro,
-        desc: `Everything on Free, with unlimited books, title checks and parked ideas, all ${ALL_CHECKS.length} consistency checks, twelve months of the writing record with its fingerprint, and paperback setup.`,
+        desc: `Everything on Free, with unlimited books, title and price checks and parked ideas, all ${ALL_CHECKS.length} consistency checks, twelve months of the writing record with its fingerprint, and paperback setup.`,
       },
       {
         name: "Not on sale yet",

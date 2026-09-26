@@ -61,8 +61,8 @@
  * every other gate here.
  */
 
-/** The three that ask a catalogue something, counted per day. */
-export type DailyLimit = "comps" | "covers" | "titleCheck";
+/** The four that ask a catalogue something, counted per day. */
+export type DailyLimit = "comps" | "covers" | "titleCheck" | "priceCheck";
 
 /** The ones that work on one manuscript, counted in distinct books. */
 export type BookLimit = "blurb" | "prose" | "track";
@@ -120,6 +120,20 @@ export const FREE_LIMITS: Record<Limited, { free: number; pro: number | null }> 
    * `workOne` stays, so a daily limit of one would still read in the singular.
    */
   titleCheck: { free: 3, pro: null },
+  /*
+   * **Three, matching the title check**, because it is the same shape of work:
+   * a keyless catalogue search on a free cache, metered as a pricing decision
+   * rather than because it costs anything to run. The two tools sit in the
+   * same group and a writer moving between them should not have to learn two
+   * different allowances.
+   *
+   * Worth knowing when this number is next argued about: roughly four searches
+   * in ten come back with too few prices to summarise — measured across ten
+   * genre queries on 2026-09-26, see `MIN_PRICES` in `comps/price-check.ts`.
+   * A search that reports nothing still spends one, because it really did ask
+   * both catalogues; but that is the reason three is not obviously generous.
+   */
+  priceCheck: { free: 3, pro: null },
   blurb: { free: 5, pro: null },
   prose: { free: 6, pro: null },
   track: { free: 2, pro: null },
@@ -372,6 +386,7 @@ const SHAPE: Record<Limited, Shape> = {
   comps: "daily",
   covers: "daily",
   titleCheck: "daily",
+  priceCheck: "daily",
   blurb: "book",
   prose: "book",
   track: "book",
@@ -412,6 +427,7 @@ const WORDS: Record<
   comps: { one: "search", many: "searches", short: "searches", shortOne: "search", work: "comp searches", workOne: "comp search" },
   covers: { one: "search", many: "searches", short: "searches", shortOne: "search", work: "cover searches", workOne: "cover search" },
   titleCheck: { one: "check", many: "checks", short: "checks", shortOne: "check", work: "title checks", workOne: "title check" },
+  priceCheck: { one: "check", many: "checks", short: "checks", shortOne: "check", work: "price checks", workOne: "price check" },
   blurb: { one: "book", many: "books", short: "books", shortOne: "book", work: "the blurb" },
   prose: { one: "book", many: "books", short: "books", shortOne: "book", work: "the prose report" },
   track: { one: "book", many: "books", short: "books", shortOne: "book", work: "money tracking" },

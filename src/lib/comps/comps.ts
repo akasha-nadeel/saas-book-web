@@ -48,6 +48,18 @@ export interface CompTitle {
   source: "google" | "openlibrary";
   /** Where a reader can go and look at it themselves. */
   infoUrl?: string;
+  /**
+   * The store's own listed price, when the store admits to one.
+   *
+   * **Google Books only, and only when the request carried a `country`.** With
+   * no country parameter every record comes back `NOT_FOR_SALE` and this field
+   * is absent from all of them — measured 2026-09-26, and it is why no price
+   * was visible here for the whole life of the module. The route pins `US`.
+   *
+   * Open Library never carries one, so a merged record's price always came
+   * from the Google half. `fuse` has to say so explicitly or it is lost.
+   */
+  price?: { amount: number; currency: string };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -191,6 +203,38 @@ function strings(value: unknown): string[] {
 }
 
 /**
+ * Google's `saleInfo.listPrice`, or nothing.
+ *
+ * **`listPrice` alone, never `retailPrice`.** They are different facts: the
+ * list price is what the publisher set, the retail price is what Google is
+ * charging today, and a promotion makes the second one lower for reasons that
+ * have nothing to do with how the book is priced. A writer deciding what to
+ * charge is choosing a list price, so that is the only one read here. Falling
+ * back to the other when the first is missing would quietly mix the two in one
+ * column of figures.
+ *
+ * Zero is kept. A book listed free is a real record and the price screen says
+ * how many of those it found; dropping them here would make that count
+ * impossible to take.
+ */
+function priceOf(value: unknown): CompTitle["price"] {
+  const sale = value as { listPrice?: unknown } | undefined;
+  const list = sale?.listPrice as
+    | { amount?: unknown; currencyCode?: unknown }
+    | undefined;
+  if (!list) return undefined;
+
+  const amount = list.amount;
+  const currency = str(list.currencyCode);
+  if (typeof amount !== "number" || !Number.isFinite(amount) || amount < 0) {
+    return undefined;
+  }
+  if (!currency) return undefined;
+
+  return { amount, currency };
+}
+
+/**
  * Google Books' `volumes` response.
  *
  * Typed as `unknown` and narrowed here rather than trusted: this is a public
@@ -237,6 +281,7 @@ export function parseGoogle(payload: unknown): CompTitle[] {
       coverUrl: cover,
       source: "google",
       infoUrl: str(info.infoLink),
+      price: priceOf(item.saleInfo),
     });
   }
   return out;
@@ -324,6 +369,11 @@ function fuse(seen: CompTitle, book: CompTitle): CompTitle {
     publisher: seen.publisher ?? book.publisher,
     year: seen.year ?? book.year,
     infoUrl: seen.infoUrl ?? book.infoUrl,
+    /* Load-bearing. Only the Google half of a merge ever carries a price, and
+       Open Library returns the larger list — so a record that arrived from
+       Open Library first would swallow the priced one and the price would
+       vanish from a book that has one. */
+    price: seen.price ?? book.price,
     subjects: [...new Set([...seen.subjects, ...book.subjects])],
   };
 }

@@ -127,6 +127,18 @@ export const ROWS: {
       pro: UNLIMITED,
     },
   },
+  /* Metered the same way and for the same reason — a keyless catalogue search
+     on a shared cache, where the allowance is a pricing decision rather than a
+     cost. Its number comes from `FREE_LIMITS` for the same reason the row
+     above does. */
+  {
+    group: "Publishing",
+    label: "Price check",
+    values: {
+      free: `${FREE_LIMITS.priceCheck.free} a day`,
+      pro: UNLIMITED,
+    },
+  },
   /* **The wedge.** Export is the one thing a writer cannot do without, and
      charging for the door is what this trade's writers check for first. Two
      identical values *is* the argument; the row stays for exactly that

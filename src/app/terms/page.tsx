@@ -73,13 +73,15 @@ export default function TermsPage() {
           The Free plan includes {plural(TIER_LIMITS.free.books ?? 0, "book")},
           unlimited chapters and words, autosave and sync where accounts are
           configured, Word, EPUB and PDF export,{" "}
-          {plural(FREE_LIMITS.titleCheck.free, "title check")} a day,{" "}
+          {plural(FREE_LIMITS.titleCheck.free, "title check")} and{" "}
+          {plural(FREE_LIMITS.priceCheck.free, "price check")} a day,{" "}
           {plural(FREE_LIMITS.ideas.free, "parked idea")} at a time,{" "}
           {FREE_CHECKS.length} of the {ALL_CHECKS.length} consistency checks,
           and the last {FREE_RECORD_DAYS} days of the writing record.
         </p>
         <p>
-          {TIER_NAMES.pro} adds unlimited books, title checks and parked ideas,
+          {TIER_NAMES.pro} adds unlimited books, title checks, price checks and
+          parked ideas,
           all {ALL_CHECKS.length} consistency checks, the writing record for the
           twelve months the app keeps, and paperback setup. Every export format
           is included on every plan, paid or not.

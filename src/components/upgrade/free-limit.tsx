@@ -455,6 +455,7 @@ const REACHED_LINE: Record<Limited, string> = {
   comps: "Comp and cover searches with no daily limit",
   covers: "Comp and cover searches with no daily limit",
   titleCheck: "Title checks with no daily limit",
+  priceCheck: "Price checks with no daily limit",
   blurb: "The blurb, prose report and money tracking on every book",
   prose: "The blurb, prose report and money tracking on every book",
   track: "The blurb, prose report and money tracking on every book",

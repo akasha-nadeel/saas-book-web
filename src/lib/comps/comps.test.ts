@@ -183,6 +183,66 @@ describe("parseGoogle", () => {
     expect(parseGoogle({ totalItems: 0 })).toEqual([]);
     expect(parseGoogle(null)).toEqual([]);
   });
+
+  /*
+   * The price half. `saleInfo` only arrives at all when the request carried a
+   * `country` — see `PRICE_COUNTRY` in the route — so the common shape in the
+   * wild is the one with no `listPrice` on it, and that has to cost the field
+   * rather than the record.
+   */
+  describe("prices", () => {
+    const one = (saleInfo: unknown) =>
+      parseGoogle({ items: [{ id: "a", volumeInfo: { title: "T" }, saleInfo }] })[0];
+
+    it("reads a list price with its currency", () => {
+      const book = one({
+        saleability: "FOR_SALE",
+        isEbook: true,
+        listPrice: { amount: 4.99, currencyCode: "USD" },
+        retailPrice: { amount: 3.99, currencyCode: "USD" },
+      });
+      expect(book.price).toEqual({ amount: 4.99, currency: "USD" });
+    });
+
+    it("keeps a book listed free, which is a record rather than a gap", () => {
+      expect(one({ listPrice: { amount: 0, currencyCode: "USD" } })?.price).toEqual({
+        amount: 0,
+        currency: "USD",
+      });
+    });
+
+    it("has no price for a book the store does not sell", () => {
+      expect(one({ saleability: "NOT_FOR_SALE", isEbook: false })?.price).toBe(
+        undefined,
+      );
+      expect(one(undefined)?.price).toBe(undefined);
+    });
+
+    /* The retail price is what Google charges today and the list price is what
+       the publisher set. Reading one when the other is missing would mix two
+       different facts into one column of figures. */
+    it("does not fall back to the retail price", () => {
+      expect(one({ retailPrice: { amount: 3.99, currencyCode: "USD" } })?.price).toBe(
+        undefined,
+      );
+    });
+
+    it("refuses anything that is not a real amount and a real currency", () => {
+      expect(one({ listPrice: { amount: "4.99", currencyCode: "USD" } })?.price).toBe(
+        undefined,
+      );
+      expect(one({ listPrice: { amount: Number.NaN, currencyCode: "USD" } })?.price).toBe(
+        undefined,
+      );
+      expect(one({ listPrice: { amount: -1, currencyCode: "USD" } })?.price).toBe(
+        undefined,
+      );
+      expect(one({ listPrice: { amount: 4.99 } })?.price).toBe(undefined);
+      expect(one({ listPrice: { amount: 4.99, currencyCode: "" } })?.price).toBe(
+        undefined,
+      );
+    });
+  });
 });
 
 describe("parseOpenLibrary", () => {
@@ -264,6 +324,21 @@ describe("mergeComps", () => {
     expect(book.pageCount).toBe(384);
     expect(book.subjects).toEqual(["Fantasy"]);
     expect(book.coverUrl).toBe("https://c/1.jpg");
+  });
+
+  /*
+   * The price is the one field only ever carried by one of the two services,
+   * and Open Library returns the longer list — so the Open Library record
+   * routinely lands in a slot first and the Google one merges into it. Without
+   * `price` named in `fuse`, that merge silently drops it and a priced book
+   * reads as unpriced.
+   */
+  it("keeps a price that arrived on the Google half of a merge", () => {
+    const [book] = mergeComps(
+      [comp({ isbn13: "978", source: "openlibrary", subjects: ["Fantasy"] })],
+      [comp({ isbn13: "978", price: { amount: 4.99, currency: "USD" } })],
+    );
+    expect(book.price).toEqual({ amount: 4.99, currency: "USD" });
   });
 
   /**

@@ -1601,6 +1601,19 @@ flow, and whether the tool pages survive a narrow window. The dashboard rail is
 
 ## Taken out on purpose
 
+- **The price check's price chart** (`components/price-check/price-strip.tsx`,
+  with `axisCeiling` and `aboveCeiling` in `comps/price-check.ts`). Mounted for
+  a few hours on 2026-09-26 and taken out by the owner after using it: its
+  caption repeated the headline figure, and the screen reads as one number and
+  its evidence without it. The middle-half range was the only fact the caption
+  held alone and now sits in the headline sentence, so nothing true went with
+  the chart. The argument *for* it is still good on its own terms — a genre's
+  prices cluster in two places and a chart is the only way to see that — so it
+  is kept whole and tested. Putting it back is one line in
+  `price-check-page.tsx` plus an answer to the two objections in its header.
+
+
+
 - **Collaboration, hidden on 2026-09-03** at the owner's request — *"no need
   collaborating tool for this web app right now, I will tell you if I want to."*
   Built, tested, and reachable from nothing rather than deleted.
@@ -3375,6 +3388,106 @@ wireframes, not designs — so a writer arriving from a video promising it
 their characters and bible are **per-novel**; ours read across a series with
 transitive alias merging (`series.ts`), which is the one place we are already
 ahead on their flagship feature.
+
+## Shipped 2026-09-26 — the price check found more prices, then got a form
+
+Two rounds after the tool shipped, both driven by the same complaint: a real
+search reported **"Only 3 of 53 books carried a price"** and could say nothing.
+
+**Round one — the number was wrong three ways.**
+
+- **The denominator counted books that could never have had a price.** Open
+  Library carries none, for any book, ever, so thirty-odd of those fifty-three
+  were never candidates. `/api/comps` gained `only=google`, which also stopped
+  fetching and discarding five hundred Open Library records per search. It
+  gained `asked` at the same time, so `ok: false` cannot mean both *it failed*
+  and *we never called it*.
+- **One page of Google was too shallow, and its median was the unreliable
+  one.** Five pages drops thin searches from four in ten to one in ten. The
+  medians that move under depth are all small samples moving toward the
+  commercial range — $9.99 to $5.99, $16.79 to $9.99, $167 to $85.50 — while
+  the four that already had seven or more prices do not move at all. **An
+  earlier note in this file and in CLAUDE.md said depth could not help; that
+  was measured on two pages and was wrong at five.**
+- **`filter=paid-ebooks` is broken on Google's side** and is the one dead end
+  worth recording: asked for *paid* ebooks it returns `saleability: "FREE"`
+  public-domain scans. Every `filter` value returned fewer priced records than
+  no filter at all.
+
+**Round two — the input was the real problem.** The first thing a writer types
+into an empty box is their title, which is the one search that cannot work:
+Google knows prices for the books it *sells* and a title matches the ones it
+merely *scanned*. `i love you` found three priced books in a hundred records
+and no amount of depth changed that. So the box became a small form — a genre
+dropdown and two optional boxes — built on two measurements:
+
+- **A bare genre is enough for a narrow shelf and hopeless for a broad one.**
+  `cozy mystery` alone found 37 prices, `young adult dystopian` 20,
+  `paranormal romance` 18 — but `thriller` found **4**, `contemporary romance`
+  **3** and `literary fiction` **1**. So each shelf in `PRICE_SHELVES` carries
+  its own measured words, and the broad ones carry a qualifier. Twelve shelves;
+  `historical fiction` has none because all three candidates for it were
+  measured and refused.
+- **More words are not reliably better.** `cozy mystery village murder` plus
+  five more words tripled the prices; `epic fantasy dragon kingdom war` plus
+  four more collapsed from 99 records to **16**. So a typed box *replaces* the
+  shelf's extra words rather than adding to them, and the query never grows
+  past a genre and two things.
+
+**The one rule holding it honest:** the "Searching for" line prints exactly
+what the fetch sends. Three shelves search for more words than their own name,
+so showing the name alone would mean searching words the writer never saw.
+
+**A native `<select>` was written first and replaced with `ui/picker.tsx`.**
+Chrome changes a focused select's value on a mouse wheel, so scrolling past the
+card on the dashboard silently re-picked the genre and the form then searched a
+shelf nobody chose. It was caught in the running app within minutes of being
+written. `picker.tsx`'s own doc already argued the case on appearance grounds;
+this is the behavioural half of it.
+
+## Shipped 2026-09-26 — the price check
+
+**A sixth live tool, and the second written for the MVP rather than un-gated
+into it.** It shows what comparable ebooks actually charge: a median, the range
+the middle half sits in, and every priced book listed with a link to its
+listing.
+
+**It cost almost nothing to build because the data was already arriving and
+nothing was reading it.** `/api/comps` has called Google Books since the comps
+screen was written; `saleInfo.listPrice` was on every response. The one change
+that mattered was a query parameter — **without `country`, Google marks every
+record `NOT_FOR_SALE` and returns no price at all**. Pinning `country=US` was
+measured not to change which books come back, so the comps screen and the title
+check are unaffected.
+
+**What it refuses to do, and these are the load-bearing decisions:**
+
+- **No recommended, suggested or optimal price.** What a book should cost
+  depends on the writer's royalty rate, their series and their launch plan.
+  Publisher Rocket, the trade's tool for this, prints one "average price"
+  beside an invented competitive score and an estimated monthly earnings
+  figure. That is the thing this is the alternative to.
+- **A median, never a mean, and every book drawn as its own dot.** A live
+  search for `thriller detective serial killer` returned 0.50, 4.99, 4.99,
+  5.99, 8.99, 11.99 ×5, 14.99, 75.95, 119 — an indie cluster near $5, a trade
+  cluster near $12, and two criminology textbooks. The mean is $22 and
+  describes no thriller in the list.
+- **Nothing is filtered for being awkward.** The $119 textbook stays in the
+  list, because deciding which books are comparable is a judgement about
+  somebody's genre.
+- **Too few prices is said out loud rather than summarised.** Ten genre
+  searches returned priced counts of 1, 4, 5, 5, 5, 7, 8, 10, 13, 13 — so
+  `MIN_PRICES = 6` refuses roughly four searches in ten, and the screen lists
+  what it found instead of a figure. The one that returned a single price was
+  `historical fiction world war two`, whose one priced record was a $167
+  Liverpool University Press history.
+- **No paperback prices, and the screen says so.** Neither catalogue carries
+  them. Print costs live in the paperback tool.
+
+**Known limits worth not rediscovering.** `subject:"..."` queries return no
+prices at all, so the browse-shelf style of query is the wrong one here. And
+the Google key is set on Vercel for **production only**, so price
+data is absent in preview deploys.
 
 ## Switched on 2026-09-15 — four hidden tools, and the plans redrawn
 

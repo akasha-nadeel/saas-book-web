@@ -173,6 +173,7 @@ type Area =
   | "overview"
   | "write"
   | "title-check"
+  | "price-check"
   | "ideas"
   | "paperback"
   | "prepare"
@@ -240,6 +241,20 @@ const AREAS: {
     label: "Title check",
     live: true,
     icon: shelfIcons.search,
+    stage: true,
+  },
+  /*
+   * **The price check, added 2026-09-26**, directly under the title check
+   * because it is the same errand at the same moment: both ask the two free
+   * catalogues what is already published beside this book, and both are
+   * decisions a writer makes before the file exists. Metered rather than
+   * gated, so no `pro` flag — the rail draws no badge on it.
+   */
+  {
+    id: "price-check",
+    label: "Price check",
+    live: true,
+    icon: shelfIcons.tag,
     stage: true,
   },
   /*
@@ -364,6 +379,7 @@ const RAIL: readonly RailRow[] = [
   { view: "archived" },
   { divider: true },
   { area: "title-check" },
+  { area: "price-check" },
   { area: "ideas" },
   { area: "paperback" },
   { divider: true },
@@ -1283,6 +1299,7 @@ export function Bookshelf({
             )}
 
             {area === "title-check" && <TitleCheckArea />}
+      {area === "price-check" && <PriceCheckArea />}
 
             {area === "ideas" && <IdeasArea />}
 
@@ -4858,6 +4875,14 @@ const TitleCheck = dynamic(
   { ssr: false, loading: ToolPending },
 );
 
+const PriceCheck = dynamic(
+  () =>
+    import("@/components/price-check/price-check-page").then(
+      (m) => m.PriceCheckPage,
+    ),
+  { ssr: false, loading: ToolPending },
+);
+
 /**
  * Title check — is anybody already publishing under this name?
  *
@@ -4931,6 +4956,49 @@ function TitleCheckArea() {
           heading. */}
       <div className="[&>div]:h-auto [&>div]:overflow-visible [&>div]:overscroll-auto">
         <TitleCheck embedded />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Price check — what are the books beside this one charging?
+ *
+ * **The same no-book shape as `TitleCheckArea` above**, and for the same
+ * reason: the tool searches a description of a book rather than this writer's
+ * manuscript, so there is nothing to pick a book for. No `WorkingOn`, no
+ * `BookToolArea`, no `bookId`.
+ *
+ * The banner is `banner-lamplight.webp`, borrowed from the rotating band at
+ * the head of Write rather than shot for this. **`ink="light"` with no scrim,
+ * and both halves of that were measured** (2026-09-26) rather than judged:
+ * over the left 512px of the frame at this crop the picture's mean relative
+ * luminance is 0.012, which puts `#f6f6f8` at 15.8:1, and the *brightest
+ * single pixel* under the type still clears 9.2:1. A scrim on a picture that
+ * does not need one is only a dimmer picture. `banner-lantern.webp` was the
+ * other candidate and was rejected on the same measurement — its lilac sky
+ * takes light ink down to 2.0:1 and it would have needed one.
+ */
+function PriceCheckArea() {
+  return (
+    <div className="flex flex-col gap-5">
+      <SectionBanner
+        image="/banner-lamplight.webp"
+        ink="light"
+        /* The same pan `BAND_SLIDES` uses for this picture, and for the same
+           reason: the figure is in the bottom third, so a centred crop of a
+           16:9 file in a 4:1 band keeps the empty sky and loses the subject. */
+        crop="45% 86%"
+        title="What the shelf beside yours charges"
+        subtitle="Real prices from real listings — and no recommended price, because that is yours to decide."
+      />
+
+      {/* The child override, as on the title check above: `toolShell` makes
+          every tool its own scroll container, which traps the wheel inside the
+          dashboard's scroller. Undone from the outside rather than by adding a
+          third meaning to `embedded`. */}
+      <div className="[&>div]:h-auto [&>div]:overflow-visible [&>div]:overscroll-auto">
+        <PriceCheck embedded />
       </div>
     </div>
   );

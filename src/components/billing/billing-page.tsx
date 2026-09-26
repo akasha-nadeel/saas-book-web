@@ -450,7 +450,8 @@ export function BillingPage({
                   until you are under that.
                 </li>
                 <li>
-                  {plural(FREE_LIMITS.titleCheck.free, "title check")} a day
+                  {plural(FREE_LIMITS.titleCheck.free, "title check")} and{" "}
+                  {plural(FREE_LIMITS.priceCheck.free, "price check")} a day
                   instead of unlimited.
                 </li>
                 <li>

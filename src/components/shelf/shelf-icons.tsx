@@ -69,6 +69,15 @@ export const shelfIcons = {
       <path d="m20 20-3.5-3.5" />
     </Svg>
   ),
+  /* A price tag, for the price check. Not a coin and not a currency sign: a
+     coin reads as money in general and a "$" would be a claim about which
+     store, while a tag is the thing on the book. */
+  tag: (
+    <Svg>
+      <path d="M3.6 11.3V4.4a.8.8 0 0 1 .8-.8h6.9c.2 0 .4.1.6.2l8.4 8.4a.8.8 0 0 1 0 1.2l-6.9 6.9a.8.8 0 0 1-1.2 0L3.8 11.9a.8.8 0 0 1-.2-.6Z" />
+      <circle cx="8" cy="8" r="1.4" />
+    </Svg>
+  ),
   /* The rail's own collapse and expand, drawn rather than the two PNGs they
      replace — a panel with its handle on the side it moves towards. Same grid
      and stroke as everything else here, so the toggle stops being the one

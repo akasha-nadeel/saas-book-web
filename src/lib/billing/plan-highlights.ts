@@ -119,6 +119,11 @@ const FREE_HIGHLIGHTS: Highlight[] = [
     lead: String(FREE_LIMITS.titleCheck.free),
     text: `${nounFor(FREE_LIMITS.titleCheck.free, "title check")} a day`,
   },
+  {
+    row: "Price check",
+    lead: String(FREE_LIMITS.priceCheck.free),
+    text: `${nounFor(FREE_LIMITS.priceCheck.free, "price check")} a day`,
+  },
   EXPORT,
   {
     row: "Consistency check",
@@ -149,6 +154,7 @@ const PAID_HIGHLIGHTS: Record<PaidTier, Highlight[]> = {
     { row: "Ideas", lead: "Unlimited", text: "parked ideas" },
     { row: "Colour themes", lead: "Every", text: "colour and paper" },
     { row: "Title check", lead: "Unlimited", text: "title checks" },
+    { row: "Price check", lead: "Unlimited", text: "price checks" },
     EXPORT,
     {
       row: "Consistency check",

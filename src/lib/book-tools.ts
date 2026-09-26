@@ -61,16 +61,27 @@ export interface ToolGroup {
  * `HIDDEN_BOOK_TOOL_PATHS` until it is wanted. The group kept its shape rather
  * than folding into another, because what returns is a second search asking
  * the same catalogues the same kind of question.
+ *
+ * **That is exactly what the price check turned out to be** (2026-09-26): the
+ * same two catalogues, the same kind of query, a field on the same response
+ * that nothing had been reading. It is the second entry now, and the group's
+ * note has widened past names because of it.
  */
 export const LOOK_OUTWARD: ToolGroup = {
   title: "Before you name it",
-  note: "What is already published under the name you are considering.",
+  note: "What is already published beside the book you are about to put out.",
   tools: [
     {
       path: "title-check",
       icon: "search",
       name: "Title check",
       what: "Whether somebody else's book turns up first when a reader searches for yours, and how close each one is. Titles cannot be copyrighted, so this reports rather than advises.",
+    },
+    {
+      path: "price-check",
+      icon: "coins",
+      name: "Price check",
+      what: "What comparable ebooks are actually charging, every one of them listed with its price, and how many carried no price at all. A median and a spread, never a recommended price.",
     },
   ],
 };
