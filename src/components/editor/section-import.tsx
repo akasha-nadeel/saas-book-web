@@ -2,8 +2,6 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RailMark } from "@/components/editor/rail-mark";
-import { Tooltip } from "@/components/ui/tooltip";
 import { SectionImportDialog } from "@/components/editor/section-import-dialog";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 import { IMPORT_ACCEPT, ImportError, importFile } from "@/lib/import";
@@ -39,6 +37,13 @@ import { ImportFailedDialog } from "@/components/editor/import-failed-dialog";
  * doors came to need `newInImport` and `importAsksFirst` pulled out of them, and
  * there is no reason to learn that twice.
  *
+ * **A hook rather than a button, because the trigger moved into a menu.** The
+ * card's three header glyphs became one `+` holding both ways of adding to a
+ * part, and a menu here is portalled: rendered inside it, the hidden `<input>`
+ * would be unmounted by the press that opened the file picker and would never
+ * live to see its own `change`. So the card mounts `nodes` in its own header,
+ * outside the menu, and the menu item calls `pick`.
+ *
  * Four rules it keeps:
  *
  * - **Only what the file says belongs to this part is used.** `partOfImport`
@@ -50,7 +55,7 @@ import { ImportFailedDialog } from "@/components/editor/import-failed-dialog";
  *   end of the book are untouched, and the dialog says so.
  * - **Undo covers all of it**, through the same banner every other import uses.
  */
-export function SectionImportButton({
+export function useSectionImport({
   book,
   part,
   label,
@@ -59,7 +64,14 @@ export function SectionImportButton({
   part: ChapterMatter;
   /** The card's own heading — "Front matter", "Body matter", "Back matter". */
   label: string;
-}) {
+}): {
+  /** Opens the file picker. Safe to call from inside a menu that then closes. */
+  pick: () => void;
+  /** A file is being read. The menu item says so rather than going quiet. */
+  busy: boolean;
+  /** The hidden input and the two dialogs. Mounted outside the menu. */
+  nodes: React.ReactNode;
+} {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -141,89 +153,50 @@ export function SectionImportButton({
     }
   };
 
-  return (
-    <>
-      {/* Square and iconic, not a third text button: the body card already
-          carries two, and `[Hide chapters][New chapter][Import]` across a
-          250px card cuts the first label in half. The words are on the
-          `aria-label` and the tooltip, where they cost no room. */}
-      <button
-        type="button"
-        onClick={() => fileRef.current?.click()}
-        disabled={busy}
-        aria-label={`Import a file into ${here}`}
-        /* **The third of three square buttons on the card**, so it matches the
-           two beside it — the same 36px box, the same `md` corner, and the
-           itshover upload mark rather than a hand-drawn arrow on a 20 grid.
-           The `title` is gone with them: `Tooltip` is the app's card, and a
-           browser tooltip beside two real ones is two tooltips. */
-        /* The quiet weight it shares with the add-a-page button beside it —
-           both are secondary to the card's name, and only the disclosure
-           carries a fill. */
-        className={`group relative flex h-8 w-8 shrink-0 cursor-pointer
-                    items-center justify-center rounded-md font-sans outline-none
-                    transition-colors focus-visible:ring-2 disabled:opacity-45
-                    ${CARD_QUIET}`}
-      >
-        <RailMark mark="import" size={17} />
-        <Tooltip
-          label={`Import a file into ${here}`}
-          side="bottom"
-          align="end"
-          nowrap
+  return {
+    pick: () => fileRef.current?.click(),
+    busy,
+    nodes: (
+      <>
+        <input
+          ref={fileRef}
+          type="file"
+          accept={IMPORT_ACCEPT}
+          // sr-only hides it from the eye but not from a screen reader, so
+          // without a name it is an unexplained file control in the tab order.
+          aria-label={`Import a file into ${here}`}
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            // Reset immediately, or picking the same file twice does nothing.
+            e.target.value = "";
+            if (file) void handleFile(file);
+          }}
         />
-      </button>
 
-      <input
-        ref={fileRef}
-        type="file"
-        accept={IMPORT_ACCEPT}
-        // sr-only hides it from the eye but not from a screen reader, so
-        // without a name it is an unexplained file control in the tab order.
-        aria-label={`Import a file into ${here}`}
-        className="sr-only"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          // Reset immediately, or picking the same file twice does nothing.
-          e.target.value = "";
-          if (file) void handleFile(file);
-        }}
-      />
+        {pending && (
+          <SectionImportDialog
+            label={label}
+            noun={noun}
+            existingCount={existing.length}
+            incomingCount={pending.kept.length}
+            // Add's own arithmetic: what is left once the pages the book already
+            // has are taken out. Replace spares nothing, so it needs no count.
+            newCount={newInImport(book, pending.kept).length}
+            leftOut={pending.leftOut}
+            onAdd={() => run(pending.kept, "add", pending.leftOut)}
+            onReplace={() => run(pending.kept, "replace", pending.leftOut)}
+            onClose={() => setPending(null)}
+          />
+        )}
 
-      {pending && (
-        <SectionImportDialog
-          label={label}
-          noun={noun}
-          existingCount={existing.length}
-          incomingCount={pending.kept.length}
-          // Add's own arithmetic: what is left once the pages the book already
-          // has are taken out. Replace spares nothing, so it needs no count.
-          newCount={newInImport(book, pending.kept).length}
-          leftOut={pending.leftOut}
-          onAdd={() => run(pending.kept, "add", pending.leftOut)}
-          onReplace={() => run(pending.kept, "replace", pending.leftOut)}
-          onClose={() => setPending(null)}
-        />
-      )}
-
-      {problem && (
-        <ImportFailedDialog
-          message={problem}
-          onClose={() => setProblem(null)}
-        />
-      )}
-    </>
-  );
+        {problem && (
+          <ImportFailedDialog
+            message={problem}
+            onClose={() => setProblem(null)}
+          />
+        )}
+      </>
+    ),
+  };
 }
-
-/* The card's own quiet button, copied from `book-panel.tsx` rather than
-   exported from it, because importing the panel here would be a cycle — the
-   panel mounts this. Three lines of class names against a circular import is
-   the right trade; if a fourth screen wants them they move to `ui/`.
-
-   It was the *outlined* weight, and moved with the panel's when the card's
-   actions went up onto the title row: three bordered boxes in a header is
-   three boxes inside a box. */
-const CARD_QUIET = `border border-transparent bg-transparent text-fg
-                    hover:border-accent/30 hover:bg-accent/10
-                    focus-visible:ring-accent/50`;

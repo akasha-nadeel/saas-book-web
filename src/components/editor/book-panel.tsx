@@ -35,7 +35,8 @@ import {
   menuIcons,
   type RowMenuItem,
 } from "@/components/sidebar/row-menu";
-import { SectionImportButton } from "@/components/editor/section-import";
+import { useSectionImport } from "@/components/editor/section-import";
+import { Menu, MenuButton } from "@/components/ui/menu";
 import { ConfirmDialog, PromptDialog } from "@/components/ui/dialog";
 
 /**
@@ -399,6 +400,14 @@ export function BookPanel({
    */
   const canWrite = canWriteBook(book);
 
+  /* The chapters' own import. Unconditional, as a hook has to be — the card
+     decides whether to *offer* it, not whether it exists. */
+  const bodyImport = useSectionImport({
+    book,
+    part: "body",
+    label: "Body matter",
+  });
+
   const chapters = book.chapters;
   const bodyChapters = chapters.filter((c) => chapterMatterOf(c) === "body");
   const frontPages = chapters.filter((c) => chapterMatterOf(c) === "front");
@@ -714,26 +723,20 @@ export function BookPanel({
               body.open === "body" || (!body.open && openPart === "body")
             }
             onAction={() => openPartList("body")}
-            /* This part's own import, beside the two controls the card
-               already had. A reader is offered none of the three. */
-            trailing={
-              canWrite ? (
-                <SectionImportButton
-                  book={book}
-                  part="body"
-                  label="Body matter"
-                />
-              ) : undefined
-            }
             compact={!!body.open && body.open !== "body"}
-            // Only once the list is open. Shut, the card has one thing to
-            // offer — open me — and a second button beside it halves the
-            // width of that one thing to sit next to a list nobody is looking
-            // at. The new chapter appears in the list it was added to, so the
-            // button belongs where the list is.
-            secondary={
-              body.open === "body" && canWrite
-                ? { label: "New chapter", onClick: handleCreate }
+            /* Both ways of adding to the chapters, behind the one `+`. A
+               reader is offered neither. */
+            add={
+              canWrite
+                ? {
+                    menuLabel: "Add to Body matter",
+                    newLabel: "New chapter",
+                    onNew: handleCreate,
+                    importLabel: "Import a file…",
+                    onImport: bodyImport.pick,
+                    importBusy: bodyImport.busy,
+                    nodes: bodyImport.nodes,
+                  }
                 : undefined
             }
             grow={body.open === "body"}
@@ -1239,9 +1242,7 @@ function MatterCard({
   action,
   active,
   onAction,
-  secondary,
-  secondaryNode,
-  trailing,
+  add,
   grow = false,
   compact = false,
   connectToPage = false,
@@ -1266,33 +1267,34 @@ function MatterCard({
   active: boolean;
   onAction: () => void;
   /**
-   * A second button beside the first. Only the body has one — making a chapter
-   * belongs with the chapters, not up in the panel's chrome where it was
-   * competing with the way out of the panel.
-   */
-  secondary?: { label: string; onClick: () => void };
-  /**
-   * The second control, when it opens a menu rather than doing something.
+   * **Everything that adds to this part, behind one `+`.**
    *
-   * Front and back matter offer *which page to add*, which is a list rather
-   * than an action — so the slot takes a node and the caller renders its own
-   * trigger with `matterOutlineClass` on it, instead of this card growing a
-   * second set of props describing somebody else's menu.
+   * It was two glyphs: a file-with-a-plus for a new page and an upload arrow
+   * for this part's own import, either side of the chevron. Three marks on a
+   * 250px header, two of them saying "add" in two different drawings, and the
+   * file in the first one repeating the heading the card already carries.
    *
-   * Mutually exclusive with `secondary`; passing both draws both, which is a
-   * caller error rather than a state worth guarding.
-   */
-  secondaryNode?: React.ReactNode;
-  /**
-   * A control at the end of the button row, outside the flex-1 share.
+   * The two are one control now, and a menu rather than a toggle because they
+   * are two *ways* of doing the same thing rather than two different jobs.
+   * Undefined for a reader, who may add nothing.
    *
-   * The two above take an equal half of the row each, which is right for two
-   * words apiece and wrong for a third: the body card would read
-   * `[Hide chapters][New chapter][Import]` across a card about 250px wide and
-   * the first label would not fit. This slot is for a square icon button that
-   * takes only its own width, so the text buttons keep theirs.
+   * `nodes` is the import's hidden file input and its two dialogs, and the
+   * card mounts them in the header **outside** the menu — portalled inside it
+   * they would be unmounted by the press that opened the file picker. See
+   * `useSectionImport`.
    */
-  trailing?: React.ReactNode;
+  add?: {
+    /** Names the menu for a screen reader — "Add to Front matter". */
+    menuLabel: string;
+    /** "New chapter" on the body, "Add your own page" on the other two. */
+    newLabel: string;
+    onNew: () => void;
+    importLabel: string;
+    onImport: () => void;
+    /** A file is being read. The item says so rather than going quiet. */
+    importBusy: boolean;
+    nodes: React.ReactNode;
+  };
   grow?: boolean;
   /**
    * Shrink to a name and nothing else, because another card is using the room.
@@ -1420,31 +1422,76 @@ function MatterCard({
             whose scarce dimension is height. On a header row they are what
             they are: the things this card does, beside its name.
 
-            **Add and Import are plain glyphs; only the chevron carries a
-            fill.** The old row gave the *chevron* the filled treatment, which
-            said the least consequential control — a disclosure toggle — was
-            the card's primary action, while adding a chapter was outlined
-            beside it. Quiet until hovered is what a secondary action does.
+            **Two marks, not three.** The row carried a file-with-a-plus for a
+            new page and an upload arrow for this part's own import; they are
+            one `+` holding both now — see `add`.
+
+            **The plus is a plain glyph; only the chevron carries a fill.** The
+            old row gave the *chevron* the filled treatment, which said the
+            least consequential control — a disclosure toggle — was the card's
+            primary action, while adding a chapter was outlined beside it.
+            Quiet until hovered is what a secondary action does.
 
             **The chevron sits last**, where a disclosure indicator sits in
             every Apple list, and it points the way the card will move. */}
         {!compact && (
           <span className="relative z-10 flex shrink-0 items-center gap-0.5">
-            {secondaryNode}
-            {secondary && (
-              <button
-                type="button"
-                onClick={secondary.onClick}
-                aria-label={secondary.label}
-                className={`group relative flex h-8 w-8 cursor-pointer items-center
-                            justify-center rounded-md outline-none transition-colors
-                            focus-visible:ring-2 ${CARD_QUIET}`}
-              >
-                <RailMark mark="new-page" size={17} />
-                <Tooltip label={secondary.label} side="bottom" align="end" nowrap />
-              </button>
+            {add && (
+              <>
+                {/* The file input and its dialogs, outside the menu on
+                    purpose — see `add`. */}
+                {add.nodes}
+                <Menu
+                  label={add.menuLabel}
+                  align="end"
+                  width={244}
+                  triggerClassName={`group relative flex h-8 w-8 cursor-pointer
+                              items-center justify-center rounded-md outline-none
+                              transition-colors focus-visible:ring-2 ${CARD_QUIET}`}
+                  trigger={
+                    <>
+                      <RailMark mark="plus" size={17} />
+                      <Tooltip
+                        label={add.menuLabel}
+                        side="bottom"
+                        align="end"
+                        nowrap
+                      />
+                    </>
+                  }
+                >
+                  {(close) => (
+                    <>
+                      {/* Both items are offered whether or not the list is
+                          open. The add used to appear only once it was, so a
+                          new chapter would land somewhere visible — but both
+                          of these *navigate to what they made*, so the writer
+                          is taken to it either way, and a menu that changes
+                          shape depending on whether a card is expanded is
+                          worse than the rule it was protecting. */}
+                      <MenuButton
+                        onClick={() => {
+                          close();
+                          add.onNew();
+                        }}
+                      >
+                        {add.newLabel}
+                      </MenuButton>
+                      <MenuButton
+                        disabled={add.importBusy}
+                        hint={add.importBusy ? "Reading the file…" : undefined}
+                        onClick={() => {
+                          close();
+                          add.onImport();
+                        }}
+                      >
+                        {add.importLabel}
+                      </MenuButton>
+                    </>
+                  )}
+                </Menu>
+              </>
             )}
-            {trailing}
             {action && (
               <button
                 type="button"
@@ -1751,6 +1798,12 @@ function MatterPagesCard({
     else onDelete(page.id, page.title);
   };
 
+  /* This part on its own, from a file. Front matter, the chapters and back
+     matter are often three documents rather than one, and the rail's
+     whole-book import has no way to be told which of the three it is holding.
+     See `section-import.tsx`. */
+  const partImport = useSectionImport({ book, part, label });
+
   return (
     <MatterCard
       connectToPage={connectToPage}
@@ -1775,21 +1828,20 @@ function MatterPagesCard({
          it there argued it is "the end of the list it adds to" rather than a
          peer of Hide pages. That was right while the body card kept New chapter
          in its header and these two did not — the two sides of the panel
-         disagreed about where you go to add something. Now all three cards
-         carry the same row: open, add, import. */
-      secondary={
-        open && canWrite
-          ? { label: "Add your own page", onClick: () => setNaming(true) }
+         disagreed about where you go to add something. All three cards carry
+         the same header now, and since 2026-10-01 the same single `+`. */
+      add={
+        canWrite
+          ? {
+              menuLabel: `Add to ${label}`,
+              newLabel: "Add your own page",
+              onNew: () => setNaming(true),
+              importLabel: "Import a file…",
+              onImport: partImport.pick,
+              importBusy: partImport.busy,
+              nodes: partImport.nodes,
+            }
           : undefined
-      }
-      /* This part on its own, from a file. Front matter, the chapters and back
-         matter are often three documents rather than one, and the rail's
-         whole-book import has no way to be told which of the three it is
-         holding. See `section-import.tsx`. */
-      trailing={
-        canWrite ? (
-          <SectionImportButton book={book} part={part} label={label} />
-        ) : undefined
       }
     >
       {rows.map((row) =>
@@ -1851,7 +1903,7 @@ function MatterPagesCard({
       )}
 
       {/* **The writer's own page is added from the header now**, beside Pages
-          and the import — see the `secondary` prop above. It was a dashed row
+          and the import — see the `add` prop above. It was a dashed row
           at the foot of this list, which is where the note that put it there
           said it belonged: "the end of the list it adds to". What changed is
           the body card, which moved New chapter into its own header; with this

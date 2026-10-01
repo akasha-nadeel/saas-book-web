@@ -5,9 +5,7 @@ import type { Editor } from "@tiptap/react";
 import { ChapterSidebar } from "@/components/sidebar/chapter-sidebar";
 import { BookmarksPanel } from "@/components/editor/bookmarks-panel";
 import { HistoryPanel } from "@/components/editor/history-panel";
-import { BiblePanel } from "@/components/editor/bible-panel";
 import { IdeasPanel } from "@/components/editor/ideas-panel";
-import { NotesPanel } from "@/components/editor/notes-panel";
 import { TrashPanel } from "@/components/editor/trash-panel";
 import { SearchPanel } from "@/components/editor/search-panel";
 import { ConsistencyPanel } from "@/components/editor/consistency-panel";
@@ -508,13 +506,12 @@ export function LeftPanel({
             />
           )}
           {tab === "consistency" && <ConsistencyPanel bookId={bookId} />}
-          {tab === "notes" && (
-            <NotesPanel key={chapterId} chapterId={chapterId} />
-          )}
           {tab === "ideas" && <IdeasPanel bookId={bookId} />}
-          {tab === "bible" && (
-            <BiblePanel bookId={bookId} chapterId={chapterId} />
-          )}
+          {/* No `bible` and no `notes` here: both open over the page, in the
+              editor's own area, rather than in this panel — see
+              `bible/bible-view.tsx` and `notes/notes-view.tsx`. The notes were
+              a column of two textareas here until 2026-10-01, which could only
+              ever show the chapter the writer was standing in. */}
           {tab === "bookmarks" && <BookmarksPanel bookId={bookId} />}
           {tab === "history" && (
             <HistoryPanel key={chapterId} bookId={bookId} chapterId={chapterId} />

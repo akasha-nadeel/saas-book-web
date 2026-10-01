@@ -39,6 +39,8 @@ import { useStoredZoom } from "@/lib/editor/use-stored-zoom";
 import { suspendPagination } from "@/lib/editor/pagination";
 import { WorkspaceRail } from "@/components/editor/workspace-rail";
 import { ToolsPopover } from "@/components/editor/tools-popover";
+import { BibleView } from "@/components/bible/bible-view";
+import { NotesView } from "@/components/notes/notes-view";
 import { PaperThemeButton } from "@/components/editor/paper-theme";
 import { icons } from "@/components/editor/icon-rail";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -261,12 +263,32 @@ export function ChapterEditor({
    * page's width reads this same flag**, which is the half that was missed
    * first time round: hiding the panel while a 25rem spacer stayed behind left
    * a column of empty ground beside a 3rem strip. */
-  /* The tools, the one rail tab that is not the panel: it opens as a strip
-     at the rail’s edge instead — see `ToolsPopover` for why. Declared above
-     the flag below, which reads it. */
+  /* The tools, the first of two rail tabs that are not the panel: it opens as
+     a strip at the rail’s edge instead — see `ToolsPopover` for why. Declared
+     above the flags below, which read it. */
   const [toolsOpen, setToolsOpen] = useState(false);
 
-  const isLeftPanelOpen = panelOpen && !focus && !toolsOpen;
+  /**
+   * **Two tabs are not the panel either: they cover the page.**
+   *
+   * The story bible (2026-09-27) and the notes (2026-10-01). The same stored
+   * pair decides both — `panelTab` with the panel "open" — so the rail needs
+   * nothing new: it lights the tab, a second press closes it through
+   * `setEditorPanel(false)`, which puts the caret back, and pressing any other
+   * tab swaps it out the way tabs always have. See `BibleView`, `NotesView`
+   * and CLAUDE.md for why these two screens may hide the page and nothing else
+   * may.
+   *
+   * Held as *which one*, rather than as a flag each: everything below asks
+   * "is something covering the page", and two booleans is two chances to
+   * update one of them and not the other.
+   */
+  const coverTab =
+    panelOpen && !focus && !toolsOpen && (tab === "bible" || tab === "notes")
+      ? tab
+      : null;
+
+  const isLeftPanelOpen = panelOpen && !focus && !toolsOpen && !coverTab;
 
   /**
    * Whether the panel and page should play their entrance.
@@ -572,7 +594,9 @@ export function ChapterEditor({
         onWordsPlace={(onPage) => setPref("wordsOnPage", onPage)}
         focus={focus}
         onFocus={setFocus}
-        history={<HistoryControls editor={liveEditor} />}
+        /* Not while something covers the page: an undo there would change
+           text nobody can see. `HistoryControls` draws nothing for `null`. */
+        history={<HistoryControls editor={coverTab ? null : liveEditor} />}
         /* **One row today, and that is the honest state of it.** A File menu
            is the right home for what acts on the manuscript as a file, and of
            those the book's own details is the only one that is not already a
@@ -633,7 +657,7 @@ export function ChapterEditor({
           shelf hero's, in both themes — so the two read as one surface rather
           than separate sections. The children below are transparent; only the
           rails and the open left panel lay their own chrome over it. */}
-      <div className="shelf-hero flex min-h-0 min-w-0 flex-1">
+      <div className="shelf-hero relative flex min-h-0 min-w-0 flex-1">
         {mobileBookOpen && (
           <MobileBookNavigation
             book={book}
@@ -716,8 +740,20 @@ export function ChapterEditor({
 
         {/* No ground of its own: `bg-white dark:bg-transparent` here was the
             third copy of the literal that kept a tint off the editor, and the
-            `.shelf-hero` row behind already paints one for every theme. */}
-        <div className="editor-main flex min-w-0 flex-1 flex-col">
+            `.shelf-hero` row behind already paints one for every theme.
+
+            **Hidden under a cover screen, never unmounted.** `invisible`
+            rather than `hidden` keeps the page laid out, so the pagination has
+            nothing to re-measure when it comes back; `inert` takes it out of
+            the keyboard and the tab order while it cannot be seen. Unmounting
+            would cost the Tiptap instance, and with it the undo history and
+            the caret. */}
+        <div
+          className={`editor-main flex min-w-0 flex-1 flex-col ${
+            coverTab ? "invisible" : ""
+          }`}
+          inert={!!coverTab}
+        >
           {/* Keyed on the id and a cross-tab reload counter — not the stored
               text — so a save from another tab reloads the surface, while this
               tab's own autosaves never remount it mid-keystroke. */}
@@ -759,6 +795,25 @@ export function ChapterEditor({
           />
         </div>
 
+        {/* Over the page they hide, and over that page alone: `absolute` on
+            the row, which is the editor's own area once no panel stands beside
+            it. Their ✕ goes through the same `setEditorPanel(false)` as the
+            rail's second press, so both give the caret back. */}
+        {coverTab === "bible" && (
+          <BibleView
+            bookId={bookId}
+            chapterId={chapterId}
+            onClose={() => setEditorPanel(false)}
+          />
+        )}
+
+        {coverTab === "notes" && (
+          <NotesView
+            bookId={bookId}
+            chapterId={chapterId}
+            onClose={() => setEditorPanel(false)}
+          />
+        )}
       </div>
       </div>
 

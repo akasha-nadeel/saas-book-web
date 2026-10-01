@@ -543,3 +543,143 @@ it("clears the slot once the real write lands", async () => {
   store.clearRescue(chapterId);
   expect(localStorage.getItem(`openchapter:rescue:${chapterId}`)).toBeNull();
 });
+
+// ---------------------------------------------------------------------------
+// The tool stores
+//
+// The story bible, the advance-copy list, the consistency dismissals, the
+// cover measurements, the ledger, the writing log and the parked ideas stayed
+// in `localStorage` when the manuscript left. Four of the seven are written
+// once *per book* into the same five megabytes the shelf lives in, so they are
+// what breaks the budget first — measured at two to five megabytes for a
+// hundred books with populated bibles, well before the shelf's own 0.63MB.
+//
+// What is proved below is the half a second migration can get wrong: that it
+// runs at all on a browser that already migrated its manuscript, and that it
+// does not undo work when it is retried.
+// ---------------------------------------------------------------------------
+
+it("moves the tool stores off localStorage and clears them out", async () => {
+  localStorage.setItem("openchapter:bible:b1", '[{"id":"e1","name":"Ana"}]');
+  localStorage.setItem("openchapter:arc:b1", '[{"id":"r1"}]');
+  localStorage.setItem("openchapter:coverfacts:b1", '{"bytes":1000}');
+  localStorage.setItem("openchapter:ledger", '[{"id":"row"}]');
+  localStorage.setItem("openchapter:ideas", '[{"id":"i1"}]');
+
+  const store = await reopen();
+
+  for (const key of [
+    "openchapter:bible:b1",
+    "openchapter:arc:b1",
+    "openchapter:coverfacts:b1",
+    "openchapter:ledger",
+    "openchapter:ideas",
+  ]) {
+    expect(localStorage.getItem(key)).toBeNull();
+  }
+
+  expect(store.getBibleRaw("b1")).toContain("Ana");
+  expect(store.getArcRaw("b1")).toContain("r1");
+  expect(store.getLedgerRaw()).toContain("row");
+  expect(store.getIdeasRaw()).toContain("i1");
+  expect((await reopen()).getBibleRaw("b1")).toContain("Ana");
+});
+
+/**
+ * **The second flag, and without it this change reaches nobody who already has
+ * the app.**
+ *
+ * `moveOffLocalStorage` runs only while its flag is absent, and every writer
+ * who has opened the app since the manuscript moved has set the first one. Had
+ * the tool stores simply been added to `MOVED`, their bible and ledger would
+ * have sat in `localStorage` for good — readable, through the fallback that
+ * makes all of this safe, and still spending the five megabytes. New writers
+ * would get the fix and existing ones would not.
+ */
+it("still moves the tool stores when the manuscript has already migrated", async () => {
+  const { store, db } = await freshStore();
+  await db.writeOne(db.META, "moved-off-localstorage", new Date().toISOString());
+  localStorage.setItem("openchapter:bible:b1", '[{"id":"e1","name":"Ana"}]');
+  localStorage.setItem("openchapter:ledger", '[{"id":"row"}]');
+
+  await store.loadFromDisk();
+
+  expect(localStorage.getItem("openchapter:bible:b1")).toBeNull();
+  expect(localStorage.getItem("openchapter:ledger")).toBeNull();
+  expect(store.getBibleRaw("b1")).toContain("Ana");
+  expect((await reopen()).getLedgerRaw()).toContain("row");
+});
+
+/**
+ * **The retried pass prefers the disk, which is the reverse of the rule the
+ * manuscript's move follows — and the reverse is what makes both correct.**
+ *
+ * `localStorage` always wins for the manuscript because nothing can write to
+ * the disk before that flag is set. The tool stores move *after* it: by the
+ * time their pass runs the app is already on the disk, so a session that
+ * copied some of them and then failed has been writing the rest there ever
+ * since. Preferring the old key here would take a writer's afternoon in the
+ * story bible and replace it with the version from before the failure.
+ */
+it("keeps the disk's copy when the tool move is retried", async () => {
+  const { store, db } = await freshStore();
+  await db.writeOne(db.META, "moved-off-localstorage", new Date().toISOString());
+  await db.writeOne(db.BIBLE, "b1", '[{"id":"e1","name":"written since"}]');
+  localStorage.setItem("openchapter:bible:b1", '[{"id":"e1","name":"stale"}]');
+
+  await store.loadFromDisk();
+
+  expect(store.getBibleRaw("b1")).toContain("written since");
+  // The stale key still goes: freeing those bytes is the point of the move.
+  expect(localStorage.getItem("openchapter:bible:b1")).toBeNull();
+});
+
+/**
+ * A move that cannot land is a load that behaved like the old one, exactly as
+ * it is for the manuscript: the old keys stay, the fallback reads them, and
+ * the next load tries again.
+ */
+it("leaves a tool store readable when its move cannot land", async () => {
+  const { store, db } = await freshStore();
+  localStorage.setItem("openchapter:bible:b1", '[{"id":"e1","name":"Ana"}]');
+  db.__failWritesAfter(0);
+  await store.loadFromDisk();
+  db.__failWritesAfter(-1);
+
+  expect(store.getBibleRaw("b1")).toContain("Ana");
+  expect(localStorage.getItem("openchapter:bible:b1")).not.toBeNull();
+
+  const next = await reopen();
+  expect(next.getBibleRaw("b1")).toContain("Ana");
+  expect(localStorage.getItem("openchapter:bible:b1")).toBeNull();
+});
+
+/**
+ * **The `storage` event used to carry this and IndexedDB has none**, so the
+ * tool stores join the channel the manuscript already uses. Nothing would fail
+ * to compile if a store were left off `announce`; a writer with the dashboard
+ * open in one tab and the editor in another would simply stop seeing their own
+ * ideas appear.
+ */
+it("tells the other tab about a tool store too", async () => {
+  const a = await reopen();
+  a.saveIdeasRaw('[{"id":"i1","text":"one"}]');
+
+  const b = await reopen();
+  let told = 0;
+  b.subscribeToIdeas(() => {
+    told += 1;
+  });
+
+  let echoed = 0;
+  a.subscribeToIdeas(() => {
+    echoed += 1;
+  });
+
+  a.saveIdeasRaw('[{"id":"i1","text":"two"}]');
+  await new Promise((r) => setTimeout(r, 20));
+
+  expect(told).toBeGreaterThan(0);
+  expect(echoed).toBe(1); // its own write, fired directly — never the echo
+  expect(b.getIdeasRaw()).toContain("two");
+});

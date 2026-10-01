@@ -353,3 +353,55 @@ export function useNotes(id: string): string | null {
   const snapshot = useCallback(() => getNotes(id), [id]);
   return useSyncExternalStore(subscribe, snapshot, getServerNotes);
 }
+
+/** What `useEveryNote` hands back: the chapter id, and whatever it holds. */
+export type NoteOf = Readonly<Record<string, string>>;
+
+/**
+ * Every chapter's notes at once, for the screen that reads across a book.
+ *
+ * **One hook call, not one per chapter**, because the list is as long as the
+ * book and the rules of hooks do not allow a loop. The shape is `useIdeas`':
+ * the **snapshot is a string**, which `useSyncExternalStore` compares by value,
+ * and the map is memoised off it — handing back a fresh object each call is
+ * what loops the store forever.
+ *
+ * **The snapshot is JSON rather than a joined string**, which is not a style
+ * choice: a note is prose a writer typed, so there is no separator character
+ * it cannot contain. JSON escapes its own, and `parse` gives the map back
+ * without an index to line up.
+ *
+ * The subscription covers every id in the list, so a note typed on this screen
+ * updates its own row's preview as it is written.
+ */
+export function useEveryNote(ids: readonly string[]): NoteOf {
+  /* The dependency for both callbacks. The array itself is a new reference on
+     every render of the caller, so keying on it would resubscribe each time. */
+  const key = ids.join(",");
+
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      const offs = (key ? key.split(",") : []).map((id) =>
+        subscribeToNotes(id, onStoreChange),
+      );
+      return () => offs.forEach((off) => off());
+    },
+    [key],
+  );
+
+  const snapshot = useCallback(() => {
+    const out: Record<string, string> = {};
+    for (const id of key ? key.split(",") : []) out[id] = getNotes(id) ?? "";
+    return JSON.stringify(out);
+  }, [key]);
+
+  const raw = useSyncExternalStore(subscribe, snapshot, getServerEveryNote);
+
+  return useMemo(() => JSON.parse(raw) as Record<string, string>, [raw]);
+}
+
+/* Nothing is read on the server, like every other store here. A constant, so
+   the snapshot is referentially stable across renders. */
+function getServerEveryNote(): string {
+  return "{}";
+}

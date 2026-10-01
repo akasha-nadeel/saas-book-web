@@ -518,8 +518,8 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   transitioning once they have arrived**: the 700ms ease is the entrance, and
   left on it made them trail two-thirds of a second behind a zoom gesture and
   float off the paper.
-- **Tools is the one tab that is not the panel** (`editor/tools-popover.tsx`,
-  key `page`). It opens as a strip of tools at the rail’s edge, because a dozen
+- **Tools is one of two tabs that are not the panel** (`editor/tools-popover.tsx`,
+  key `page`); the story bible is the other, below. It opens as a strip of tools at the rail’s edge, because a dozen
   short settings rows in a 25rem full-height column is a panel three-quarters
   empty that pushes the manuscript sideways to be it. Portalled
   and `fixed` (the rail scrolls, and would clip it), ceilinged at the **rail’s**
@@ -540,6 +540,38 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   bar**, where `bab1c3d` had already put one and left this copy behind.
   `PAPERS` is now one list, in `paper-theme.tsx`, imported by the phone’s
   `format-controls.tsx`, which keeps its own 44px touch swatches.
+- **Two tabs are not the panel either: they cover the page** — the story bible
+  (2026-09-27, `components/bible/bible-view.tsx`) and the notes (2026-10-01,
+  `components/notes/notes-view.tsx`). A gallery of a book's world wants four
+  cards to a row, not two in a 23.5rem column; the notes want the book's
+  chapters listed beside the fields. The owner chose *over the page* against
+  *beside it* both times, knowing the rule further down. They are decided by
+  the same stored pair as every tab — `panelTab` with the panel "open" — and
+  held as **`coverTab`, which one rather than a flag each**, since everything
+  downstream asks only "is something covering the page" and two booleans is two
+  chances to update one and not the other. `isLeftPanelOpen` excludes them, and
+  the rail needed no new code: it lights the tab, a second press closes it
+  through `setEditorPanel(false)` (which puts the caret back), and any other
+  tab swaps it out. **The page under them is never unmounted**: `.editor-main`
+  goes `invisible` and `inert`, so the Tiptap instance, its undo history and
+  the pagination are exactly as they were, and the bar's undo and redo are
+  withdrawn while one is up (`HistoryControls` gets `null`) so nothing edits
+  text nobody can see. Each draws its own ✕ back to the page, because a phone
+  has no rail.
+- **The notes are a book's notes now, not a chapter's** (`components/notes/`).
+  The panel showed the Synopsis and Notes of the chapter the writer was
+  standing in and nothing else, which is the wrong half of the job — a note is
+  written in chapter four *for* chapter nineteen, and reading it back meant
+  navigating to chapter four. The screen is Apple Notes' shape: every chapter
+  down the left with the first line of its note under the title, the selected
+  chapter's fields on the right. **Selecting a row does not navigate**, so the
+  page underneath stays where the writer was writing, and the row they are on
+  says so. `useEveryNote` in `use-library.ts` feeds the list — **one
+  subscription for the book, not one per row**, because the rules of hooks do
+  not allow a hook per chapter; its snapshot is **JSON**, since a note is prose
+  and there is no separator character it cannot contain. The fields are keyed
+  on the chapter, so moving between rows unmounts them, and **that unmount is
+  what writes the half-second the debounce is still holding**.
 - **The left chrome is one slot, `--sidebar-width` wide, and the page stands
   beside it.** At most one thing in it is visible: the book navigator, a tool
   panel, or a tool panel over the navigator. `BookPanel` takes that width
@@ -564,7 +596,8 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   `LeftPanel` owns its own mounting so it can animate out. **The tabs are named
   once, in `src/lib/panel-tabs.ts`** — chapters, search, consistency, notes,
   ideas, bible, bookmarks, page, history, trash, of which `page` is
-  the card and the other nine are the panel — and not in the panel,
+  the card, `bible` and `notes` cover the page, and the other seven are the
+  panel — and not in the panel,
   because which tab is open is a stored preference and `library-store.ts` needs
   the type without importing a `"use client"` component. The rail owns the
   order; that module owns the words.
@@ -633,14 +666,30 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   chevron in the panel's header that nobody was looking for. `book-guide.tsx`,
   `book-overview.tsx` and `page-preview.tsx` were deleted with it, along with
   the `bookPanel` pref, `BackToBooks`, and the `[data-matter="book"]` sheet
-  edge. **The panes live in the pages rather than in
+  edge. **Two exceptions, the story bible (2026-09-27) and the notes
+  (2026-10-01)**, which cover the page while they are open — both chosen by the
+  owner with this rule in front of them. Neither is the Book View back: that
+  replaced the page with a picture of the book behind a chevron nobody found;
+  these are tools the rail lights and a second press closes, and the page
+  underneath is hidden and inert rather than gone, so it comes back with the
+  caret where it was. Anything else that wants the middle of the window is
+  still refused, and a third exception is a decision for the owner rather than
+  a precedent these two have set. **The panes live in the pages rather than in
   `book/[bookId]/layout.tsx`**, because the left panel needs the chapter id and
   the tools need the editor instance; the import banner is the one
   exception and does live in that layout.
 - `book-panel.tsx` is the navigator and has **one face** (front/body/back as
   cards, each opening into a list — chapters in the body, the sixteen divisions
-  with their switches in the other two). **Which card is open lives in
-  `useOpenPart`, called by the *screen*** — the page sheet's edge takes the
+  with their switches in the other two). **Each card's header is one `+` and
+  the chevron** (2026-10-01): the `+` is a `ui/menu.tsx` menu holding both ways
+  of adding to that part — a page of the writer's own, and this part's own
+  import. It was three marks, a file-with-a-plus and an upload arrow either
+  side of the chevron, two of them saying "add" in two different drawings and
+  the file in the first repeating the heading the card already carries. The
+  import's hidden file input and its dialogs are mounted in the header
+  **outside** the menu (`useSectionImport`), because portalled inside it they
+  would be unmounted by the press that opened the file picker. **Which card is
+  open lives in `useOpenPart`, called by the *screen*** — the page sheet's edge takes the
   colour of the selected part, and two copies of that state would be two
   answers to one question.
 - **The two rules from the selected card to the paper are portalled and

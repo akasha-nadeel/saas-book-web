@@ -34,14 +34,16 @@
 const DB_NAME = "openchapter";
 
 /**
- * Version 2 adds the library's own stores beside the print covers.
+ * Version 2 adds the library's own stores beside the print covers. Version 3
+ * adds the tool stores, which stayed in `localStorage` when the manuscript
+ * left and were the next thing to break its five-megabyte ceiling.
  *
  * Bump this and add the store to `STORES` to add another; `onupgradeneeded`
- * creates whatever is missing, so an upgrade from either version lands in the
+ * creates whatever is missing, so an upgrade from any version lands in the
  * same place and a browser that has never opened the database gets all of them
  * in one go.
  */
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 /** Full-size cover artwork, one object per book. Predates the rest. */
 export const PRINT_COVERS = "print-covers";
@@ -56,7 +58,54 @@ export const COVERS = "covers";
 /** Housekeeping: whether the move off localStorage has happened. */
 export const META = "meta";
 
-const STORES = [PRINT_COVERS, BODIES, NOTES, HISTORY, COVERS, META] as const;
+// ---------------------------------------------------------------------------
+// The tool stores, added in version 3
+//
+// **Per book, and that is why they had to move.** A story bible, an
+// advance-copy list, a set of consistency dismissals and a cover's
+// measurements are written once per *book* into the same five megabytes the
+// shelf lives in. A hundred books with populated bibles is two to five
+// megabytes on its own — measured — so these break the budget well before the
+// shelf itself does, and the writer with a hundred books is exactly the one
+// using the bible on all of them.
+//
+// **The last three hold one value each**, not one per book, and they take a
+// store apiece rather than sharing one keyed by name. That keeps them on the
+// same `readStored`/`writeStored` path as everything else: their legacy key is
+// the prefix with nothing after it, so an empty key reconstructs it exactly and
+// no call site needs a special case.
+// ---------------------------------------------------------------------------
+
+/** One story bible per book, as JSON. */
+export const BIBLE = "bible";
+/** One advance-copy list per book, as JSON. */
+export const ARC = "arc";
+/** One set of consistency dismissals per book, as JSON. */
+export const CONSISTENCY = "consistency";
+/** One cover's measurements per book, as JSON. */
+export const COVER_FACTS = "coverfacts";
+/** The money ledger. One value for the library. */
+export const LEDGER = "ledger";
+/** The writing log. One value for the library. */
+export const ACTIVITY = "activity";
+/** Parked ideas. One value for the library. */
+export const IDEAS = "ideas";
+
+const STORES = [
+  PRINT_COVERS,
+  BODIES,
+  NOTES,
+  HISTORY,
+  COVERS,
+  META,
+  BIBLE,
+  ARC,
+  CONSISTENCY,
+  COVER_FACTS,
+  LEDGER,
+  ACTIVITY,
+  IDEAS,
+] as const;
 
 /**
  * The open database, opened at most once.
@@ -146,7 +195,28 @@ export function run<T>(
         try {
           const tx = db.transaction(store, mode);
           const request = work(tx.objectStore(store));
-          request.onsuccess = () => resolve(request.result ?? null);
+
+          /* **A write answers when the transaction commits; a read answers as
+             soon as it has the value.**
+
+             These used to both answer on `request.onsuccess`, and for a write
+             that is too early to be true. A put reports success the moment it
+             is applied *inside* the transaction, and the transaction can still
+             abort afterwards — which is exactly what a quota error does, as
+             the `onabort` below says. A promise resolves once, so the success
+             won the race and the abort arrived to an audience of nobody: the
+             write was reported as landed and was not. That is the one claim
+             this module exists to get right, because `saveBody` awaits it to
+             decide whether the editor may print "Saved".
+
+             A read has no such gap — there is nothing to commit — so it keeps
+             answering on the request and stays a single round trip. */
+          if (mode === "readwrite") {
+            tx.oncomplete = () => resolve(request.result ?? null);
+          } else {
+            request.onsuccess = () => resolve(request.result ?? null);
+          }
+
           request.onerror = () => {
             console.error(`[store-db] ${store} request failed`, request.error);
             resolve(null);

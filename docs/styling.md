@@ -485,6 +485,50 @@ This does not reopen the rail-icon rule below. That one is about **chrome** —
 eleven coloured discs down the edge of a manuscript — and these are content
 classification, the same job the tool marks do on the dashboard.
 
+### Amendment, 2026-09-27: the story bible is a gallery
+
+The owner asked for the bible panel's entries as **cards**, laid out the way
+Apple's own apps lay out a collection. It was a column of text rows under a
+full-width blue button, which is the grouped-list language above applied to
+what is not a list of peers. `components/bible/` is the result, and this is
+where the grouped-list rule stops and why.
+
+- **An entry is a small document, so it earns a card** — the argument the
+  2026-09-03 amendment made for a finding. A person or a place has a name,
+  what else they are called, a description and what they are tied to; the
+  gallery is read like a box of index cards, not scanned like a settings list.
+- **Several to a row is what keeps it from being the pile.** The pile was a
+  *column* of identical boxes on a narrow rail. A gallery reads as a
+  collection — Notes' gallery, Reminders' tiles. It began the day in the side
+  panel at two to a row and ended it **over the page, in the editor's own
+  area** (`bible-view.tsx`; CLAUDE.md has why the page may be covered), sized by
+  `@container` on its content column: two on a phone's width, three from
+  42rem, four from 56rem.
+- **The card is neutral: `bg-raised/40` and `border-line`, the same grey and
+  hairline as `ListGroup`.** The kind's colour is on a mark in the corner and
+  nowhere else — "colour that carries information moves to a glyph" still
+  holds. Seven washed grounds down one gallery would be the finding card's
+  six hues without the finding card's excuse.
+- **The marks are `check-marks.tsx`'s method with the bible's own shapes**
+  (`kind-marks.tsx`): solid shapes on the 24 grid, fills mixed from the hue
+  into theme tokens through `check-hue.ts`, nothing added to the closed list.
+  The seven hues are taken from the eleven `CHECK_LOOK` already measured, and
+  `bible.test.ts` fails if one is not — a hue paler than amber would fall
+  under the contrast those mixes were measured to. None is the accent indigo.
+- **Opening a card pushes a page**; it does not grow the card in place. A
+  gallery that reflows around an expanding card is the one thing a grid should
+  never do, and iOS answers the same question by navigation. The page itself
+  goes back to the grouped-list language for what *is* a list — its About
+  group and its connections are `ListGroup` rows, with the section label
+  outside and the explanation underneath — so the rules above still hold
+  everywhere they were written for.
+- **Adding is a round "+" beside the search**, the toolbar placement Contacts
+  and Notes use, rather than a full-width bar above everything: it is one
+  action among several here, not the reason for the panel.
+- **The push and the pop reuse `oc-step-in-next` / `oc-step-in-back`**, the
+  wizard's direction-aware step animation, with its reduced-motion rule. No new
+  keyframes.
+
 ## The editor's rail icons
 
 `src/components/icons/` is [itshover](https://itshover.com) (Apache-2.0),

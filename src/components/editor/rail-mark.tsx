@@ -9,7 +9,6 @@ import ChevronDownIcon from "@/components/icons/chevron-down-icon";
 import DoubleCheckIcon from "@/components/icons/double-check-icon";
 import DownloadIcon from "@/components/icons/download-icon";
 import FileDescriptionIcon from "@/components/icons/file-description-icon";
-import FilePlusIcon from "@/components/icons/file-plus-icon";
 import FocusIcon from "@/components/icons/focus-icon";
 import HistoryCircleIcon from "@/components/icons/history-circle-icon";
 import HomeIcon from "@/components/icons/home-icon";
@@ -68,9 +67,9 @@ export type MarkName =
   | "link"
   | "tools"
   | "share"
-  /* The body card's two, since its buttons lost their labels. */
+  /* The matter cards' two, since their buttons lost their labels. */
   | "collapse"
-  | "new-page"
+  | "plus"
   /* The idea card's three, since its buttons lost their labels too. `trash` is
      already above and is the third. */
   | "book"
@@ -107,7 +106,6 @@ const ICONS: Partial<Record<MarkName, IconComponent>> = {
   paper: PaintIcon,
   share: UsersGroupIcon,
   collapse: ChevronDownIcon,
-  "new-page": FilePlusIcon,
   /* The same drawing as `chapters`, under a second name. An idea card's button
      starts a *book*; pointing it at `chapters` would have worked and would have
      been a lie about what the press does, and the next person reading the card
@@ -115,8 +113,17 @@ const ICONS: Partial<Record<MarkName, IconComponent>> = {
   book: BookIcon,
 };
 
-/** The two the set above cannot draw, on the app's own 20-unit grid. */
+/** The ones the set above cannot draw, on the app's own 20-unit grid. */
 const DRAWN: Partial<Record<MarkName, React.ReactNode>> = {
+  /* A plain plus, for the matter cards' one Add control.
+
+     **It was a file with a plus on it** (`FilePlusIcon`), beside an upload
+     arrow, beside a chevron — three glyphs across a 250px header, two of them
+     saying "add" in two different drawings. The file was the part doing no
+     work: the card it sits on is already headed "Front matter", so the sheet
+     of paper in the mark repeated the heading rather than saying what the
+     press does. One plus now, holding both ways of adding to the part. */
+  plus: <path d="M10 4.5v11M4.5 10h11" />,
   /* A lamp, for the idea parking lot. */
   ideas: (
     <>

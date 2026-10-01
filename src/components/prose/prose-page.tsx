@@ -134,7 +134,7 @@ export function ProsePage({ bookId }: { bookId: string }) {
        74-word chapter reported 76, and the average sentence length carried
        the error with it — while the picker directly above said 74. The other
        two callers that want prose rather than a search index pass "" for the
-       same reason (`resume-card.tsx`, `bible-panel.tsx`). */
+       same reason (`resume-card.tsx`, `bible/bible-view.tsx`). */
     return proseReport(chapterText("", getBody(chosen)));
   }, [chosen, chapters]);
 

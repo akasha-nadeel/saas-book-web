@@ -9,6 +9,12 @@
  * The rail owns the **order** the tabs appear in; this owns the **words**, so
  * the button a writer presses and the panel that opens cannot end up with two
  * different names for one thing.
+ *
+ * Three of them do not open the panel at all: `page` is the tools strip at
+ * the rail's edge, and `bible` and `notes` cover the page
+ * (`components/bible/bible-view.tsx`, `components/notes/notes-view.tsx`).
+ * They are still tabs — one lit at a time, a second press puts them away — so
+ * they live here with the rest.
  */
 
 export type PanelTab =
@@ -27,6 +33,17 @@ export const PANEL_TITLES: Record<PanelTab, string> = {
   chapters: "Manuscript",
   search: "Find & replace",
   consistency: "Consistency check",
+  /**
+   * The synopsis and the notes for a chapter — every chapter, since
+   * 2026-10-01.
+   *
+   * **The second tab that covers the page.** It was a column beside it
+   * holding two textareas for the chapter the writer happened to be in, which
+   * is the wrong half of the job: a note is written in chapter four *for*
+   * chapter nineteen. The wider screen is a list of the book's chapters with
+   * the first line of each note on it, so the notes can be read across rather
+   * than one at a time. See `components/notes/notes-view.tsx`.
+   */
   notes: "Notes",
   ideas: "Ideas",
   bible: "Story bible",

@@ -25,6 +25,7 @@ import {
   shouldAskMatter,
   startMatter,
   clearStorageTrouble,
+  resetShelfCacheForTest,
   deleteChapterForever,
   getBody,
   getHistoryRaw,
@@ -82,6 +83,11 @@ beforeEach(() => {
   // Module state, so it outlives the store being emptied — a test that filled
   // the origin would otherwise leave the next one thinking it is still full.
   clearStorageTrouble();
+  /* Same shape, different state: a word count is written a moment after the
+     commit that raised it, so a test ending mid-window leaves a shelf in
+     memory that `localStorage.clear()` cannot reach. Without this the next
+     test would be handed the previous one's books. */
+  resetShelfCacheForTest();
 });
 
 it("starts with an empty shelf", () => {
@@ -2461,4 +2467,91 @@ it("still takes the server's answer for fields the server does have", () => {
   const book = findBook(getShelf(), bookId)!;
   expect(book.title).toBe("Renamed elsewhere");
   expect(book.roadmapDone).toEqual(["draft"]);
+});
+
+/**
+ * **The shelf write is the expensive part of an autosave, and word counts are
+ * why every autosave pays it.**
+ *
+ * `commit` re-serialises the whole shelf — measured at ~7.5ms for a hundred
+ * books and ~18ms for five hundred, synchronously, on the main thread. The
+ * count of words in a chapter lives in the shelf, so before this it happened
+ * every few seconds while somebody was typing. The rule the tests below pin:
+ * **a change to the index is written at once; a change to a counter waits.**
+ */
+describe("a word count waits and the index does not", () => {
+  /** The shelf as it is actually stored, rather than as the store sees it. */
+  function storedShelf(): string {
+    return localStorage.getItem("openchapter:shelf") ?? "";
+  }
+
+  it("answers with the new count straight away", () => {
+    const { bookId, chapterId } = createBook("A");
+    saveBody(bookId, chapterId, { type: "doc" }, 1204);
+
+    // The whole reason the memory copy has to win while a write is waiting:
+    // `emitShelf` has already woken every listener, and they read through here.
+    expect(findBook(getShelf(), bookId)!.chapters[0].words).toBe(1204);
+  });
+
+  it("does not write the shelf for the count alone", () => {
+    const { bookId, chapterId } = createBook("A");
+    saveBody(bookId, chapterId, { type: "doc" }, 1204);
+
+    expect(storedShelf()).not.toContain("1204");
+  });
+
+  it("carries the waiting count along with the next real change", () => {
+    const { bookId, chapterId } = createBook("A");
+    saveBody(bookId, chapterId, { type: "doc" }, 1204);
+
+    renameBook(bookId, "Renamed");
+
+    // One write, both changes. A rename is the index, so it does not wait —
+    // and it cannot leave the count behind, because the shelf it commits was
+    // read through `getShelf()`, which already had it.
+    expect(storedShelf()).toContain("1204");
+    expect(storedShelf()).toContain("Renamed");
+  });
+
+  it("writes what is waiting when the page goes away", () => {
+    const { bookId, chapterId } = createBook("A");
+    saveBody(bookId, chapterId, { type: "doc" }, 1204);
+    expect(storedShelf()).not.toContain("1204");
+
+    window.dispatchEvent(new Event("pagehide"));
+
+    expect(storedShelf()).toContain("1204");
+  });
+
+  /**
+   * **A write that did not land must stop being reported as though it had.**
+   *
+   * The deferred case has no caller left to tell — the press it came from
+   * returned long ago — so the honest answer is to drop the memory copy and
+   * let the shelf read back as what is actually on the disk. The prose itself
+   * is untouched: it went to IndexedDB before any of this, and a stale count
+   * is cosmetic where lost writing is not.
+   */
+  it("stops claiming a count the disk refused", () => {
+    const { bookId, chapterId } = createBook("A");
+    saveBody(bookId, chapterId, { type: "doc" }, 1204);
+
+    const real = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+      this: Storage,
+      k: string,
+      v: string,
+    ) {
+      if (k === "openchapter:shelf") {
+        throw new DOMException("quota", "QuotaExceededError");
+      }
+      real.call(this, k, v);
+    });
+    window.dispatchEvent(new Event("pagehide"));
+    vi.restoreAllMocks();
+
+    expect(getStorageTrouble()).toBe("full");
+    expect(findBook(getShelf(), bookId)!.chapters[0].words).toBe(0);
+  });
 });

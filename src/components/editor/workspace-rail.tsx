@@ -40,6 +40,8 @@ export function selectPanel(
  * where nothing else will ever be.
  *
  * - **Finding a place in the book** — search, and the places already marked.
+ * - **How the page looks** — one tab, between the two, because it is the one
+ *   that changes the book rather than telling you about it.
  * - **Kept beside the book** — the notes on this chapter, the ideas that are
  *   not this book's, the people and places.
  * - **The safety nets**, pinned to the foot of the rail: what this chapter used
@@ -54,12 +56,6 @@ export function selectPanel(
  */
 const GROUPS: readonly (readonly PanelTab[])[] = [
   ["chapters", "search", "consistency"],
-  /* Ideas, the story bible and bookmarks are all held back from the rail. The
-     first two came back for a day on 2026-09-15 and the owner took them out
-     again: ideas lives in the dashboard's side panel instead, and the bible is
-     hidden everywhere. The note above still describes where they belong if
-     they return. */
-  ["notes"],
   /* **How the page looks, and what goes on it.** Its own group because it is
      the one tab that changes the *book* rather than telling you about it —
      everything above reads the manuscript back to the writer, and this sets
@@ -68,8 +64,19 @@ const GROUPS: readonly (readonly PanelTab[])[] = [
      It is also what let the right-hand rail go. Those controls opened flyouts
      over the page, so half this column would have opened the panel beside it
      and half something over the manuscript, with nothing about a glyph to say
-     which. Behind a tab they are one kind of button again. */
+     which. Behind a tab they are one kind of button again.
+
+     **It sat at the foot of the rail until 2026-10-01**, under the two tabs a
+     writer reaches for least often, which put the one control that changes
+     the look of the page furthest from the page. Up here it is next to the
+     three that are used every session, still in a group of its own. */
   ["page"],
+  /* Ideas, the story bible and bookmarks are all held back from the rail. The
+     first two came back for a day on 2026-09-15 and the owner took them out
+     again: ideas lives in the dashboard's side panel instead, and the bible is
+     hidden everywhere. The note above still describes where they belong if
+     they return. */
+  ["notes", "bible"],
 ];
 
 /** Below the rest, always. See the note above. */

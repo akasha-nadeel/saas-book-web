@@ -48,9 +48,16 @@ import {
 } from "./cover-store";
 import { openStoreChannel, postStoreNote, type StoreNote } from "./store-channel";
 import {
+  ACTIVITY,
+  ARC,
+  BIBLE,
   BODIES,
+  CONSISTENCY,
   COVERS,
+  COVER_FACTS,
   HISTORY,
+  IDEAS,
+  LEDGER,
   META,
   NOTES,
   clearStore,
@@ -135,6 +142,32 @@ const COVER_FACTS_PREFIX = "openchapter:coverfacts:";
  * single screen rendered.
  */
 const HISTORY_PREFIX = "openchapter:history:";
+
+// ---------------------------------------------------------------------------
+// The tool stores' keys
+//
+// **Up here with the others for the reason the note on `HISTORY_PREFIX`
+// gives**, and it is not a style choice: `LEGACY_PREFIX` below is an object
+// literal evaluated when this module loads, so a `const` still declared down
+// beside its own code would be in its temporal dead zone at that moment and
+// throw before a single screen rendered. Each of these used to sit above the
+// functions that read it; they moved when the stores did.
+//
+// **The last three name a whole key rather than a prefix**, because they hold
+// one value for the library rather than one per book. They still go through
+// the same read and write path: the key inside their store is the empty
+// string, so `LEGACY_PREFIX[store] + key` reconstructs exactly what
+// `localStorage` held.
+// ---------------------------------------------------------------------------
+const BIBLE_PREFIX = "openchapter:bible:";
+const ARC_PREFIX = "openchapter:arc:";
+const CONSISTENCY_PREFIX = "openchapter:consistency:";
+const LEDGER_KEY = "openchapter:ledger";
+const ACTIVITY_KEY = "openchapter:activity";
+const IDEAS_KEY = "openchapter:ideas";
+
+/** The one key inside a store that holds a single value for the library. */
+const ONLY = "";
 
 /**
  * Which of a book's three parts a chapter belongs to. Absent means the body —
@@ -455,7 +488,6 @@ const EMPTY_SHELF: Shelf = Object.freeze({
 const bodyKey = (id: string) => `${BODY_PREFIX}${id}`;
 const notesKey = (id: string) => `${NOTES_PREFIX}${id}`;
 const coverKey = (id: string) => `${COVER_PREFIX}${id}`;
-const coverFactsKey = (id: string) => `${COVER_FACTS_PREFIX}${id}`;
 const historyKey = (chapterId: string) => `${HISTORY_PREFIX}${chapterId}`;
 
 function newId(): string {
@@ -510,27 +542,69 @@ function readRaw(key: string): string | null {
 // fallback *read* path for good.
 // ---------------------------------------------------------------------------
 
-/** The stores that moved, in the order the migration walks them. */
-const MOVED = [BODIES, NOTES, HISTORY, COVERS] as const;
+/**
+ * The manuscript, moved on 2026-08-17. The order the first migration walks.
+ */
+const MANUSCRIPT_STORES = [BODIES, NOTES, HISTORY, COVERS] as const;
 
-const mirrors: Record<string, Map<string, string>> = {
-  [BODIES]: new Map(),
-  [NOTES]: new Map(),
-  [HISTORY]: new Map(),
-  [COVERS]: new Map(),
-};
+/**
+ * The tool stores, moved after them — one story bible, advance-copy list,
+ * set of consistency dismissals and cover measurement *per book*, plus the
+ * three that hold one value for the library.
+ *
+ * **A separate list because they need a separate migration**, not because
+ * they behave differently afterwards. See `TOOLS_FLAG`.
+ */
+const TOOL_STORES = [
+  BIBLE,
+  ARC,
+  CONSISTENCY,
+  COVER_FACTS,
+  LEDGER,
+  ACTIVITY,
+  IDEAS,
+] as const;
+
+/** Everything that lives on the disk behind a mirror. */
+const MOVED = [...MANUSCRIPT_STORES, ...TOOL_STORES] as const;
+
+/**
+ * **Derived from `MOVED` rather than written out again.**
+ *
+ * A store named in `MOVED` with no mirror beside it is not a mild
+ * inconsistency: `readStored` reads `mirrors[store].get(key)` and would throw,
+ * and `onStoreNote` looks the mirror up to decide whether the note is for a
+ * store it knows and would silently drop every cross-tab note for it instead.
+ * Both are failures nothing would catch at build time, so the pair cannot be
+ * allowed to fall out of step by hand.
+ */
+const mirrors: Record<string, Map<string, string>> = Object.fromEntries(
+  MOVED.map((store) => [store, new Map<string, string>()]),
+);
 
 const bodyMirror = mirrors[BODIES];
 const notesMirror = mirrors[NOTES];
 const historyMirror = mirrors[HISTORY];
 const coverMirror = mirrors[COVERS];
 
-/** Where each moved store used to sit, and still falls back to. */
+/**
+ * Where each moved store used to sit, and still falls back to.
+ *
+ * The last three name a whole key with nothing after it, which is what makes
+ * the empty-string key (`ONLY`) reconstruct them exactly.
+ */
 const LEGACY_PREFIX: Record<string, string> = {
   [BODIES]: BODY_PREFIX,
   [NOTES]: NOTES_PREFIX,
   [HISTORY]: HISTORY_PREFIX,
   [COVERS]: COVER_PREFIX,
+  [BIBLE]: BIBLE_PREFIX,
+  [ARC]: ARC_PREFIX,
+  [CONSISTENCY]: CONSISTENCY_PREFIX,
+  [COVER_FACTS]: COVER_FACTS_PREFIX,
+  [LEDGER]: LEDGER_KEY,
+  [ACTIVITY]: ACTIVITY_KEY,
+  [IDEAS]: IDEAS_KEY,
 };
 
 /**
@@ -562,12 +636,9 @@ let onDisk = false;
  * it alone, and `flushPending` puts it on the disk before the app stops writing
  * old keys.
  */
-const pending: Record<string, Set<string>> = {
-  [BODIES]: new Set(),
-  [NOTES]: new Set(),
-  [HISTORY]: new Set(),
-  [COVERS]: new Set(),
-};
+const pending: Record<string, Set<string>> = Object.fromEntries(
+  MOVED.map((store) => [store, new Set<string>()]),
+);
 
 const DURABLE = Promise.resolve(true);
 
@@ -878,9 +949,16 @@ async function hydrate(): Promise<void> {
   if (typeof window === "undefined") return;
   if (!(await diskReady())) return;
 
+  /* **Read together rather than one after another.** This was a sequential
+     await per store, which was four round trips and is now eleven — and this
+     runs before anything can paint, on every load. They are independent
+     reads of independent stores, so the wait is one round trip's worth
+     instead of eleven. */
   const loaded = new Map<string, [string, string][]>();
-  for (const store of MOVED) loaded.set(store, await entriesOf(store));
+  const read = await Promise.all(MOVED.map((store) => entriesOf(store)));
+  MOVED.forEach((store, i) => loaded.set(store, read[i]));
   const moved = await readOne(META, MIGRATION_FLAG);
+  const movedTools = await readOne(META, TOOLS_FLAG);
 
   for (const store of MOVED) {
     const mirror = mirrors[store];
@@ -891,7 +969,25 @@ async function hydrate(): Promise<void> {
     }
   }
 
-  if (moved === null && !(await moveOffLocalStorage())) return;
+  if (
+    moved === null &&
+    !(await moveOffLocalStorage(MANUSCRIPT_STORES, MIGRATION_FLAG, true))
+  ) {
+    return;
+  }
+
+  /* **The second pass, and its failure is not the first one's.**
+
+     Giving up here the way the line above does would put the *manuscript*
+     back on `localStorage` for the session because a story bible would not
+     copy, which is a far worse trade than leaving the bible where it is for
+     one more load. Nothing is lost by carrying on: `readStored` falls back to
+     the legacy key, so a store that did not move reads exactly as it did
+     before, and the flag stays unset so this runs again next time. */
+  if (movedTools === null) {
+    await moveOffLocalStorage(TOOL_STORES, TOOLS_FLAG, false);
+  }
+
   if (!(await flushPending())) return;
 
   onDisk = true;
@@ -979,8 +1075,23 @@ async function flushPending(): Promise<boolean> {
   return true;
 }
 
-/** Set once the library is on the disk and the old keys are gone. */
+/** Set once the manuscript is on the disk and the old keys are gone. */
 const MIGRATION_FLAG = "moved-off-localstorage";
+
+/**
+ * Set once the tool stores are on the disk and *their* old keys are gone.
+ *
+ * **A second flag rather than a re-run of the first, and without it this whole
+ * change does nothing for anybody who already has the app.** The move below
+ * runs only while its flag is absent, and every existing writer set
+ * `MIGRATION_FLAG` back in August. Adding the tool stores to `MOVED` alone
+ * would therefore leave their bible, ledger and advance-copy list sitting in
+ * `localStorage` for good — still readable, through the fallback that makes
+ * all of this safe, and still spending the five megabytes this change exists
+ * to free. New writers would get the fix and existing ones would not, which is
+ * two products.
+ */
+const TOOLS_FLAG = "moved-tool-stores";
 
 /**
  * The one-time move, and it is written to survive being interrupted.
@@ -1005,7 +1116,11 @@ const MIGRATION_FLAG = "moved-off-localstorage";
  * so there is no way for the disk to be ahead of `localStorage` while this is
  * running. That makes the rule as simple as it looks.
  */
-async function moveOffLocalStorage(): Promise<boolean> {
+async function moveOffLocalStorage(
+  stores: readonly string[],
+  flag: string,
+  preferLocal: boolean,
+): Promise<boolean> {
   const found = new Map<string, [string, string][]>();
   const doomed: string[] = [];
   let bytes = 0;
@@ -1013,10 +1128,23 @@ async function moveOffLocalStorage(): Promise<boolean> {
   for (let i = 0; i < window.localStorage.length; i += 1) {
     const key = window.localStorage.key(i);
     if (!key) continue;
-    for (const store of MOVED) {
+    for (const store of stores) {
       const prefix = LEGACY_PREFIX[store];
       if (!key.startsWith(prefix)) continue;
       const id = key.slice(prefix.length);
+
+      /* **The second pass reverses the rule above, and for the same reason
+         that rule exists.** `localStorage` always wins for the manuscript
+         because nothing could have written to the disk before that flag was
+         set. The tool stores move *after* it: by the time this pass runs the
+         app is already on the disk, so a session that copied some of them and
+         then failed has been writing the rest there ever since, and a disk
+         copy is newer by construction. The stale key still goes — freeing
+         those bytes is the point. */
+      if (!preferLocal && mirrors[store].has(id)) {
+        doomed.push(key);
+        break;
+      }
 
       const value = readRaw(key);
       if (value === null) break;
@@ -1029,7 +1157,7 @@ async function moveOffLocalStorage(): Promise<boolean> {
     }
   }
 
-  for (const store of MOVED) {
+  for (const store of stores) {
     const entries = found.get(store);
     if (!entries?.length) continue;
     if (!(await writeAll(store, entries))) {
@@ -1041,7 +1169,7 @@ async function moveOffLocalStorage(): Promise<boolean> {
     for (const [id, value] of entries) mirrors[store].set(id, value);
   }
 
-  if (!(await writeOne(META, MIGRATION_FLAG, new Date().toISOString()))) {
+  if (!(await writeOne(META, flag, new Date().toISOString()))) {
     return false;
   }
 
@@ -1052,7 +1180,8 @@ async function moveOffLocalStorage(): Promise<boolean> {
       // Left behind, and harmless: the mirror shadows it on every read.
     }
   }
-  rebuildCoverIndex();
+  // Only the pass that moved the thumbnails can have invalidated it.
+  if (stores.includes(COVERS)) rebuildCoverIndex();
 
   if (bytes > 0) {
     console.info(
@@ -1105,6 +1234,33 @@ function announce(store: string, key: string): void {
       coverEpoch += 1;
       emitShelf();
       break;
+    /* The tool stores. Each fires its whole listener set rather than the
+       listeners for one book, which is what their own writes have always
+       done — `saveBibleRaw` does not know which subscriber cares either. */
+    case BIBLE:
+      for (const listener of bibleListeners) listener();
+      break;
+    case ARC:
+      for (const listener of arcListeners) listener();
+      break;
+    case CONSISTENCY:
+      for (const listener of consistencyListeners) listener();
+      break;
+    case LEDGER:
+      for (const listener of ledgerListeners) listener();
+      break;
+    case ACTIVITY:
+      for (const listener of activityListeners) listener();
+      break;
+    case IDEAS:
+      for (const listener of ideaListeners) listener();
+      break;
+    // No listeners of its own: the dashboard reads the facts while rendering
+    // the shelf, so it is told the same way a cover is. See `setCoverFacts`.
+    case COVER_FACTS:
+      coverEpoch += 1;
+      emitShelf();
+      break;
   }
 }
 
@@ -1115,6 +1271,14 @@ function refreshEverything(): void {
   for (const set of bodyListeners.values()) for (const l of set) l();
   for (const set of noteListeners.values()) for (const l of set) l();
   for (const listener of historyListeners) listener();
+  // The tool stores read null until the disk has been read, exactly as the
+  // manuscript does, so they need telling in the same breath.
+  for (const listener of bibleListeners) listener();
+  for (const listener of arcListeners) listener();
+  for (const listener of consistencyListeners) listener();
+  for (const listener of ledgerListeners) listener();
+  for (const listener of activityListeners) listener();
+  for (const listener of ideaListeners) listener();
 }
 
 // ---------------------------------------------------------------------------
@@ -1175,7 +1339,16 @@ export function subscribeToShelf(onStoreChange: () => void) {
 
   const onStorage = (event: StorageEvent) => {
     // A null key means the whole store was cleared, which affects everyone.
-    if (event.key === null || event.key === SHELF_KEY) onStoreChange();
+    if (event.key === null || event.key === SHELF_KEY) {
+      /* **Land ours before reading theirs.** While a write is waiting in
+         memory this tab is ahead of the disk, so it would answer every read
+         with its own copy and overwrite the other tab a moment later anyway.
+         Flushing closes that window: two tabs writing the shelf stays exactly
+         the last-write-wins it has always been, rather than becoming
+         last-write-wins with a delay nobody can see. */
+      flushShelf();
+      onStoreChange();
+    }
     // A cover written in another tab changes what this one renders without
     // touching the shelf, exactly as a local `setCover` does.
     else if (event.key.startsWith(COVER_PREFIX)) {
@@ -1253,18 +1426,57 @@ let cachedRaw: string | null = null;
 let cachedShelf: Shelf = EMPTY_SHELF;
 
 /**
+ * A shelf that is in memory and not yet on the disk. See `commit`.
+ *
+ * **Null almost always, and that is the point.** While it is null this module
+ * reads the shelf exactly as it always has — off the stored text, so a write
+ * from another tab busts the cache for free. It is set only for the few
+ * hundred milliseconds a word count is waiting to be written, and cleared the
+ * moment that lands or fails.
+ */
+let pendingShelf: Shelf | null = null;
+
+/**
  * Cached on the raw string it was parsed from. Keying the cache on the stored
  * text — rather than invalidating by hand — means a write from another tab
  * busts it for free, and null always maps to EMPTY_SHELF so the pair can never
  * fall out of step.
+ *
+ * **A shelf waiting to be written is ahead of the stored text and wins.**
+ * Without that, deferring the write would serve the *old* shelf to every
+ * listener `emitShelf` had just woken — the screen going stale on exactly the
+ * change that woke it.
  */
 export function getShelf(): Shelf {
+  if (pendingShelf !== null) return pendingShelf;
+
   const raw = readRaw(SHELF_KEY);
   if (raw === cachedRaw) return cachedShelf;
 
   cachedRaw = raw;
   cachedShelf = parseShelf(raw);
   return cachedShelf;
+}
+
+/**
+ * Forget what this module believes about the shelf. A test seam, and the
+ * invariant it makes explicit is worth stating: **anything that changes
+ * `localStorage` behind the store's back has to say so.**
+ *
+ * The app never needs it — `clearLocalLibrary` is the one path that empties
+ * the origin and it resets these for itself. The suites do: they call
+ * `localStorage.clear()` between tests, which the store cannot see, and a word
+ * count left waiting from the previous test would otherwise be answered to the
+ * next one as its shelf.
+ */
+export function resetShelfCacheForTest(): void {
+  pendingShelf = null;
+  if (shelfFlushTimer !== null) {
+    clearTimeout(shelfFlushTimer);
+    shelfFlushTimer = null;
+  }
+  cachedRaw = null;
+  cachedShelf = EMPTY_SHELF;
 }
 
 function parseShelf(raw: string | null): Shelf {
@@ -1345,7 +1557,7 @@ export function getCoverFacts(bookId: string): CoverFacts | null {
   // the parse, so in a browser that throws on `getItem` — private-mode Safari
   // and friends — this took the render down with it, and it is called during
   // one.
-  const raw = readRaw(coverFactsKey(bookId));
+  const raw = readStored(COVER_FACTS, bookId);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
@@ -1359,8 +1571,8 @@ export function getCoverFacts(bookId: string): CoverFacts | null {
 
 export function setCoverFacts(bookId: string, facts: CoverFacts | null): void {
   try {
-    if (facts === null) window.localStorage.removeItem(coverFactsKey(bookId));
-    else window.localStorage.setItem(coverFactsKey(bookId), JSON.stringify(facts));
+    if (facts === null) forgetStored(COVER_FACTS, bookId);
+    else void writeStored(COVER_FACTS, bookId, JSON.stringify(facts));
   } catch (err) {
     // A full origin costs the dashboard a warning, never the check itself.
     console.error("[store] could not write cover facts", err);
@@ -1556,34 +1768,106 @@ export function bookChapterCount(book: Book): number {
  * write, which is the same trade and an easier one here, because what is at
  * stake is the writer's ability to fix the problem at all.
  */
-function commit(next: Shelf) {
+function commit(next: Shelf, defer = false) {
   /* Read *before* the write, because `getShelf()` re-reads once the key
      changes. This is the fallback diff baseline — see `pushShelfDiff`. */
   const previous = getShelf();
-  const raw = JSON.stringify(next);
 
-  const write = (): boolean => {
-    try {
-      window.localStorage.setItem(SHELF_KEY, raw);
-      return true;
-    } catch (err) {
-      console.error("[store] could not write shelf", err);
-      return false;
-    }
-  };
-
-  if (!write()) {
-    // `dropAllHistory` reports "history-dropped" for itself when it frees
-    // something. Reaching the end of this means the shelf did not move, so
-    // whatever the writer just pressed did not happen.
-    if (!dropAllHistory() || !write()) {
-      reportStorage("full");
-      return;
-    }
-  }
+  pendingShelf = next;
+  if (defer) scheduleShelfFlush();
+  else if (!flushShelf()) return;
 
   emitShelf();
   pushShelfDiff(next, previous);
+}
+
+/**
+ * How long a word count may sit in memory before it is written. A cap rather
+ * than a debounce — the timer is not restarted by later counts — so the disk
+ * is never more than this far behind however fast somebody types.
+ */
+const SHELF_FLUSH_MS = 400;
+let shelfFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleShelfFlush(): void {
+  if (shelfFlushTimer !== null) return;
+  shelfFlushTimer = setTimeout(() => {
+    shelfFlushTimer = null;
+    flushShelf();
+  }, SHELF_FLUSH_MS);
+}
+
+function writeShelfRaw(raw: string): boolean {
+  try {
+    window.localStorage.setItem(SHELF_KEY, raw);
+    return true;
+  } catch (err) {
+    console.error("[store] could not write shelf", err);
+    return false;
+  }
+}
+
+/**
+ * Put the shelf on the disk, and answer whether it landed.
+ *
+ * **This is where the cost that made all of this necessary actually is.** The
+ * `JSON.stringify` is the expensive half, not the `setItem` — measured at
+ * ~7.5ms for a hundred books and ~18ms for five hundred, synchronously, on the
+ * main thread. Word counts live in the shelf, so before the counter case was
+ * deferred every autosave paid it while somebody was mid-sentence.
+ *
+ * The quota ladder is unchanged and must stay: every escape from "this browser
+ * is out of room" — archiving, trashing, emptying the trash, deleting — goes
+ * through a shelf write, so a `commit` that gives up on a quota error locks
+ * the door from the inside.
+ */
+function flushShelf(): boolean {
+  const next = pendingShelf;
+  if (next === null) return true;
+
+  if (shelfFlushTimer !== null) {
+    clearTimeout(shelfFlushTimer);
+    shelfFlushTimer = null;
+  }
+
+  const raw = JSON.stringify(next);
+  if (!writeShelfRaw(raw)) {
+    // `dropAllHistory` reports "history-dropped" for itself when it frees
+    // something. Reaching the end of this means the shelf did not move, so
+    // whatever the writer just pressed did not happen — and the copy in memory
+    // has to stop saying otherwise, or the screen would show a change the disk
+    // never took.
+    if (!dropAllHistory() || !writeShelfRaw(raw)) {
+      pendingShelf = null;
+      reportStorage("full");
+      return false;
+    }
+  }
+
+  pendingShelf = null;
+  /* The parsed copy is the object the callers are already holding, rather than
+     a re-parse of the text just written. Same contents, and `useSyncExternalStore`
+     is spared a re-render over a new identity for an unchanged shelf. */
+  cachedRaw = raw;
+  cachedShelf = next;
+  return true;
+}
+
+/**
+ * **Nothing may be left in memory when the page goes away.**
+ *
+ * `pagehide` is the one event that fires reliably on a tab being closed or
+ * backgrounded on iOS; `visibilitychange` covers the rest. Neither is a
+ * substitute for the cap above — a crash fires no event at all — which is why
+ * the window is bounded at `SHELF_FLUSH_MS` rather than left open until the
+ * writer leaves.
+ */
+if (typeof window !== "undefined") {
+  const land = () => {
+    flushShelf();
+  };
+  window.addEventListener("pagehide", land);
+  window.addEventListener("visibilitychange", land);
 }
 
 /**
@@ -1858,14 +2142,21 @@ function pushShelfDiff(next: Shelf, previous: Shelf) {
 }
 
 /** Replaces one book in place, leaving shelf order untouched. */
-function commitBook(bookId: string, update: (book: Book) => Book) {
+function commitBook(
+  bookId: string,
+  update: (book: Book) => Book,
+  defer = false,
+) {
   const shelf = getShelf();
   const target = findBook(shelf, bookId);
   if (!target) return;
-  commit({
-    ...shelf,
-    books: shelf.books.map((b) => (b.id === bookId ? update(b) : b)),
-  });
+  commit(
+    {
+      ...shelf,
+      books: shelf.books.map((b) => (b.id === bookId ? update(b) : b)),
+    },
+    defer,
+  );
 }
 
 /**
@@ -2920,10 +3211,28 @@ export async function saveBody(
     // previous count at this point, and the difference is the day's work.
     rememberActivity(words - current.words);
 
-    commitBook(bookId, (b) => ({
-      ...b,
-      chapters: b.chapters.map((c) => (c.id === chapterId ? { ...c, words } : c)),
-    }));
+    /* **Deferred, and this is the one call site that defers.**
+
+       A word count is a counter, not the index: the prose it counts is
+       already on the disk by the time this runs, and the shelf write is the
+       expensive part of an autosave — the whole shelf re-serialised, on the
+       main thread, every few seconds while somebody is typing. So it is
+       written within `SHELF_FLUSH_MS` rather than this instant, and any
+       structural change in the meantime carries it along.
+
+       Everything else stays immediate. A rename, a reorder, a delete or a
+       trash is a change to the index itself, and the safe answer when it is
+       not obviously a counter is to write at once. */
+    commitBook(
+      bookId,
+      (b) => ({
+        ...b,
+        chapters: b.chapters.map((c) =>
+          c.id === chapterId ? { ...c, words } : c,
+        ),
+      }),
+      true,
+    );
   }
 
   /* **The one await, and it is last on purpose.** Everything above is
@@ -3960,9 +4269,14 @@ export function setTheme(theme: Theme) {
 //
 // One key per book, like covers: it belongs to a book rather than to the
 // library, and it is unbounded text that must not ride along in a shelf write.
+//
+// **On the disk since the tool stores moved**, and `BIBLE_PREFIX` now lives up
+// with the other prefixes — see the note there for why it cannot stay here.
+// The subscription below is unchanged and needs to be: it keeps the `storage`
+// listener for a browser with no IndexedDB, and the channel reaches the same
+// set through `announce`.
 // ---------------------------------------------------------------------------
 
-const BIBLE_PREFIX = "openchapter:bible:";
 const bibleKey = (bookId: string) => `${BIBLE_PREFIX}${bookId}`;
 const bibleListeners = new Set<() => void>();
 
@@ -3980,7 +4294,7 @@ export function subscribeToBible(bookId: string, onStoreChange: () => void) {
 }
 
 export function getBibleRaw(bookId: string): string | null {
-  return readRaw(bibleKey(bookId));
+  return readStored(BIBLE, bookId);
 }
 
 export function getServerBibleRaw(): string | null {
@@ -3990,11 +4304,15 @@ export function getServerBibleRaw(): string | null {
 /**
  * Write a book's bible back.
  *
- * Not swallowed on failure, for the same reason the ledger is not: this is what
- * the writer typed, rather than something the app worked out for itself.
+ * **Still not swallowed, but the mechanism changed with the store.** On a
+ * browser with no IndexedDB `writeStored` throws out of here exactly as the
+ * bare `setItem` did; on the disk it cannot throw, and a refused put raises
+ * `reportStorage("full")` instead, which puts the same modal on the screen.
+ * What must not happen is a write that fails in silence — this is what the
+ * writer typed, rather than something the app worked out for itself.
  */
 export function saveBibleRaw(bookId: string, json: string) {
-  window.localStorage.setItem(bibleKey(bookId), json);
+  void writeStored(BIBLE, bookId, json);
   for (const listener of bibleListeners) listener();
 }
 
@@ -4012,7 +4330,7 @@ export function saveBibleRaw(bookId: string, json: string) {
  * arriving has no bible of its own.
  */
 export function getBiblesRaw(bookIds: readonly string[]): string {
-  return JSON.stringify(bookIds.map((id) => [id, readRaw(bibleKey(id))]));
+  return JSON.stringify(bookIds.map((id) => [id, readStored(BIBLE, id)]));
 }
 
 export function getServerBiblesRaw(): string {
@@ -4048,7 +4366,6 @@ export function subscribeToBibles(
 // and a writer running two launches at once needs two lists, not one merged one.
 // ---------------------------------------------------------------------------
 
-const ARC_PREFIX = "openchapter:arc:";
 const arcKey = (bookId: string) => `${ARC_PREFIX}${bookId}`;
 const arcListeners = new Set<() => void>();
 
@@ -4066,7 +4383,7 @@ export function subscribeToArc(bookId: string, onStoreChange: () => void) {
 }
 
 export function getArcRaw(bookId: string): string | null {
-  return readRaw(arcKey(bookId));
+  return readStored(ARC, bookId);
 }
 
 export function getServerArcRaw(): string | null {
@@ -4081,7 +4398,7 @@ export function getServerArcRaw(): string | null {
  * book.
  */
 export function saveArcRaw(bookId: string, json: string) {
-  window.localStorage.setItem(arcKey(bookId), json);
+  void writeStored(ARC, bookId, json);
   for (const listener of arcListeners) listener();
 }
 
@@ -4094,7 +4411,6 @@ export function saveArcRaw(bookId: string, json: string) {
 // else. It does not sync: a judgement about a draft is not worth a column.
 // ---------------------------------------------------------------------------
 
-const CONSISTENCY_PREFIX = "openchapter:consistency:";
 const consistencyKey = (bookId: string) => `${CONSISTENCY_PREFIX}${bookId}`;
 const consistencyListeners = new Set<() => void>();
 
@@ -4115,7 +4431,7 @@ export function subscribeToConsistency(
 }
 
 export function getConsistencyRaw(bookId: string): string | null {
-  return readRaw(consistencyKey(bookId));
+  return readStored(CONSISTENCY, bookId);
 }
 
 export function getServerConsistencyRaw(): string | null {
@@ -4130,9 +4446,11 @@ export function getServerConsistencyRaw(): string | null {
  */
 export function saveConsistencyRaw(bookId: string, json: string) {
   try {
-    window.localStorage.setItem(consistencyKey(bookId), json);
+    void writeStored(CONSISTENCY, bookId, json);
   } catch {
-    // Out of room. `storage-space.ts` is already saying so somewhere louder.
+    // Out of room, on a browser with no IndexedDB — `writeStored` is the only
+    // path that still throws. On the disk a refused put reports "full" for
+    // itself, which `storage-space.ts` is already saying somewhere louder.
   }
   for (const listener of consistencyListeners) listener();
 }
@@ -4145,7 +4463,6 @@ export function saveConsistencyRaw(bookId: string, json: string) {
 // that a person might genuinely want to export and keep.
 // ---------------------------------------------------------------------------
 
-const LEDGER_KEY = "openchapter:ledger";
 const ledgerListeners = new Set<() => void>();
 
 export function subscribeToLedger(onStoreChange: () => void) {
@@ -4161,7 +4478,7 @@ export function subscribeToLedger(onStoreChange: () => void) {
 }
 
 export function getLedgerRaw(): string | null {
-  return readRaw(LEDGER_KEY);
+  return readStored(LEDGER, ONLY);
 }
 
 export function getServerLedgerRaw(): string | null {
@@ -4174,11 +4491,16 @@ export function getServerLedgerRaw(): string | null {
  * Unlike history and the writing log, a failure here is *not* swallowed: those
  * two are conveniences the app derives for itself, and this is what the writer
  * typed. Losing a row they entered by hand, silently, in a screen about money,
- * would be the worst kind of quiet failure — so it throws and the caller says
- * so.
+ * would be the worst kind of quiet failure.
+ *
+ * **How it refuses to be silent changed when the ledger moved to the disk.**
+ * On a browser with no IndexedDB it still throws out of here and the caller
+ * still says so. On the disk nothing can throw, so a refused put raises
+ * `reportStorage("full")` from inside `writeStored` and the writer gets the
+ * modal instead. Either way the failure reaches a screen.
  */
 export function saveLedgerRaw(json: string) {
-  window.localStorage.setItem(LEDGER_KEY, json);
+  void writeStored(LEDGER, ONLY, json);
   for (const listener of ledgerListeners) listener();
 }
 
@@ -4191,7 +4513,6 @@ export function saveLedgerRaw(json: string) {
 // who spent March on book two did not have a bad March.
 // ---------------------------------------------------------------------------
 
-const ACTIVITY_KEY = "openchapter:activity";
 const activityListeners = new Set<() => void>();
 
 export function subscribeToActivity(onStoreChange: () => void) {
@@ -4207,7 +4528,7 @@ export function subscribeToActivity(onStoreChange: () => void) {
 }
 
 export function getActivityRaw(): string | null {
-  return readRaw(ACTIVITY_KEY);
+  return readStored(ACTIVITY, ONLY);
 }
 
 export function getServerActivityRaw(): string | null {
@@ -4225,7 +4546,7 @@ function rememberActivity(delta: number) {
     const next = trimActivity(
       recordActivity(parseActivity(getActivityRaw()), delta),
     );
-    window.localStorage.setItem(ACTIVITY_KEY, JSON.stringify(next));
+    void writeStored(ACTIVITY, ONLY, JSON.stringify(next));
     for (const listener of activityListeners) listener();
   } catch {
     // Deliberately silent, as above.
@@ -4479,7 +4800,6 @@ export function subscribeToStorageTrouble(onStoreChange: () => void) {
 // editor should see the count change in the same tab, not only in the next one.
 // ---------------------------------------------------------------------------
 
-const IDEAS_KEY = "openchapter:ideas";
 const ideaListeners = new Set<() => void>();
 
 export function subscribeToIdeas(onStoreChange: () => void) {
@@ -4495,7 +4815,7 @@ export function subscribeToIdeas(onStoreChange: () => void) {
 }
 
 export function getIdeasRaw(): string | null {
-  return readRaw(IDEAS_KEY);
+  return readStored(IDEAS, ONLY);
 }
 
 export function getServerIdeasRaw(): string | null {
@@ -4504,8 +4824,10 @@ export function getServerIdeasRaw(): string | null {
 
 export function saveIdeasRaw(json: string) {
   try {
-    window.localStorage.setItem(IDEAS_KEY, json);
+    void writeStored(IDEAS, ONLY, json);
   } catch (err) {
+    // Only the no-IndexedDB path can land here; on the disk a refused put
+    // reports "full" for itself.
     console.error("[store] could not write ideas", err);
     return;
   }
@@ -4825,6 +5147,14 @@ export async function clearLocalLibrary(): Promise<void> {
 
   cachedRaw = null;
   cachedShelf = EMPTY_SHELF;
+  /* A shelf still waiting to be written belongs to the writer who just signed
+     out. Flushing it here would put their books back; keeping it would show
+     them to the next account. */
+  pendingShelf = null;
+  if (shelfFlushTimer !== null) {
+    clearTimeout(shelfFlushTimer);
+    shelfFlushTimer = null;
+  }
   pushedBooks = null;
   emitShelf();
   refreshEverything();
@@ -4955,6 +5285,7 @@ export function applyRemoteForTest(remote: Shelf): void {
   const merged = keepLost(local, keepLocalOnly(local, remote));
   window.localStorage.setItem(SHELF_KEY, JSON.stringify(merged));
   cachedRaw = null;
+  pendingShelf = null;
   emitShelf();
 }
 
@@ -5037,6 +5368,11 @@ function applyRemote(remote: Awaited<ReturnType<typeof fetchLibrary>>) {
   // Seed the diff baseline from what we just wrote, or the next edit would
   // push every book back up as though it were new.
   cachedRaw = null;
+  /* Anything still waiting in memory was read into the merge above, so it is
+     already in what was written. Leaving it set would shadow the download it
+     took part in — and hand `pushedBooks` the pre-merge shelf as its
+     baseline, which is the one value here that must not be stale. */
+  pendingShelf = null;
   pushedBooks = getShelf().books;
 
   emitShelf();

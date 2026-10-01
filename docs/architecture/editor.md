@@ -349,9 +349,11 @@ the name, so the un-keyed one is `bubbleMenu$`. It *would* have collided in v2,
 where both defaulted to the literal string.
 
 **The editor shell is a rail, a tool panel, and the book panel.**
-`workspace-rail.tsx` selects which tool panel (`PanelTab` in `left-panel.tsx`:
-chapters, search, notes, ideas, bible, bookmarks, history, trash) is
-open, and clicking the active tab closes it — one control, never two.
+`workspace-rail.tsx` selects which tool panel (`PanelTab` in `panel-tabs.ts`:
+chapters, search, consistency, notes, ideas, bible, bookmarks, page, history,
+trash) is open, and clicking the active tab closes it — one control, never two.
+Three of those tabs are not the panel: `page` is the tools strip at the rail's
+edge, and `bible` and `notes` cover the page.
 
 **The left chrome is one slot, `--sidebar-width` wide, and the page stands
 beside it.** At most one thing in the slot is visible at a time: the book
@@ -391,12 +393,12 @@ Four things follow. **One header for all nine tabs**, written by `LeftPanel`:
 four of them drew their own and five drew none, so the panel's top edge moved
 with the tab and only some of them said what you were looking at. The names live
 in `PANEL_TITLES` and the rail reads them for its tooltips, so the button and
-the panel it opens cannot end up with two names for one thing. Two tabs also
-carry a **scope** (`panelScope`) — Notes is per *chapter* and the parking lot is
-per *library*, they sit next to each other in the rail, and both were a plain
-box under a one-word heading, so a note about Chapter 3 was one debounced save
-from a place nobody would look for it. The chapter's name is set in the writer's
-own casing, not uppercased with the heading beside it.
+the panel it opens cannot end up with two names for one thing. A tab can also
+carry a **scope** (`panelScope`) — the parking lot is per *library*, and was a
+plain box under a one-word heading. The scope is set in the writer's own
+casing, not uppercased with the heading beside it. Notes carried one too, for
+the chapter it was showing, until it left the panel on 2026-10-01 — a screen
+that lists every chapter says which one it is on by the row that is selected.
 
 **Four ways out and they are one toggle** — the rail's tab, the header's control
 at the top right, Escape from inside the panel only (it is a layer, not a modal,
@@ -428,27 +430,59 @@ from behind the rail — which is why the left rail is `z-[45]`, above the panel
 layer that was always there. In decelerating, out accelerating and quicker.
 
 **The rail is grouped, and the groups are the argument** (`GROUPS` / `FOOTER` in
-`workspace-rail.tsx`): finding a place in the book (search, bookmarks), then
-what is kept beside the book (notes, ideas, bible), then the two
-safety nets — versions and the trash — pinned to the foot, where Material's own
-rail guidance puts this class of item and for the reason that matters here: the
-trash is the one button in the column nobody wants to press by accident, so it
-must never sit where the eye has learned to find something else. **Page & type
-is its own group between those two**, because it is the one tab that changes the
-*book* rather than reporting on it: everything above reads the manuscript back
-to the writer, and this sets the type it is read in.
+`workspace-rail.tsx`): finding a place in the book (chapters, search, the
+consistency check), then **Tools in a group of its own**, then what is kept
+beside the book (notes, bible), then the two safety nets — versions and the
+trash — pinned to the foot, where Material's own rail guidance puts this class
+of item and for the reason that matters here: the trash is the one button in
+the column nobody wants to press by accident, so it must never sit where the
+eye has learned to find something else. Tools is alone because it is the one
+tab that changes the *book* rather than reporting on it: the group above it
+reads the manuscript back to the writer, and this sets the type it is read in.
+**It sat at the foot until 2026-10-01**, under the two tabs a writer reaches
+for least often, which put the one control that changes how the page looks
+furthest from the page.
 
 Three of those tabs are writer-pain features, each a panel over a pure module:
 **ideas** (`ideas.ts`) is a parking lot for the shiny idea that would otherwise
 stall book two — being *in the rail* is the feature, since leaving the book to
-write it down is itself the interruption; **bible** (`bible.ts`) is people and
-places with the aliases they answer to, and its opening question is "who is in
-this chapter", answered by whole-word search over what is written rather than
-by the list being maintained; **history** (`history.ts`) is eight snapshots a
+write it down is itself the interruption; **bible** (`bible.ts`) is people,
+places, factions, events, things and lore with the aliases they answer to and
+the links between them, and its opening question is "who is in this chapter",
+answered by whole-word search over what is written rather than by the list
+being maintained — and since 2026-09-27 it is not a panel: its tab covers the
+page with a card gallery (`components/bible/bible-view.tsx`), the page kept
+mounted and inert underneath (CLAUDE.md records the exception and why);
+**history** (`history.ts`) is eight snapshots a
 chapter under a 400KB budget, taken at most every ten minutes and only when the
 text really changed — a safety net, not an archive, and the panel says so.
 `rememberVersion` runs after the body is written and swallows every error: a
 full origin means no history, never a failed save.
+
+**Notes left the panel on 2026-10-01 and are a book's notes now**
+(`components/notes/`). The panel showed one chapter's Synopsis and Notes — the
+chapter the writer happened to be standing in — which is the wrong half of the
+job: a note is written in chapter four *for* chapter nineteen, and reading it
+back meant navigating to chapter four and opening the panel. The screen is
+Apple Notes' shape: every chapter down the left with the first line of its note
+under the title, the selected chapter's fields on the right, and it covers the
+page the way the bible does (CLAUDE.md records both exceptions and why there is
+not a third). Four things in it are deliberate.
+
+- **Selecting a row does not navigate.** The manuscript underneath stays on the
+  chapter being written; sending somebody to chapter nineteen because they
+  glanced at its note would lose their place. The row they *are* on is marked.
+- **One subscription for the book, not one per row** (`useEveryNote` in
+  `use-library.ts`). The list is as long as the book and the rules of hooks do
+  not allow a hook per chapter, so the shape is `useIdeas`': a string snapshot,
+  which `useSyncExternalStore` compares by value, with the map memoised off it.
+- **The snapshot is JSON**, not a joined string. A note is prose a writer
+  typed, so there is no separator character it cannot contain.
+- **The fields are keyed on the chapter**, so moving between rows unmounts
+  them — and `NoteFields`' unmount is what writes the half-second of typing the
+  500ms debounce is still holding. That flush was already there and already
+  load-bearing; it is now on the path a writer takes every time they read down
+  the list.
 
 **The bible reads across a series, and `src/lib/series.ts` is that half.**
 Three things in it are load-bearing. **A series is derived, never declared** —
@@ -573,10 +607,28 @@ that arrived out of order would sit in one place on this card and in another in
 the finished file. Only the off rows are placed, and they are placed by the
 arithmetic `createMatterPages` uses, so a row does not move when it is pressed.
 
-**"Add your own page" survives as the last row.** Nothing on a catalogue can
-express a page nobody has named yet, and it was the Add-page menu's
-"Something else…"; a row rather than a header button, because it is the end of
-the list it adds to rather than a peer of "Hide pages".
+**"Add your own page" survives.** Nothing on a catalogue can express a page
+nobody has named yet, and it was the Add-page menu's "Something else…". It was
+the last row of the list — "the end of the list it adds to rather than a peer
+of Hide pages" — and moved into the card's header once the body card put New
+chapter in its own, since the two halves of one panel were then giving
+different answers to "where do I add something".
+
+**Each card's header is one `+` and the chevron** (2026-10-01). The `+` is a
+`ui/menu.tsx` menu holding both ways of adding to that part: the writer's own
+page, and this part's own import (`useSectionImport`). It was three marks — a
+file-with-a-plus, an upload arrow, the chevron — across a 250px header, two of
+them saying "add" in two different drawings, and the file in the first one
+repeating the heading the card already carries. Two things about it are
+load-bearing. **The import's hidden `<input>` and its two dialogs are mounted
+in the header, outside the menu**: the menu is portalled, so rendered inside it
+they would be unmounted by the press that opened the file picker and would
+never live to see the `change`. That is why `section-import.tsx` is a hook
+returning `{ pick, busy, nodes }` rather than a button. And **both items are
+offered whether or not the card's list is open**, where the add used to appear
+only once it was — both of them navigate to what they made, so the writer is
+taken to it either way, and a menu that changes shape depending on whether a
+card is expanded is worse than the rule it was protecting.
 
 **The editor's popup below was deleted on 2026-09-15**, and what follows is the
 record of what it was. The owner removed it because the Front matter and Back
