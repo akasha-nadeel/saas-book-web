@@ -728,15 +728,13 @@ export function MvpLandingPage() {
               <h1
                 className={`oc-display font-serif text-lp-ink ${HERO_TITLE}`}
               >
-                Write the whole book, then leave with the file.
+                Finish your novel. Get a file the shops take.
               </h1>
             </div>
             <p className={`oc-lead mx-auto mt-6 max-w-xl ${SECTION_LEAD}`}>
-              Write your whole manuscript in the browser.{" "}
-              <strong className={LEAD_EM}>
-                Export to Word, EPUB or PDF any time.
-              </strong>{" "}
-              No AI — every word is yours.
+              Write it in the browser. Export as{" "}
+              <strong className={LEAD_EM}>Word, EPUB or PDF</strong> — the EPUB
+              clears EPUBCheck. No AI — every word is yours.
             </p>
 
             {/* Two pills side by side, filled and white — the reference's pair.

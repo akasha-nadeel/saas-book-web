@@ -17,7 +17,7 @@ import { createClient } from "@/lib/supabase/server";
  * the shelf a writer lands on is where that same book lives.
  */
 export const metadata: Metadata = {
-  title: "OpenChapter · Write your book and leave with the file",
+  title: "OpenChapter · Finish your novel and get a file the shops take",
   description:
     "A quiet editor for a whole manuscript — chapters, notes, versions and front matter. Written to your own browser, exported as Word, EPUB or PDF.",
 };
