@@ -151,51 +151,6 @@ const LOGO_SETS: { name: string; path: string }[][] = [
   ],
 ];
 
-const TESTIMONIALS = [
-  {
-    quote: "OpenChapter continues to amaze me every day.",
-    name: "Jhonata Teixeira",
-    role: "Fantasy & Sci-Fi Author",
-    avatar: "/testimonials/avatar-1.png",
-    bg: "bg-[#eef6cd]",
-  },
-  {
-    quote: "The most interesting part of OpenChapter is just how perfectly it makes writing in the cloud just work.",
-    name: "Álvaro Mateut",
-    role: "Independent Publisher",
-    avatar: "/testimonials/avatar-4.png",
-    bg: "bg-[#f5fce3]",
-  },
-  {
-    quote: "Its dramatically improved my experience of sharing ideas and manuscript drafts.",
-    name: "Elena Rostova",
-    role: "Fiction Writer & Editor",
-    avatar: "/testimonials/avatar-2.png",
-    bg: "bg-[#c0f400]",
-  },
-  {
-    quote: "Seriously, OpenChapter is amazing.",
-    name: "Maya Vance",
-    role: "Non-Fiction Author",
-    avatar: "/testimonials/avatar-3.png",
-    bg: "bg-[#f5fce3]",
-  },
-  {
-    quote: "It's a great experience and I miss some of its features when writing elsewhere.",
-    name: "Sarah Jenkins",
-    role: "Historical Fiction Author",
-    avatar: "/testimonials/avatar-5.png",
-    bg: "bg-[#c0f400]",
-  },
-  {
-    quote: "The new OpenChapter is the first online editor I can see myself using to build a full project.",
-    name: "Grace Chen",
-    role: "Biographer & Essayist",
-    avatar: "/testimonials/avatar-6.png",
-    bg: "bg-[#c0f400]",
-  },
-];
-
 /**
  * The footer's five columns.
  *
@@ -492,6 +447,51 @@ const ROWS: Row[] = [
     title: "Start blank, from a file, or from pasted text",
     lead: `One button, three ways in: an empty book, a manuscript in any of the ${IMPORT_FORMATS.length} formats it reads, or text pasted straight in. Nothing is added to your shelf until you have seen what came through.`,
     figure: <NewBookMenuScreen chrome={{ url: "openchapter.app/" }} />,
+  },
+  {
+    /* **The two search tools, together and before the export**, because they
+       are one subject — looking outward at what is already published — and a
+       writer meets them at the two moments a book faces a shop: naming it, and
+       pricing it. `book-tools.ts` groups them that way too (`LOOK_OUTWARD`).
+
+       Both are reached from the dashboard's side panel rather than from a
+       book, which is why the chrome carries `?area=` rather than a book route:
+       neither searches this writer's manuscript, so neither needs one. */
+    badge: "Title check",
+    title: "Know who is already using your title",
+    /* **The allowance is imported, not typed.** It is the same `FREE_LIMITS`
+       the tool meters itself with, so this sentence cannot drift from the
+       gate — the rule that matters most on this page, since a figure here is
+       read by somebody deciding. */
+    lead: `No title is taken — titles cannot be copyrighted. What matters is whether somebody else's book turns up first, so it looks yours up in Google Books and Open Library and shows every published book under it or close to it. Free runs ${FREE_LIMITS.titleCheck.free} a day.`,
+    figure: (
+      <Shot
+        src="/shot-title-check.webp"
+        width={1897}
+        height={860}
+        url="openchapter.app/?area=title-check"
+        alt="The title check: a box asking for a title you are considering with a Check it button, under the heading Check a title before you commit to it — and below it a wall of real published covers from the self-help shelf, each with its year and its author, to browse while you decide."
+      />
+    ),
+  },
+  {
+    /* **No recommended price, and the sentence says so.** The tool this one is
+       measured against prints one average beside an invented competitive
+       score; this reports a median, the spread, and every book it found. The
+       house rule about invented numbers is the whole of the difference, and
+       the line "It never tells you what to charge" is the tool's own deck. */
+    badge: "Price check",
+    title: "See what books like yours are selling for",
+    lead: `Pick your genre and get the real prices of the ebooks a reader would see beside yours — the median, the spread, and every book it found, cheapest first. It never tells you what to charge. Free runs ${FREE_LIMITS.priceCheck.free} a day.`,
+    figure: (
+      <Shot
+        src="/shot-price-check.webp"
+        width={1897}
+        height={860}
+        url="openchapter.app/?area=price-check"
+        alt="The price check: a genre picker with two optional boxes for where and what happens, a Check prices button, and the answer — $7.49 is the median of 18 prices, from 20 of 81 books that carried one, half of them between $3.99 and $11.99 — with a note that these are Google Play US ebook prices and say nothing about print, above the books it found, cheapest first."
+      />
+    ),
   },
   {
     /* **The export was a band of its own and is a row now**, which is the
@@ -894,61 +894,6 @@ export function MvpLandingPage() {
           </div>
         </section>
 
-        {/* ---- Testimonials ----------------------------------------------- */}
-        <section
-          id="reviews"
-          className="scroll-mt-20 border-b border-lp-line bg-lp-ground px-6 py-14 sm:py-20"
-        >
-          <div className="mx-auto max-w-[88rem]">
-            <div className="mx-auto max-w-3xl text-center">
-              <h2
-                className={`oc-display font-serif text-lp-ink ${SECTION_TITLE}`}
-              >
-                Loved by authors & writers
-              </h2>
-            </div>
-
-            <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {TESTIMONIALS.map((t, i) => (
-                <div
-                  key={i}
-                  className={`flex flex-col justify-between rounded-[0.9rem] p-8 sm:p-9 ${t.bg}`}
-                >
-                  <div>
-                    <svg
-                      className="mb-4 h-7 w-7 text-[#000000]/60 shrink-0"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
-                    </svg>
-                    <p className="font-sans text-[1.25rem] font-semibold leading-[1.3] tracking-[-0.015em] text-[#000000]">
-                      {t.quote}
-                    </p>
-                  </div>
-                  <div className="mt-10 flex items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={t.avatar}
-                      alt={t.name}
-                      className="h-9 w-9 rounded-full object-cover shrink-0"
-                    />
-                    <div>
-                      <h4 className="font-sans text-[0.875rem] font-semibold leading-tight text-[#000000]">
-                        {t.name}
-                      </h4>
-                      <p className="font-sans text-[0.8125rem] font-normal leading-tight text-[#000000]/60 mt-0.5">
-                        {t.role}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* ---- Pricing ------------------------------------------------------
 
             Two cards and a row of figures, all of them read: the prices from
@@ -969,7 +914,8 @@ export function MvpLandingPage() {
                 Start free. Pay when the book is going out.
               </h2>
               <p className={`oc-lead mx-auto mt-6 max-w-2xl ${SECTION_LEAD}`}>
-                Four plans, two cycles, and nothing held hostage.{" "}
+                {TIER_NAMES.free} and {TIER_NAMES.pro}, two cycles, and
+                nothing held hostage.{" "}
                 <strong className={LEAD_EM}>
                   Every export format is free, on every plan, for good.
                 </strong>

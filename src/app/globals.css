@@ -3133,6 +3133,69 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   The closing ask's own ground — a painted sky, and the scrim that makes it
+   safe to write on.
+
+   **It replaces the gradient on the closing banner only.** The hero keeps
+   `.oc-gradient-field`; this class is the one `CtaBanner` takes. The old
+   arrangement had the page open and close on one colour, which is a real loss
+   and was the owner's trade to make.
+
+   **The scrim is the whole of why this picture can carry type where three
+   earlier ones could not.** The note on `CtaBanner` has the history: the ask
+   is a fixed stack of pixels while the frame scales with the width, so the
+   share of the composition it covers grows as the window narrows, and a
+   picture with a subject in it puts the caveat line somewhere different at
+   390 than at 1280. Measured on this one, the frame splits in two — deep sky
+   on the left and lit cloud on the right — and **neither ink clears it**:
+
+   | ink                | worst on the bare picture |
+   |--------------------|---------------------------|
+   | `#0f0f10` near-black |  1.83:1                 |
+   | `#ffffff` white      |  1.38:1                 |
+
+   So the type brings its own ground, which is the rule `docs/architecture/
+   landing.md` states for anything placed on artwork. A flat scrim over the
+   *whole* frame is what makes it hold at every width: there is no safe zone to
+   drift out of, because every pixel is covered to the same floor. Measured
+   over the picture at 32x18, the worst white contrast anywhere in the frame
+   is **4.62:1 at alpha 0.52** and 5.60:1 at 0.58, so the gradient below never
+   goes under 0.52 and the band is AA for body text at its lightest point.
+   Re-run that measurement if the picture is ever swapped; the alphas are
+   properties of this image, not of this layout.
+
+   **Five tokens are re-pointed, because the band is now dark and the page is
+   light.** That is the mechanism this file already uses for `.oc-footer-dark`
+   and `.oc-gradient-field` — a class that re-points, never a second
+   component. `lp-ground` going navy is what turns the button from a near-black
+   pill into a white one, since it is drawn `bg-lp-ink` on `text-lp-ground`;
+   `lp-ink` carries the heading and the deck alike, since `SECTION_LEAD` is
+   drawn in it. The other three are for the tool marquee, which `CtaBanner`
+   draws under the ask for the sixteen-tool page and which would otherwise set
+   near-black type on this ground.
+
+   `cover` rather than the gradient's `100% 100%`: this one has edges in it and
+   a figure on the right, so stretching it would be visible.
+   -------------------------------------------------------------------------- */
+.oc-closing-sky {
+  --color-lp-ink: #ffffff;
+  --color-lp-soft: #e4eaf6;
+  --color-lp-body: #e4eaf6;
+  --color-lp-faint: #e4eaf6;
+  --color-lp-ground: #101a33;
+
+  background:
+    linear-gradient(
+      to bottom,
+      rgb(8 12 24 / 0.62) 0%,
+      rgb(8 12 24 / 0.52) 62%,
+      rgb(8 12 24 / 0.6) 100%
+    ),
+    url("/closing-sky.webp") center / cover no-repeat,
+    #101a33;
+}
+
+/* --------------------------------------------------------------------------
    The grounds a feature row's figure sits on.
 
    A gradient rather than the flat `--color-lp-card-*` tints, because a wash

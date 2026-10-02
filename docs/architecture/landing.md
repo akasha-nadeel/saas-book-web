@@ -19,8 +19,8 @@ photographed rule, the ban on invented numbers — and the differences are here.
 
 **Its sections, in order**: hero (headline, two actions, the drawn editor);
 the programs a finished file opens in, grouped by the export that reaches each;
-`#inside`, four `FeatureRow`s over drawn screens; `#formats`, the export wizard
-drawn with the three formats under it; `#private`, three cards about where the
+`#inside`, a `FeatureRow` per screen, over drawn screens and shots;
+`#formats`, the export wizard drawn with the three formats under it; `#private`, three cards about where the
 writing is; `#pricing`, the two plans; `#faq`; `CtaBanner`; `LandingFooter`.
 
 **It may only name what the launch flag leaves reachable, and that cost three

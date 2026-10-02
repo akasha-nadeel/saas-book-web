@@ -6,27 +6,30 @@ import { SECTION_LEAD, SECTION_TITLE } from "@/components/landing/type";
 /**
  * The closing ask — the last thing on the page before the footer.
  *
- * **It closes on the gradient the page opened on**, which is the arrangement
- * that makes the whole thing read as one piece rather than as a stack of
- * bands: a reader arrives on that colour and leaves on it. `.oc-gradient-field`
- * is the same class the hero takes and the same file behind it — an abstract
- * blur has no subject to frame, so a second crop of it would buy nothing.
+ * **It closes on a painted sky** (`.oc-closing-sky`), at the owner's choice,
+ * and that reverses what stood here: the page used to open and close on one
+ * gradient, which is what made the whole thing read as one piece rather than
+ * as a stack of bands. The hero keeps that gradient; only this band changed.
  *
- * **Three artworks have stood here and the notes on the first two are worth
- * keeping**, because each failed in a way that is a property of the picture
- * rather than of this layout. First an indigo sky with a drawn app window,
- * whose gradient landed on the footer's ground. Then a photographed landscape,
- * with the footer riding up onto it as a card. Then a doorway in a pale field,
- * which took near-black type and no overlay at all. The lesson under all three:
- * the ask is a fixed stack of pixels while the frame scales with the width, so
- * the share of the picture it covers grows as the window narrows — probing
- * four widths with the landscape put the caveat line at 41% of the frame at
- * 1280 and 58% at 390, out over open water at 2.2:1.
+ * **Four artworks have now stood here and the notes on the first three are
+ * worth keeping**, because each failed in a way that is a property of the
+ * picture rather than of this layout. First an indigo sky with a drawn app
+ * window, whose gradient landed on the footer's ground. Then a photographed
+ * landscape, with the footer riding up onto it as a card. Then a doorway in a
+ * pale field, which took near-black type and no overlay at all. The lesson
+ * under all three: the ask is a fixed stack of pixels while the frame scales
+ * with the width, so the share of the picture it covers grows as the window
+ * narrows — probing four widths with the landscape put the caveat line at 41%
+ * of the frame at 1280 and 58% at 390, out over open water at 2.2:1.
  *
- * A gradient is the one kind of image that cannot fail that way, because there
- * is no composition for the type to drift across. The contrast working — why
- * the stack sits in the upper two thirds and what the fade at the foot is
- * doing — is in `globals.css` beside `.oc-gradient-field`.
+ * **The fourth survives it by covering the whole frame rather than finding a
+ * safe zone in it.** Measured, this picture carries neither ink bare —
+ * near-black worst 1.83:1, white worst 1.38:1, because it splits into deep sky
+ * and lit cloud — so a scrim takes every pixel down to a floor and the type is
+ * white on top of it. There is no composition left for the ask to drift
+ * across, which is the property a gradient had for free. The alphas, the
+ * measurement behind them and the four re-pointed tokens are in `globals.css`
+ * beside `.oc-closing-sky`; re-run that measurement if the picture is swapped.
  *
  * **One button, not two.** The reference closes on a single press and it is
  * right to: the pair belongs in the header, where a returning writer needs the
@@ -64,7 +67,7 @@ export function CtaBanner({
   marquee?: boolean;
 } = {}) {
   return (
-    <section className="oc-gradient-field">
+    <section className="oc-closing-sky">
       {/* The stack lives in the upper two thirds of the section — see the
           measurement beside `.oc-gradient-field`. The padding is what puts it
           there: heavier at the foot than the head, so the bloom at the bottom
@@ -75,7 +78,7 @@ export function CtaBanner({
           {/* **A step heavier than the page's other section titles, and the
               picture is the reason.** `SECTION_TITLE` is `medium`, which is
               right on flat ground where a heading has nothing competing with
-              it; on the gradient the same weight reads as thin. This is the
+              it; over artwork the same weight reads as thin. This is the
               one heading on the page allowed to differ, and it differs in
               weight alone — the size is still the shared constant, so it does
               not become a second scale. The hero's title made the same move.

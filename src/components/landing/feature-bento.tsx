@@ -329,42 +329,131 @@ function TogetherVisual() {
         {/* The editor, in the accent — the one tile that is the writing itself,
             and the only place a hue is spent in this card. */}
         <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-lp-accent text-white shadow-[0_10px_24px_-12px_rgba(20,110,245,0.8)]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/icons/icon-typewriter.png"
-            alt="Editor"
-            width={44}
-            height={44}
-            className="h-11 w-11 shrink-0 object-contain"
-          />
+          <Mark name="Editor" mark={MARKS.chapters} size={11} />
         </span>
         <span className="flex h-16 flex-1 items-center gap-4 rounded-xl border border-lp-edge bg-lp-ground px-4.5 shadow-[0_8px_24px_-16px_rgba(15,15,16,0.5)] sm:gap-5 sm:px-5">
-          <IconMark name="Shelf" src="/icons/icon-home.png" />
-          <IconMark name="Import" src="/icons/icon-import.png" />
+          <Mark name="Shelf" mark={MARKS.home} />
+          <Mark name="Import" mark={MARKS.import} />
         </span>
       </div>
       <div className="flex h-16 items-center gap-4 rounded-xl border border-lp-edge bg-lp-ground px-4.5 shadow-[0_8px_24px_-16px_rgba(15,15,16,0.5)] sm:gap-5 sm:px-5">
-        <IconMark name="Saved versions" src="/icons/icon-history.png" />
-        <IconMark name="Export" src="/icons/icon-export.png" />
-        <IconMark name="Consistency" src="/icons/icon-consistency.png" />
+        <Mark name="Saved versions" mark={MARKS.history} />
+        <Mark name="Export" mark={MARKS.export} />
+        <Mark name="Consistency" mark={MARKS.consistency} />
       </div>
     </div>
   );
 }
 
-/** One tile mark using custom branded icon. */
-function IconMark({ name, src }: { name: string; src: string }) {
+/**
+ * The app's own marks, copied as paths rather than imported as components.
+ *
+ * **These are the six icons the product actually draws**, taken from
+ * `src/components/icons/` and mapped the way `editor/rail-mark.tsx` maps them:
+ * `home` is the way back to the shelf, `chapters` is the manuscript, and
+ * `import`, `export`, `history` and `consistency` are the four it names. They
+ * replace six PNGs that were a second drawing of the same six things.
+ *
+ * **Copied, and not imported, because every one of those files is
+ * `"use client"`.** They are `motion/react` components with hover animations,
+ * and importing them here would put motion in the bundle of a page whose
+ * standing claim is that the whole thing ships one script — see the note on
+ * `MvpLandingPage`. Nothing in this card is hoverable anyway: it is a figure,
+ * and the marks are `aria-hidden` with the name in `sr-only` beside them.
+ *
+ * **The cost of a copy is drift**, which is the same cost the drawn screens
+ * carry and is handled the same way: each entry names the file it came from,
+ * so re-copying is a `grep` for `d="` in that file. A mark that changes shape
+ * here is cosmetic; a mark that changes *meaning* is a lie, and the mapping
+ * above is the part to check.
+ *
+ * **Two of the six are drawn in a 48 box and four in a 24**, which is true in
+ * the app as well — so the stroke is scaled by the box rather than fixed, or
+ * the two would come out at half the weight of the four standing beside them.
+ * `1.8` is what `rail-mark.tsx` passes.
+ */
+const MARKS = {
+  /** `home-icon.tsx` — the shelf. */
+  home: {
+    box: 24,
+    paths: [
+      "M5 12l-2 0l9 -9l9 9l-2 0",
+      "M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7",
+      "M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6",
+    ],
+  },
+  /** `book-icon.tsx` — the manuscript, which is what the editor holds. */
+  chapters: {
+    box: 48,
+    paths: [
+      "M24 40.5V41L24 10V10.5",
+      "M24 41C31.0005 36.9995 37.9995 36.9995 45 41V10.0003C37.9995 5.99989 31.0005 5.99989 24 10.0003C16.9995 5.99989 10.0005 5.99989 3 10.0003V41C10.0005 36.9995 16.9995 36.9995 24 41Z",
+      "M30 16.5C32.8362 15.1345 36.5662 15.06 39.5 16.2763",
+      "M30 23.5832C32.8362 22.2178 36.5662 22.1432 39.5 23.3596",
+      "M30 30.6665C32.8362 29.301 36.5662 29.2265 39.5 30.4428",
+    ],
+  },
+  /** `upload-icon.tsx`. */
+  import: {
+    box: 24,
+    paths: [
+      "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4",
+      "M12 3v12",
+      "m17 8-5-5-5 5",
+    ],
+  },
+  /** `download-icon.tsx`. */
+  export: {
+    box: 24,
+    paths: [
+      "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4",
+      "M12 15V3",
+      "m7 10 5 5 5-5",
+    ],
+  },
+  /** `history-circle-icon.tsx` — the versions a chapter keeps. */
+  history: {
+    box: 24,
+    paths: ["M12 8l0 4l2 2", "M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"],
+  },
+  /** `double-check-icon.tsx` — the consistency check. */
+  consistency: {
+    box: 48,
+    paths: ["M3 26.4L11.8846 39L35 11", "M45 11L21.8847 39L20.2098 36.6248"],
+  },
+} as const;
+
+type MarkShape = { box: number; paths: readonly string[] };
+
+/** One tile mark, in the app's own drawing. */
+function Mark({
+  name,
+  mark,
+  /** In `0.25rem` steps, so it reads like the Tailwind sizes around it. */
+  size = 10,
+}: {
+  name: string;
+  mark: MarkShape;
+  size?: number;
+}) {
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt=""
+      <svg
+        viewBox={`0 0 ${mark.box} ${mark.box}`}
+        fill="none"
+        stroke="currentColor"
+        /* Scaled by the box — see the note on `MARKS`. */
+        strokeWidth={1.8 * (mark.box / 24)}
+        strokeLinecap="round"
+        strokeLinejoin="round"
         aria-hidden="true"
-        width={40}
-        height={40}
-        className="h-10 w-10 shrink-0 object-contain"
-      />
+        className="shrink-0"
+        style={{ width: `${size * 0.25}rem`, height: `${size * 0.25}rem` }}
+      >
+        {mark.paths.map((d) => (
+          <path key={d} d={d} />
+        ))}
+      </svg>
       <span className="sr-only">{name}</span>
     </>
   );
