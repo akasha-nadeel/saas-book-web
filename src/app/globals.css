@@ -4370,13 +4370,6 @@ body {
   display: flex;
 }
 
-/* On a phone an accordion's heading is the expected target. The full desktop
-   cards retain their explicit Pages/Chapters buttons; compact cards already
-   have their own whole-card control. */
-:root[data-editor-layout="continuous"] .oc-matter-card-mobile-toggle {
-  display: block;
-}
-
 .editor-shell {
   height: var(--oc-layout-height);
   max-height: var(--oc-layout-height);

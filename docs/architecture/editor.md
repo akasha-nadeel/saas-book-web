@@ -614,21 +614,32 @@ of Hide pages" — and moved into the card's header once the body card put New
 chapter in its own, since the two halves of one panel were then giving
 different answers to "where do I add something".
 
-**Each card's header is one `+` and the chevron** (2026-10-01). The `+` is a
-`ui/menu.tsx` menu holding both ways of adding to that part: the writer's own
-page, and this part's own import (`useSectionImport`). It was three marks — a
-file-with-a-plus, an upload arrow, the chevron — across a 250px header, two of
-them saying "add" in two different drawings, and the file in the first one
-repeating the heading the card already carries. Two things about it are
-load-bearing. **The import's hidden `<input>` and its two dialogs are mounted
-in the header, outside the menu**: the menu is portalled, so rendered inside it
-they would be unmounted by the press that opened the file picker and would
-never live to see the `change`. That is why `section-import.tsx` is a hook
-returning `{ pick, busy, nodes }` rather than a button. And **both items are
-offered whether or not the card's list is open**, where the add used to appear
-only once it was — both of them navigate to what they made, so the writer is
-taken to it either way, and a menu that changes shape depending on whether a
-card is expanded is worse than the rule it was protecting.
+**Each card's header is the arrow, the import and the `+`, in that order**
+(2026-10-01) — the disclosure, this part's own import (`useSectionImport`), and
+the writer's own page. **Only the `+` is filled**, in the Export button's own
+`bg-accent` under `text-accent-ink`; the other two are quiet until hovered.
+The add was a file-with-a-plus and is a plain `+`:
+the sheet of paper in that mark repeated the heading the card already carries,
+and two marks on one row both saying "add" in different drawings is one idea
+drawn twice.
+
+Three things about it are load-bearing.
+
+- **Both are drawn, and the day they were not is the lesson.** They were folded
+  into a single `+` menu on 2026-10-01 and the import went invisible that
+  afternoon: a writer looking at the card saw `[+] [⌄]` and had no way to know
+  a file could go into this part at all. A menu is the wrong container for two
+  actions taken this often — it costs a press to find out what the card can do.
+- **The import's hidden `<input>` and its two dialogs are mounted by the header
+  itself**, which is what that day cost and what to keep. Inside anything
+  portalled they are unmounted by the very press that opened the file picker
+  and never live to see the `change`. It is also why `section-import.tsx` is a
+  hook returning `{ pick, busy, nodes }` rather than a button: one component
+  draws all three glyphs from one set of classes, and the duplicate
+  `CARD_QUIET` that a second component needed went with it.
+- **Both are offered whether or not the card's list is open**, where the add
+  used to appear only once it was. Each navigates to what it made, so the
+  writer is taken to it either way.
 
 **The editor's popup below was deleted on 2026-09-15**, and what follows is the
 record of what it was. The owner removed it because the Front matter and Back

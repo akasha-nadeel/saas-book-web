@@ -373,9 +373,17 @@ export function CoverDialog({
             role="switch"
             aria-checked={bare}
             onClick={() => setBare(!bare)}
+            /* The same wash as its twin on `/book/new`, so the two places
+               this can be set look alike as well as saying the same sentence.
+
+               **The ground moves and the ink does not.** This card is inside a
+               dialog, and the dialog palette is scoped to dialogs precisely so
+               it cannot leak onto a page — `accent` is the one colour both
+               palettes share, so the wash crosses and
+               `text-tremor-content-strong` below stays put. */
             className="mt-3 flex w-full items-start gap-3 rounded-md border
-                       border-tremor-border px-3 py-2.5 text-left outline-none
-                       transition-colors hover:bg-tremor-background-subtle
+                       border-accent/30 bg-accent/10 px-3 py-2.5 text-left outline-none
+                       transition-colors hover:border-accent/50 hover:bg-accent/15
                        focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             <SwitchTrack on={bare} className="mt-0.5" />

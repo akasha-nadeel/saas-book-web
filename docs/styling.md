@@ -529,6 +529,82 @@ where the grouped-list rule stops and why.
   wizard's direction-aware step animation, with its reduced-motion rule. No new
   keyframes.
 
+### Amendment, 2026-10-01: the matter cards take the accent wash
+
+The owner asked for the three cards in the book panel — Front, Body, Back — to
+sit on the pale blue of a Google info card, with an edge on hover. It needs
+recording because **it reverses a note those cards carry in their own source**,
+which said the panel spends its one hue on *the way forward* and nothing else.
+
+**Revised the next day: the wash is for a card whose list is shut.** It went on
+in every state first, which tinted the nine chapter rows inside an expanded
+Body matter card — a wash over a list rather than a card. The rule it settled
+into is the better one and is worth stating as a rule rather than as a colour:
+**the wash marks a card that is one button.** It is keyed on `pressable`
+(`compact || !listOpen`), the same flag the press overlays read, so a shut card
+is washed *and* pressable anywhere, and an open card is a surface *and* presses
+only on its header. Colour and behaviour say one thing, and changing either is
+an obligation to look at the other. Expanded, the card is `bg-lifted`
+(`#ffffff` in plain light) as it always was.
+
+- **The distinction that saves the old rule is hue-for-identity.** The ladder
+  that was removed used *three different* colours for three parts, so the
+  border said which part a card was and which one you were in at the same time
+  and failed at the second. One wash says nothing about which is which — the
+  names do — and the full-ink `border-fg` still says where you are. No second
+  hue enters the palette.
+- **It is `bg-accent/10`, an alpha of a token, not a colour of its own.** That
+  is the rule to copy. The eight theme blocks must state identical token names
+  or `theme-tints.test.ts` fails, so a new `--color-*` is eight edits; an alpha
+  is none, and it follows a tint instead of painting over it.
+- **Three states, and the middle one is new**: `border-line` at rest,
+  `hover:border-accent/50` for an unselected card, `border-fg` when selected.
+  **The selected card takes no hover**, because it is already at full ink and a
+  hover that moved it would make "you are here" flicker under the pointer. The
+  border is 2px throughout — a width that changed on selection or hover would
+  nudge the card's contents by a pixel, which is the kind of thing you see
+  without being able to say what you saw.
+- **Measured, not eyeballed.** The light card lands on `#e3ecfc`, and against
+  it the title is 15.1:1, the description's `fg/75` is 7.2:1 and the meta's
+  `muted` is 5.1:1; at night the ground is `#151f3c` at 14.6 / 8.7 / 9.4. All
+  clear `AA_TEXT`. `muted` is the one to re-measure if the alpha ever moves —
+  it is the value already closest to the floor in the six tints.
+- **`CARD_STRIP` was already `bg-accent/15`**, so the two sizes of the card
+  stop disagreeing: shrinking to a strip now loses the content and keeps the
+  colour, which is what the restyle-in-place transition was built for.
+- **A card with its list shut is one button.** The name, the sentence under it
+  and the count all open the part; open, the card stands down to a header-row
+  overlay, because the rows below are chapters and one click must not both
+  open a chapter and collapse the list it came from. The two overlays'
+  conditions are complements, so exactly one is live and a card is one tab
+  stop. This replaced a *layout*-gated rule — the whole-header press existed
+  only under `[data-editor-layout="continuous"]`, so on a laptop the only way
+  into a part was a 32px chevron in a 250px card.
+- **The same wash, same values, on the "artwork already has the words on it"
+  switch** in `new-book-form.tsx` and `cover-dialog.tsx`. In the dialog **the
+  ground moves and the ink does not**: that card wears the dialog palette, and
+  `accent` is the one colour both palettes share, so the wash crosses and
+  `text-tremor-content-strong` stays put.
+- **The header row is `[arrow] [import] [+]`, and the `+` takes the Export
+  button's fill** (2026-10-02): `bg-accent` under `text-accent-ink`, hovering
+  to `accent-strong`, read off `editor-top-bar.tsx` rather than approximated so
+  the panel's one filled control and the bar's cannot drift. White on the brand
+  indigo is 4.59:1, 6.39 on the hover, and 8.85 at night where the ink is the
+  near-black navy — **`text-accent-ink`, never `text-white`**, because the
+  night accent is a bright periwinkle. Its border stays at `transparent`:
+  `CARD_QUIET` carries one, and the 1px is what holds the three glyph boxes the
+  same size. **Only one control on the card is filled**, which is the rule that
+  makes the fill mean anything, and it survives the wash above rather than
+  being broken by it: one filled control doing the thing the card is for is
+  exactly what the one hue is reserved for.
+- **The `+` sits last, which reverses "a disclosure indicator sits at the end
+  of every Apple list".** The arrow held that position and the fill for part of
+  a day; both went to the add. The rule it replaces is the honest one: the
+  chevron was the anchor while it was the *only* way into a part, and since the
+  whole shut card became pressable it is a shortcut rather than the way in. The
+  end of the row goes to the action a writer opened the panel to take, and the
+  arrow drops to `CARD_QUIET` beside the import.
+
 ## The editor's rail icons
 
 `src/components/icons/` is [itshover](https://itshover.com) (Apache-2.0),

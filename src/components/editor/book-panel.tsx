@@ -36,7 +36,6 @@ import {
   type RowMenuItem,
 } from "@/components/sidebar/row-menu";
 import { useSectionImport } from "@/components/editor/section-import";
-import { Menu, MenuButton } from "@/components/ui/menu";
 import { ConfirmDialog, PromptDialog } from "@/components/ui/dialog";
 
 /**
@@ -121,19 +120,47 @@ function destinationsFrom(
  * you had to look for, which is what a *disabled* control looks like in every
  * other app a writer has used. Pressable and dark are the same signal.
  *
- * An alpha of the ink instead, so one pair of numbers works in both themes:
- * `fg` is near-black by day and near-white at night, so 14% is a legible grey
- * slab on the white card and a legible lift on the near-black one, and the
- * hover deepens by day and brightens at night without a second rule.
+ * **It is the Export button's fill, exactly** (2026-10-02, the owner's
+ * ask) — `bg-accent` under `text-accent-ink`, hovering to `accent-strong`,
+ * the same four classes `editor-top-bar.tsx` puts on the one filled control
+ * in the application bar. Read from there rather than approximated, so the
+ * panel's one filled control and the bar's cannot drift apart.
  *
- * Still grey, and deliberately. The palette spends its one hue on *the way
- * forward* and nothing else — three indigo buttons down a panel that lists a
- * book would make the chrome the loudest thing on the screen again, which is
- * the whole reason the parts' colour ladder came off these cards.
+ * **The add wears it, and it is the only thing on the card that does.** The
+ * disclosure had it for part of a day, against the argument written over the
+ * action row itself — a toggle is not what a writer opened this panel to
+ * press. The arrow took `CARD_QUIET` instead, beside the import.
+ *
+ * **`text-accent-ink`, never `text-white`.** The night accent is a bright
+ * periwinkle, so the ink on it is near-black navy; by day it is white on the
+ * brand indigo. Measured: 4.59:1 by day, 6.39 on its hover, 8.85 at night.
+ * The chevron draws in `currentColor` (`RailMark`), so the glyph follows.
+ *
+ * **The border stays, at `transparent`.** `CARD_QUIET` carries one too, and
+ * the 1px is what holds the three glyph boxes the same size — drop it here and
+ * the chevron sits a pixel out from its neighbours.
+ *
+ * **This block used to end "still grey, and deliberately"**, on the rule that
+ * the palette spends its one hue on *the way forward* and nothing else —
+ * three indigo buttons down a panel that lists a book being the thing that
+ * took the parts' colour ladder off these cards in the first place. The rule
+ * survives here rather than being broken by this: there is **one** filled
+ * control on the card, and what it does is put a chapter or a page into the
+ * book. That is the way forward. `CARD_QUIET` keeps the other two glyphs
+ * unfilled, which is what makes the fill mean anything at all.
+ *
+ * And on 2026-10-01 the cards themselves took the wash, by the owner's choice
+ * with this note in front of them. **What the old ladder did and this does not
+ * is spend hue on *identity*** — three different colours for three parts, so
+ * the border was saying which part a card was and which one you were in at
+ * once, and failed at the second. One wash on all three says nothing about
+ * which part is which; the names do that, and the full-ink edge still says
+ * where you are. The rule that survives is the narrow one: no second hue, and
+ * nothing here competes with the accent because it *is* the accent.
  */
-const CARD_BUTTON = `border border-accent/30 bg-accent/15 text-fg
-                     hover:border-accent/60 hover:bg-accent/25
-                     focus-visible:ring-accent/50`;
+const CARD_BUTTON = `border border-transparent bg-accent text-accent-ink
+                     hover:bg-accent-strong
+                     focus-visible:ring-accent/60`;
 
 /**
  * The quiet weight, for a glyph action on the card's title row.
@@ -724,15 +751,14 @@ export function BookPanel({
             }
             onAction={() => openPartList("body")}
             compact={!!body.open && body.open !== "body"}
-            /* Both ways of adding to the chapters, behind the one `+`. A
-               reader is offered neither. */
+            /* Both ways of adding to the chapters. A reader is offered
+               neither. */
             add={
               canWrite
                 ? {
-                    menuLabel: "Add to Body matter",
                     newLabel: "New chapter",
                     onNew: handleCreate,
-                    importLabel: "Import a file…",
+                    importLabel: "Import a file into Body matter",
                     onImport: bodyImport.pick,
                     importBusy: bodyImport.busy,
                     nodes: bodyImport.nodes,
@@ -1267,31 +1293,31 @@ function MatterCard({
   active: boolean;
   onAction: () => void;
   /**
-   * **Everything that adds to this part, behind one `+`.**
+   * **The two ways of adding to this part: a page of the writer's own, and a
+   * file.** Undefined for a reader, who may add neither.
    *
-   * It was two glyphs: a file-with-a-plus for a new page and an upload arrow
-   * for this part's own import, either side of the chevron. Three marks on a
-   * 250px header, two of them saying "add" in two different drawings, and the
-   * file in the first one repeating the heading the card already carries.
+   * The add used to be a file-with-a-plus, which repeated the heading the card
+   * already carries — the sheet of paper in the mark said "page" where the
+   * card above it already said "Front matter". It is a plain `+` now.
    *
-   * The two are one control now, and a menu rather than a toggle because they
-   * are two *ways* of doing the same thing rather than two different jobs.
-   * Undefined for a reader, who may add nothing.
+   * **They were folded into one `+` menu for a day and the import went
+   * invisible**, which is the thing to remember here: a control that only
+   * exists once a menu is open is a control a writer looking at the card
+   * cannot find. Both are drawn.
    *
-   * `nodes` is the import's hidden file input and its two dialogs, and the
-   * card mounts them in the header **outside** the menu — portalled inside it
-   * they would be unmounted by the press that opened the file picker. See
-   * `useSectionImport`.
+   * `nodes` is the import's hidden file input and its two dialogs, mounted by
+   * the card's own header. That matters the moment anything here is portalled
+   * again: inside a portal they are unmounted by the very press that opened
+   * the file picker, and the `change` never arrives. See `useSectionImport`.
    */
   add?: {
-    /** Names the menu for a screen reader — "Add to Front matter". */
-    menuLabel: string;
     /** "New chapter" on the body, "Add your own page" on the other two. */
     newLabel: string;
     onNew: () => void;
+    /** The whole phrase — "Import a file into Front matter". */
     importLabel: string;
     onImport: () => void;
-    /** A file is being read. The item says so rather than going quiet. */
+    /** A file is being read. The button dims rather than disappearing. */
     importBusy: boolean;
     nodes: React.ReactNode;
   };
@@ -1311,6 +1337,11 @@ function MatterCard({
   children?: React.ReactNode;
 }) {
   const listOpen = grow && !!children;
+  /* Whether the *whole* card opens the part, rather than just its header row.
+     True while there is no list under it to click — see the two overlays at
+     the foot of this component, whose conditions are complements of each
+     other so exactly one is ever live. */
+  const pressable = compact || !listOpen;
   const cardRef = useRef<HTMLElement>(null);
   // Only the selected card draws the rules, and never a shrunk one — three
   // cards each trailing rules would be a diagram of nothing, and a strip has
@@ -1363,13 +1394,44 @@ function MatterCard({
                   ${
                     compact
                       ? CARD_STRIP
-                      : /* `bg-lifted`, not `bg-white`: the card is a face
-                           standing on the panel's ground, which is what that
-                           token is for, and it is `#ffffff` in plain light — so
-                           this changes nothing for an untinted writer and stops
-                           the cards painting white over a tinted column. */
-                        `bg-lifted dark:bg-panel/60 ${
-                          active ? CARD_EDGE_ACTIVE : CARD_EDGE
+                      : /* **The wash marks a card that is one button**, and
+                           that is why it is keyed on `pressable` rather than
+                           simply being the card's colour.
+
+                           Shut, the whole card opens the part — the name, the
+                           sentence and the count are all one target — and it
+                           takes `accent/10`, the same `ROW_ACTIVE` and the
+                           search results use. Open, it is a container with its
+                           own rows and goes back to being a surface
+                           (`bg-lifted`, `#ffffff` in plain light), because a
+                           tint behind nine chapter rows is a wash over a list
+                           rather than a button. The colour and the press now
+                           say the same thing, so changing one is an obligation
+                           to look at the other.
+
+                           The wash took every state on 2026-10-01 and was
+                           pulled back to the shut one the next day.
+
+                           It is an alpha of a token rather than a colour of
+                           its own, which is the part worth keeping: the eight
+                           theme blocks have to state identical token names or
+                           `theme-tints.test.ts` fails, so a new `--color-*`
+                           here would be eight edits, and an alpha is none. It
+                           also means the wash follows a tint instead of
+                           painting over it, which is what `bg-lifted` is for
+                           at the other end of the same expression.
+
+                           Lighter than `CARD_STRIP`'s `/15` on purpose: the
+                           strip *is* the button at that size, and this is a
+                           surface. */
+                        `${
+                          pressable
+                            ? "bg-accent/10"
+                            : "bg-lifted dark:bg-panel/60"
+                        } ${
+                          active
+                            ? CARD_EDGE_ACTIVE
+                            : `${CARD_EDGE} hover:border-accent/50`
                         }`
                   }
                   min-h-0
@@ -1413,8 +1475,8 @@ function MatterCard({
           {action}
         </span>
 
-        {/* **The card's actions live on the title's line, and the disclosure
-            is the last thing on it.**
+        {/* **The card's actions live on the title's line, and the add is the
+            last thing on it.**
 
             They had a row of their own under the description: three 36px boxes
             ranged hard right, below left-ranged text, above a left-ranged list
@@ -1422,76 +1484,38 @@ function MatterCard({
             whose scarce dimension is height. On a header row they are what
             they are: the things this card does, beside its name.
 
-            **Two marks, not three.** The row carried a file-with-a-plus for a
-            new page and an upload arrow for this part's own import; they are
-            one `+` holding both now — see `add`.
+            **The add is a plain `+`**, where it was a file with a plus on
+            it. The sheet of paper in that mark repeated the heading the card
+            already carries.
 
-            **The plus is a plain glyph; only the chevron carries a fill.** The
-            old row gave the *chevron* the filled treatment, which said the
+            **Both of them are drawn, and that is the correction.** They were
+            folded into a single `+` menu for a day and the import simply went
+            missing: a writer looking at the card saw `[+] [⌄]` and had no way
+            to know a file could go in here. Two actions taken this often are
+            worth their width.
+
+            **The add carries the fill; the import and the arrow are quiet.**
+            This paragraph used to say the opposite of its own first half: it
+            argued that giving the *chevron* the filled treatment "said the
             least consequential control — a disclosure toggle — was the card's
-            primary action, while adding a chapter was outlined beside it.
-            Quiet until hovered is what a secondary action does.
+            primary action, while adding a chapter was outlined beside it", and
+            then the chevron went on wearing it. It is the add's now. Quiet
+            until hovered is what a secondary action does, and two of the three
+            are secondary.
 
-            **The chevron sits last**, where a disclosure indicator sits in
-            every Apple list, and it points the way the card will move. */}
+            **The add sits last, where the chevron used to**, which reverses
+            "a disclosure indicator sits at the end of every Apple list". That
+            held while the chevron was the only way into a part. It is not:
+            the whole shut card is the disclosure (`pressable`, the same flag
+            the ground is keyed on), so the arrow is a shortcut rather than the
+            way in, and the anchor position goes to the action a writer came
+            here to take. */}
         {!compact && (
           <span className="relative z-10 flex shrink-0 items-center gap-0.5">
-            {add && (
-              <>
-                {/* The file input and its dialogs, outside the menu on
-                    purpose — see `add`. */}
-                {add.nodes}
-                <Menu
-                  label={add.menuLabel}
-                  align="end"
-                  width={244}
-                  triggerClassName={`group relative flex h-8 w-8 cursor-pointer
-                              items-center justify-center rounded-md outline-none
-                              transition-colors focus-visible:ring-2 ${CARD_QUIET}`}
-                  trigger={
-                    <>
-                      <RailMark mark="plus" size={17} />
-                      <Tooltip
-                        label={add.menuLabel}
-                        side="bottom"
-                        align="end"
-                        nowrap
-                      />
-                    </>
-                  }
-                >
-                  {(close) => (
-                    <>
-                      {/* Both items are offered whether or not the list is
-                          open. The add used to appear only once it was, so a
-                          new chapter would land somewhere visible — but both
-                          of these *navigate to what they made*, so the writer
-                          is taken to it either way, and a menu that changes
-                          shape depending on whether a card is expanded is
-                          worse than the rule it was protecting. */}
-                      <MenuButton
-                        onClick={() => {
-                          close();
-                          add.onNew();
-                        }}
-                      >
-                        {add.newLabel}
-                      </MenuButton>
-                      <MenuButton
-                        disabled={add.importBusy}
-                        hint={add.importBusy ? "Reading the file…" : undefined}
-                        onClick={() => {
-                          close();
-                          add.onImport();
-                        }}
-                      >
-                        {add.importLabel}
-                      </MenuButton>
-                    </>
-                  )}
-                </Menu>
-              </>
-            )}
+            {/* The arrow leads, in the same quiet weight as the import after
+                it. It carried the fill until 2026-10-02 and has no claim on
+                it: it is a shortcut to a thing the whole shut card already
+                does. */}
             {action && (
               <button
                 type="button"
@@ -1500,7 +1524,7 @@ function MatterCard({
                 aria-label={action}
                 className={`group relative flex h-8 w-8 cursor-pointer items-center
                             justify-center rounded-md outline-none transition-colors
-                            focus-visible:ring-2 ${CARD_BUTTON}`}
+                            focus-visible:ring-2 ${CARD_QUIET}`}
               >
                 <span
                   className={`flex transition-transform duration-300 ${
@@ -1512,16 +1536,92 @@ function MatterCard({
                 <Tooltip label={action} side="bottom" align="end" nowrap />
               </button>
             )}
+
+            {add && (
+              <>
+                {/* The file input and its dialogs. They live in the header
+                    rather than inside whatever opens the picker — see
+                    `add`. */}
+                {add.nodes}
+
+                {/* The import sits between the arrow and the add — the two
+                    ways of putting something into this part are next to each
+                    other, with the quieter of them first: one file arriving is
+                    the rarer gesture, and one new page the daily one. */}
+                <button
+                  type="button"
+                  onClick={add.onImport}
+                  disabled={add.importBusy}
+                  aria-label={add.importLabel}
+                  className={`group relative flex h-8 w-8 cursor-pointer items-center
+                              justify-center rounded-md outline-none transition-colors
+                              focus-visible:ring-2 disabled:opacity-45 ${CARD_QUIET}`}
+                >
+                  <RailMark mark="import" size={17} />
+                  <Tooltip
+                    label={add.importLabel}
+                    side="bottom"
+                    align="end"
+                    nowrap
+                  />
+                </button>
+
+              </>
+            )}
+
+            {/* **The add is last and it is the one filled control**, which is
+                what the row was missing: a writer comes to this card to put
+                something in the book, and that action was outlined while the
+                disclosure beside it was filled.
+
+                Offered whether or not the list is open — it navigates to what
+                it made, so the writer is taken to it either way.
+
+                A second `add &&` rather than an `order-last` utility: the
+                source order and the painted order should agree, or reading
+                this file means holding a CSS rule in your head to know what
+                the row looks like. */}
+            {add && (
+              <button
+                type="button"
+                onClick={add.onNew}
+                aria-label={add.newLabel}
+                className={`group relative flex h-8 w-8 cursor-pointer items-center
+                            justify-center rounded-md outline-none transition-colors
+                            focus-visible:ring-2 ${CARD_BUTTON}`}
+              >
+                <RailMark mark="plus" size={17} />
+                <Tooltip
+                  label={add.newLabel}
+                  side="bottom"
+                  align="end"
+                  nowrap
+                />
+              </button>
+            )}
           </span>
         )}
 
-        {!compact && action && (
+        {/* **The header is the press while the list is open**, and the whole
+            card is the press while it is shut — see the overlay at the foot of
+            this component, which the two share between them.
+
+            It was the other way round and decided by *layout*: this one was
+            `oc-matter-card-mobile-toggle`, drawn only under
+            `[data-editor-layout="continuous"]`, so on a laptop the only way
+            into a part was the 32px chevron in a 250px card. The question is
+            not what size the window is, it is whether there is a list below
+            that has its own rows to click.
+
+            Rendered rather than hidden, so there is never a second tab stop
+            over a card that already has one. */}
+        {!compact && listOpen && action && (
           <button
             type="button"
             onClick={onAction}
             aria-label={`${label} — ${action}`}
             aria-expanded={children ? listOpen : undefined}
-            className="oc-matter-card-mobile-toggle absolute inset-0 hidden rounded-t-lg outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset"
+            className="absolute inset-0 cursor-pointer rounded-t-lg outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset"
           />
         )}
       </div>
@@ -1613,25 +1713,34 @@ function MatterCard({
         </div>
       )}
 
-      {/* Shrunk, the whole card is one button — there is nothing else on it to
-          press. An overlay rather than making the header a button at both
-          sizes: the full card already has its own button, and a second control
-          doing the same job is a question the reader has to stop and answer. */}
+      {/* **A card with its list shut is one button, whatever its size** — the
+          name, the sentence under it and the count all open the part, which is
+          what the owner asked for and what the 32px chevron was standing in
+          for. Shrunk to a strip there is nothing else on it to press anyway.
+
+          Open, it stands down to the header overlay above: the rows below are
+          chapters, and a press that opened a chapter *and* collapsed the list
+          it came from would be two answers to one click. The two conditions
+          are complements, so exactly one of them is live.
+
+          The glyph buttons sit above both — their row is `relative z-10`,
+          which is the whole of what keeps "add to this part" from becoming
+          "open this part". */}
       <button
         type="button"
         onClick={onAction}
         aria-label={action ? `${label} — ${action}` : label}
-        // Mounted at both sizes and switched off with pointer-events rather
+        // Mounted in every state and switched off with pointer-events rather
         // than added and removed. Shrinking and growing take half a second, and
         // a control that appears or vanishes partway through that is a control
         // a writer can press at the moment it stops existing — which is exactly
         // the click that seems to do nothing.
-        aria-hidden={!compact}
-        tabIndex={compact ? undefined : -1}
+        aria-hidden={!pressable}
+        tabIndex={pressable ? undefined : -1}
         className={`absolute inset-0 rounded-lg outline-none
-                    focus-visible:ring-2 focus-visible:ring-white/70
+                    focus-visible:ring-2 focus-visible:ring-accent/60
                     focus-visible:ring-inset ${
-                      compact ? "cursor-pointer" : "pointer-events-none"
+                      pressable ? "cursor-pointer" : "pointer-events-none"
                     }`}
       />
     </section>
@@ -1833,10 +1942,9 @@ function MatterPagesCard({
       add={
         canWrite
           ? {
-              menuLabel: `Add to ${label}`,
               newLabel: "Add your own page",
               onNew: () => setNaming(true),
-              importLabel: "Import a file…",
+              importLabel: `Import a file into ${label}`,
               onImport: partImport.pick,
               importBusy: partImport.busy,
               nodes: partImport.nodes,

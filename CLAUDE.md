@@ -680,15 +680,35 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   exception and does live in that layout.
 - `book-panel.tsx` is the navigator and has **one face** (front/body/back as
   cards, each opening into a list — chapters in the body, the sixteen divisions
-  with their switches in the other two). **Each card's header is one `+` and
-  the chevron** (2026-10-01): the `+` is a `ui/menu.tsx` menu holding both ways
-  of adding to that part — a page of the writer's own, and this part's own
-  import. It was three marks, a file-with-a-plus and an upload arrow either
-  side of the chevron, two of them saying "add" in two different drawings and
-  the file in the first repeating the heading the card already carries. The
-  import's hidden file input and its dialogs are mounted in the header
-  **outside** the menu (`useSectionImport`), because portalled inside it they
-  would be unmounted by the press that opened the file picker. **Which card is
+  with their switches in the other two). **Each card's header is the arrow, the
+  import and the `+`, in that order** (2026-10-01). The add was a
+  file-with-a-plus and is a plain `+`: the sheet of paper in that mark repeated
+  the heading the card already carries. **The two were folded into a single `+`
+  menu for a day and the import went invisible** — a writer looking at the card
+  saw `[+] [⌄]` with no way to know a file could go in here — so both are drawn,
+  and a menu is not the container for two actions taken this often. The
+  import's hidden file input and its dialogs are mounted **by the header
+  itself** (`useSectionImport`), which is what that day cost and what to keep:
+  inside anything portalled they are unmounted by the very press that opened
+  the file picker, and the `change` never arrives. **A card with its list shut
+  is one button, and the accent wash is what says so** (`bg-accent/10`,
+  2026-10-01, the owner's choice; narrowed to shut cards on 2026-10-02). The
+  name, the sentence and the count all open the part, and the ground is keyed
+  on the same `pressable` the press overlays read — so open, the card is
+  `bg-lifted` again and the press shrinks to its header row, since the rows
+  below are chapters. Colour and behaviour say one thing. The full-ink
+  `border-fg` still says which part you are in, with
+  `hover:border-accent/50` on an unselected one; it is the one documented case
+  where hue is spent somewhere other than the way forward, and it is allowed
+  because it says nothing about *identity*, which is what the three-colour
+  ladder that came off these cards was trying and failing to do. **The header
+  row is `[arrow] [import] [+]`, and the `+` wears the Export button's own
+  fill** — `bg-accent` under `text-accent-ink`, the only filled control on the
+  card. It sits last, where the chevron used to: the chevron was the anchor
+  while it was the only way into a part, and a shut card that opens from
+  anywhere does not need one.
+  `docs/styling.md` has the amendment and the contrast
+  measurements. **Which card is
   open lives in `useOpenPart`, called by the *screen*** — the page sheet's edge takes the
   colour of the selected part, and two copies of that state would be two
   answers to one question.

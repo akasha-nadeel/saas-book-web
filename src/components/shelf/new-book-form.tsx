@@ -735,9 +735,14 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
                     role="switch"
                     aria-checked={bare}
                     onClick={() => setBare(!bare)}
+                    /* The accent wash the matter cards took on 2026-10-01,
+                       at the same `/10`. It was `border-line` on the page's
+                       own ground with a `raised` hover, which on the cover
+                       step put a plain grey box directly under the artwork —
+                       the one thing on the step with a colour in it. */
                     className="mt-4 flex w-full items-start gap-3 rounded-md border
-                         border-line px-3 py-3 text-left outline-none
-                         transition-colors hover:bg-raised
+                         border-accent/30 bg-accent/10 px-3 py-3 text-left outline-none
+                         transition-colors hover:border-accent/50 hover:bg-accent/15
                          focus-visible:ring-2 focus-visible:ring-accent/60"
                   >
                     <SwitchTrack on={bare} className="mt-0.5" />
