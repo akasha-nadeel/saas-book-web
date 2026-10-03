@@ -457,6 +457,13 @@ const ROWS: Row[] = [
        Both are reached from the dashboard's side panel rather than from a
        book, which is why the chrome carries `?area=` rather than a book route:
        neither searches this writer's manuscript, so neither needs one. */
+    /* **The `id` is here because a search ad points at it.** The campaign's
+       "Check your book title" and "See ebook prices" sitelinks are the only
+       links anywhere that aim at a *row* rather than at the top of the page,
+       so these two ids are load-bearing off-site: drop one and a reader who
+       pressed the link lands on the hero with nothing under it about the
+       thing they pressed. `FeatureRow` carries the scroll offset. */
+    id: "title-check",
     badge: "Title check",
     title: "Know who is already using your title",
     /* **The allowance is imported, not typed.** It is the same `FREE_LIMITS`
@@ -480,6 +487,8 @@ const ROWS: Row[] = [
        score; this reports a median, the spread, and every book it found. The
        house rule about invented numbers is the whole of the difference, and
        the line "It never tells you what to charge" is the tool's own deck. */
+    /* The other half of that pair — see the note on `id` above. */
+    id: "price-check",
     badge: "Price check",
     title: "See what books like yours are selling for",
     lead: `Pick your genre and get the real prices of the ebooks a reader would see beside yours — the median, the spread, and every book it found, cheapest first. It never tells you what to charge. Free runs ${FREE_LIMITS.priceCheck.free} a day.`,
