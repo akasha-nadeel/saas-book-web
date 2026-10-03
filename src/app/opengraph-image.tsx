@@ -48,6 +48,7 @@ export default function Image() {
             letterSpacing: 2,
             textTransform: "uppercase",
             color: "#8ab4ff",
+            flexShrink: 0,
           }}
         >
           OpenChapter
@@ -55,10 +56,15 @@ export default function Image() {
 
         <div
           style={{
-            fontSize: 76,
-            lineHeight: 1.1,
-            marginTop: 28,
-            maxWidth: 940,
+            // 64 rather than 76, and a wider measure: at 76 the sentence ran to
+            // three lines, the column stood taller than 630, and flex children
+            // shrink — so the heading's own box was squeezed until "file." sat
+            // on top of the sentence below it. Two lines, and nothing shrinks.
+            fontSize: 64,
+            lineHeight: 1.15,
+            marginTop: 26,
+            maxWidth: 1040,
+            flexShrink: 0,
           }}
         >
           Write your book in the browser. Leave with the file.
@@ -66,17 +72,18 @@ export default function Image() {
 
         <div
           style={{
-            fontSize: 32,
-            marginTop: 32,
+            fontSize: 30,
+            marginTop: 30,
             color: "#bcc5de",
-            maxWidth: 940,
+            maxWidth: 1000,
+            flexShrink: 0,
           }}
         >
           A quiet editor for a whole manuscript — chapters, notes, versions and
           front matter.
         </div>
 
-        <div style={{ display: "flex", gap: 20, marginTop: 52 }}>
+        <div style={{ display: "flex", gap: 20, marginTop: 48, flexShrink: 0 }}>
           {[
             "No AI",
             "EPUB, PDF & Word",
