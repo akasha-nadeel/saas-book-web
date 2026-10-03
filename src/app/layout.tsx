@@ -13,6 +13,7 @@ import { LibrarySync } from "@/components/library-sync";
 import { StorageAlert } from "@/components/storage-alert";
 import { ThemeSync } from "@/components/theme/theme-sync";
 import { ViewportController } from "@/components/viewport-controller";
+import { SITE_URL } from "@/lib/site";
 
 /**
  * Sets the theme on `<html>` before the first paint, so a writer who is on the
@@ -131,9 +132,31 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  /**
+   * `metadataBase` is what lets every page below write a canonical and a card
+   * image as a *path*. Without it Next refuses a relative one at build time,
+   * and with four places already deriving this app's own address differently,
+   * `lib/site.ts` is the one a reader of a URL should get.
+   */
+  metadataBase: new URL(SITE_URL),
   title: "OpenChapter",
   description:
     "A calm, focused place to write your novel — chapter by chapter.",
+  /**
+   * What a pasted link unfurls into. The title and description here are the
+   * *app's* — a route that has something better to say about itself overrides
+   * them, as `page.tsx` does for the landing page a stranger lands on.
+   *
+   * `twitter` names the card shape and **no image on purpose**: X falls back to
+   * `og:image`, so one drawn card serves both and the proxy needs one
+   * exception rather than two.
+   */
+  openGraph: {
+    type: "website",
+    siteName: "OpenChapter",
+    locale: "en",
+  },
+  twitter: { card: "summary_large_image" },
 };
 
 // The app shell is fixed-height and manages its own scrolling, so lock the page

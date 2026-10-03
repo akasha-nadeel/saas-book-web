@@ -8,8 +8,8 @@ import {
   isSupabaseConfigured,
 } from "@/lib/supabase/config";
 import { safeNext } from "@/lib/auth-redirect";
-import { LEGAL_PAGES } from "@/lib/legal";
 import { hiddenLaunchRoute } from "@/lib/launch";
+import { PUBLIC_PAGES } from "@/lib/site";
 
 /**
  * Session refresh, and the sign-in wall.
@@ -50,14 +50,17 @@ const PUBLIC_PREFIXES = ["/signin", "/signup", "/forgot-password", "/auth"];
  * payment provider reviews this site before it will let anybody take a card,
  * and it reviews it signed out. A privacy policy behind a sign-in wall is a
  * privacy policy that does not exist as far as that review is concerned — and
- * as far as a customer looking for the refund terms is concerned too. They are
- * read from `LEGAL_PAGES` so adding a fifth page cannot forget this list.
+ * as far as a customer looking for the refund terms is concerned too.
+ *
+ * **The list itself moved to `lib/site.ts` on 2026-10-03** and is the same
+ * array `app/sitemap.ts` hands to Google. The two were about to be written
+ * separately, which is a page offered to a search engine and answered with a
+ * redirect to `/signin` — so they are one array, read in both places, and
+ * `site.test.ts` fails if anything on it is a route `hiddenLaunchRoute` sends
+ * home. The four policy pages still arrive through `LEGAL_PAGES`, there rather
+ * than here, so adding a fifth still cannot forget either list.
  */
-const PUBLIC_EXACT = [
-  "/",
-  "/upgrade",
-  ...LEGAL_PAGES.map((page) => page.href),
-];
+const PUBLIC_EXACT = PUBLIC_PAGES;
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_EXACT.includes(pathname)) return true;
@@ -217,7 +220,16 @@ export const config = {
      * `/signin`** for a static file. Anything served out of `public/` that is
      * not one of the extensions above needs its own entry, or it is guarded
      * like a page.
+     *
+     * **`xml` and `opengraph-image` were added on 2026-10-03 and are the same
+     * mistake, found twice more.** `/sitemap.xml` answered that identical 307,
+     * so the sitemap Google was being sent to was a sign-in page; and a
+     * *generated* OpenGraph image is served at `/opengraph-image` with **no
+     * extension at all** (only sitemaps are exempt from the hash-suffix rule —
+     * `next/dist/lib/metadata/get-metadata-route.js`), so it is named here
+     * outright, beside `icon.png`, rather than caught by the list. Without it
+     * every social scraper that asked for the card got the sign-in page.
      */
-    "/((?!api|_next/static|_next/image|favicon.ico|icon.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?|txt)$).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|icon.png|opengraph-image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?|txt|xml)$).*)",
   ],
 };

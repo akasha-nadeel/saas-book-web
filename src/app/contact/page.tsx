@@ -25,6 +25,7 @@ import {
 export const metadata: Metadata = {
   title: "Contact · OpenChapter",
   description: "How to reach the person who builds and runs OpenChapter.",
+  alternates: { canonical: "/contact" },
 };
 
 export default function ContactPage() {

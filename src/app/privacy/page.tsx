@@ -12,6 +12,7 @@ export const metadata: Metadata = {
   title: "Privacy · OpenChapter",
   description:
     "What OpenChapter stores, what leaves your browser, and who receives it.",
+  alternates: { canonical: "/privacy" },
 };
 
 export default function PrivacyPage() {

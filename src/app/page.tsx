@@ -20,6 +20,12 @@ export const metadata: Metadata = {
   title: "OpenChapter · Finish your novel and get a file the shops take",
   description:
     "A quiet editor for a whole manuscript — chapters, notes, versions and front matter. Written to your own browser, exported as Word, EPUB or PDF.",
+  /**
+   * **The canonical is per page and cannot live in the layout**, which would
+   * claim every route is this one. It is a path, composed against
+   * `metadataBase` — see `app/layout.tsx`.
+   */
+  alternates: { canonical: "/" },
 };
 
 /**

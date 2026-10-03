@@ -18,6 +18,7 @@ export const metadata: Metadata = {
   title: "Terms · OpenChapter",
   description:
     "The terms of using OpenChapter: your account, your book, the two plans, and what each side is responsible for.",
+  alternates: { canonical: "/terms" },
 };
 
 export default function TermsPage() {

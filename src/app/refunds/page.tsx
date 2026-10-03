@@ -25,6 +25,7 @@ export const metadata: Metadata = {
   title: "Refunds & cancellation · OpenChapter",
   description:
     "How to cancel a paid OpenChapter plan, what happens when you do, and when we refund.",
+  alternates: { canonical: "/refunds" },
 };
 
 export default function RefundsPage() {

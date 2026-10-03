@@ -25,6 +25,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
  */
 export const metadata = {
   title: "Plans · OpenChapter",
+  alternates: { canonical: "/upgrade" },
 };
 
 export default async function UpgradePage(props: PageProps<"/upgrade">) {
