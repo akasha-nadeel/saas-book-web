@@ -229,6 +229,12 @@ export const config = {
      * `next/dist/lib/metadata/get-metadata-route.js`), so it is named here
      * outright, beside `icon.png`, rather than caught by the list. Without it
      * every social scraper that asked for the card got the sign-in page.
+     *
+     * **The card became a static `opengraph-image.png` on 2026-10-04, so that
+     * name is doing nothing today** — a static metadata image keeps its
+     * extension and the `png` in the list above catches it. It stays because
+     * the day anybody puts the generated card back, the extension goes away
+     * again and the scrapers go back to reading the sign-in page.
      */
     "/((?!api|_next/static|_next/image|favicon.ico|icon.png|opengraph-image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?|txt|xml)$).*)",
   ],

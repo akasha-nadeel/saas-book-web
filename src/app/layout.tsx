@@ -148,15 +148,23 @@ export const metadata: Metadata = {
    * them, as `page.tsx` does for the landing page a stranger lands on.
    *
    * `twitter` names the card shape and **no image on purpose**: X falls back to
-   * `og:image`, so one drawn card serves both and the proxy needs one
-   * exception rather than two.
+   * `og:image`, so one picture serves both.
+   *
+   * **The card is `summary`, not `summary_large_image`, and that follows from
+   * the image being square** (2026-10-04). `opengraph-image.png` is a 1200
+   * square — the mark on its own blue — because a chat draws a link as a small
+   * square thumbnail and crops a wide card to its centre band, which left a
+   * shared link reading "your book in the brows / with the file." X's large
+   * card crops the other way, to about 2:1, so a square logo would lose its
+   * top and bottom; `summary` asks for the small square the picture already
+   * is. Swap the picture back to a wide one and this line changes with it.
    */
   openGraph: {
     type: "website",
     siteName: "OpenChapter",
     locale: "en",
   },
-  twitter: { card: "summary_large_image" },
+  twitter: { card: "summary" },
 };
 
 // The app shell is fixed-height and manages its own scrolling, so lock the page
