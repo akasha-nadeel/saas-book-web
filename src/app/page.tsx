@@ -17,9 +17,25 @@ import { createClient } from "@/lib/supabase/server";
  * the shelf a writer lands on is where that same book lives.
  */
 export const metadata: Metadata = {
-  title: "OpenChapter · Finish your novel and get a file the shops take",
+  /**
+   * **This pair is written for a stranger's search box, not for the page.**
+   * Neither line is rendered anywhere a visitor can see — they are what a
+   * result in Google says — so they may use the words somebody actually types
+   * where the hero, which is read rather than searched, keeps its own voice.
+   *
+   * Measured on the live page 2026-10-03: "novel writing software", "book
+   * writing software", "word processor" and "write a book" appeared **zero**
+   * times in the whole document, title included. The same lesson the ad
+   * headlines had already taught — a result cannot match words that are not
+   * there. Once each is enough; repeating them is the thing search engines
+   * discount.
+   *
+   * Every claim here is one the code backs: no model is called anywhere in
+   * `src/`, and all three formats are free on both plans.
+   */
+  title: "Novel writing software, no AI — OpenChapter",
   description:
-    "A quiet editor for a whole manuscript — chapters, notes, versions and front matter. Written to your own browser, exported as Word, EPUB or PDF.",
+    "Novel writing software that runs in your browser. No AI. Chapters, notes, versions and front matter, exported as Word, EPUB or PDF — free on every plan.",
   /**
    * **The canonical is per page and cannot live in the layout**, which would
    * claim every route is this one. It is a path, composed against
