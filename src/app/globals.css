@@ -2033,17 +2033,36 @@ body {
 
 /* Coarse pointers cannot reveal a control by hovering and need a finger-sized
    hit box. Links inside prose are intentionally excluded; navigation links opt
-   in through their existing padding or `oc-touch-target`. */
+   in through their existing padding or `oc-touch-target`.
+
+   **`.oc-touch-exempt` is the way out, and it exists because a Tailwind class
+   cannot provide one.** This rule is unlayered and Tailwind's utilities are in
+   `@layer utilities`, so unlayered wins outright however specific the class —
+   `min-h-[1.6rem]` on the element loses to a `:where()` selector of no
+   specificity at all. That is the correct default: a control should have to say
+   out loud that it does not want a finger-sized box. The one that does is the
+   pricing cycle's switch, whose 52x26 pill came out 52x44 on a phone — a fat
+   lozenge beside the same 17px words, where the design and every desktop have a
+   flat one. It keeps its hit box through a transparent `::before`, which is the
+   shape to copy: exempt the *paint*, never the target.
+
+   `touch-action` and the tap highlight stay on everything, exempt or not. They
+   are about how a press behaves, not how big it is. */
 @media (pointer: coarse) {
   :where(button, [role="button"], [role="menuitem"], .oc-touch-target) {
-    min-height: var(--oc-touch-target);
-    min-width: var(--oc-touch-target);
     touch-action: manipulation;
     -webkit-tap-highlight-color: color-mix(
       in srgb,
       var(--color-accent) 20%,
       transparent
     );
+  }
+
+  :where(button, [role="button"], [role="menuitem"], .oc-touch-target):where(
+      :not(.oc-touch-exempt)
+    ) {
+    min-height: var(--oc-touch-target);
+    min-width: var(--oc-touch-target);
   }
 
   :where(.group) :where(button, [role="button"])[class*="opacity-0"] {

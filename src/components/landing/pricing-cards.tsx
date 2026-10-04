@@ -52,7 +52,13 @@ export function PricingCards() {
           ground, the switch over the paid column, and the two cards. This
           page is pinned to the dark scheme, so it shows the night values of
           `price-*`. */}
-      <div className="relative mx-auto mt-10 max-w-[52rem] overflow-hidden rounded-3xl bg-price-ground px-4 pt-7 pb-10 text-left sm:px-10">
+      {/* `px-3` on a phone rather than `px-4`. The 8px it gives back is what
+          keeps the cycle toggle's full arrangement — pill, arrow and all three
+          words — inside a 360px screen with room to spare rather than by a
+          hair; this box is `overflow-hidden`, so "by a hair" is the difference
+          between tight and a word silently missing. See the measurement on
+          `PeriodToggle`. */}
+      <div className="relative mx-auto mt-10 max-w-[52rem] overflow-hidden rounded-3xl bg-price-ground px-3 pt-7 pb-10 text-left sm:px-10">
         <PricingDecor />
 
         <div className="relative mx-auto flex max-w-[45rem] justify-center sm:justify-end sm:pr-8">
