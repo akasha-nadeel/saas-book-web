@@ -256,12 +256,26 @@ export function LandingFooter({
           </div>
 
           {/* Hard right, under Legal — placed by the span on its left
-              rather than by a start line. See the note above. */}
-          <div>
+              rather than by a start line. See the note above.
+
+              **`min-w-0` and `overflow-wrap: anywhere`, and together they
+              are a bug fix rather than a tidy.** A grid item's automatic
+              minimum size is its *min-content*, and the address is one
+              unbreakable 26-character run — a browser will not break at an
+              `@` or a `.` of its own accord. So at two columns on a phone
+              the column refused to be narrower than about 197px, and the
+              25px it overhung by was the second of the two things pushing
+              this whole page sideways. `min-w-0` lets the column shrink and
+              `anywhere` lets the address break when it must; `break-all`
+              would have broken it whether it needed to or not. */}
+          <div className="min-w-0">
             <h2 className={HEADING}>Contact</h2>
             <ul className="mt-4 space-y-2.5">
               <li>
-                <a href={`mailto:${CONTACT_EMAIL}`} className={LINK}>
+                <a
+                  href={`mailto:${CONTACT_EMAIL}`}
+                  className={`${LINK} [overflow-wrap:anywhere]`}
+                >
                   {CONTACT_EMAIL}
                 </a>
               </li>

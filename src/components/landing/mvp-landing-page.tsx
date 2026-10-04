@@ -298,74 +298,80 @@ const FORMATS = [
        `ROW_GROUNDS` documents at its own card tints. */
     ground: "bg-lp-format-word",
     text: "The .docx an agent or an editor asks for. Built in your browser.",
+    /* **The mark lives on the entry it belongs to**, which it did not until
+       2026-10-04. It was a second array beside this one, `FORMAT_MARKS`, read
+       by *position*: the marks column mapped one and the cards mapped the
+       other, and nothing anywhere said so. Reordering either list — or
+       inserting a fourth format into one of them — would have put the Word
+       mark against the EPUB card, silently and on the one page where a wrong
+       logo is read as a wrong claim. There is also a second renderer now (the
+       phone's), and two renderers against two parallel arrays is the same
+       trap twice. */
+    mark: { src: "/format-word.webp", width: 452, height: 395 },
   },
   {
     format: "EPUB",
     ground: "bg-lp-format-epub",
     text: "The file the ebook shops take, checked against EPUBCheck at zero errors. Built in your browser.",
+    mark: { src: "/format-epub.webp", width: 411, height: 413 },
   },
   {
     format: "PDF",
     ground: "bg-lp-format-pdf",
     text: "Typeset to the trim size you chose. Not print-ready in the trade sense: no bleed, no crop marks.",
+    mark: { src: "/format-pdf.webp", width: 439, height: 576 },
   },
 ] as const;
 
 /**
- * The three marks, in a column beside the cards they belong to.
+ * The three formats, one card each, with the format's own mark on the card.
+ *
+ * **There used to be a fourth box: a 96px column of the three marks running
+ * down the left of the stack.** It went on 2026-10-04. On a phone it was
+ * spending about a third of a 327px screen on pictures and leaving the
+ * sentences too little to sit in — they ran off the right of the page — so
+ * the marks moved inside the cards, and the arrangement that came out of that
+ * was plainly the better one at every width. A mark on the card it belongs to
+ * needs no matching up by position, the card is as wide as the row, and the
+ * section is three things instead of four.
  *
  * **The images carry their own transparency rather than their own ground.**
  * They arrived as screenshots on a flat #f5f5f5, which would have been a pale
- * rectangle sitting on whatever this column is over. The background was keyed
- * out by flooding in from the border — not by thresholding on colour, which
- * would have taken the white "W" out of the Word mark with it — and the small
+ * rectangle sitting on whatever is behind them. The background was keyed out
+ * by flooding in from the border — not by thresholding on colour, which would
+ * have taken the white "W" out of the Word mark with it — and the small
  * islands left behind were dropped, because the Word capture caught the
- * editor's own selection handles around the logo. So the panel below can take
- * any token, and does.
+ * editor's own selection handles around the logo. So a card can take any
+ * token, and each of the three takes a different one.
  *
- * `aria-hidden`, because every one of these names is set in type immediately to
- * the right of it. A screen reader that read the row would say "Word, Word".
+ * `alt=""`, because the format's name is set in type immediately to the right
+ * of every one of them. A screen reader that read these would say
+ * "Word, Word".
  *
  * Nominative use: these are the file types our exports produce. Trademarks
  * belong to their respective owners and no endorsement is implied.
  */
-const FORMAT_MARKS = [
-  { src: "/format-word.webp", width: 452, height: 395 },
-  { src: "/format-epub.webp", width: 411, height: 413 },
-  { src: "/format-pdf.webp", width: 439, height: 576 },
-] as const;
-
-function FormatMarks() {
-  return (
-    <div
-      aria-hidden="true"
-      className="flex w-24 shrink-0 flex-col items-center justify-around gap-6 rounded-xl bg-lp-tint py-7 sm:w-28"
-    >
-      {FORMAT_MARKS.map((mark) => (
-        <Image
-          key={mark.src}
-          src={mark.src}
-          alt=""
-          width={mark.width}
-          height={mark.height}
-          quality={95}
-          sizes="96px"
-          className="h-14 w-auto sm:h-16"
-        />
-      ))}
-    </div>
-  );
-}
-
 function FormatCards() {
   return (
-    <dl className="flex flex-1 flex-col gap-3">
+    /* `min-w-0`, because `flex-1` carries `min-width: auto` — so the longest
+       word in a card would otherwise set a floor for this whole column, and
+       through it for the row the column sits in. */
+    <dl className="flex min-w-0 flex-1 flex-col gap-3">
       {FORMATS.map((entry) => (
         <div
           key={entry.format}
           className={`rounded-xl p-5 ${entry.ground}`}
         >
-          <dt className="flex items-baseline gap-3">
+          <dt className="flex items-center gap-3">
+            <Image
+              src={entry.mark.src}
+              alt=""
+              width={entry.mark.width}
+              height={entry.mark.height}
+              quality={95}
+              sizes="44px"
+              className="h-9 w-auto sm:h-10"
+            />
             <span className="font-serif text-lg font-semibold text-lp-ink">
               {entry.format}
             </span>
@@ -517,15 +523,9 @@ const ROWS: Row[] = [
     badge: "The export",
     title: "The file is the point",
     lead: "A wizard that asks what a file needs, then hands you one, bound in a book's own order.",
-    extra: (
-      /* The marks run down the left of the cards, one to a card, which is what
-         keeps the column from being three boxes of grey type. `items-stretch`
-         so the strip is as tall as the stack rather than centred against it. */
-      <div className="flex items-stretch gap-3">
-        <FormatMarks />
-        <FormatCards />
-      </div>
-    ),
+    /* One card a format, each wearing its own mark and its own wash — see
+       `FormatCards` for what this replaced and why. */
+    extra: <FormatCards />,
     figure: (
       <Shot
         src="/shot-export-formats.webp"
@@ -677,10 +677,27 @@ export function MvpLandingPage() {
 
        `lp-type` re-points `--font-serif` for the whole subtree, which is why
        `font-serif` on this page is the grotesque — documented at length on
-       `LandingPage`. */
+       `LandingPage`.
+
+       **`overflow-x-clip` is a net and not a fix, and the distinction is the
+       whole reason it is written down.** `overflow-y: auto` with an `x` left
+       `visible` makes the `x` compute to `auto` — so this element has always
+       been a *horizontal* scroller as well, and anything overhanging it got a
+       real 12px scrollbar rather than being clipped. Two things did overhang on
+       a phone, and both are fixed where they live: the header's own min-content
+       (`landing-header.tsx`) and the footer's unbreakable address
+       (`landing-footer.tsx`). This clip is here so the next one is absent
+       rather than merely silent — but it hides whatever it catches, so a
+       section that starts disappearing off the right of a phone is to be fixed
+       at its source and never left to this.
+
+       **`clip` rather than `hidden`**, which is not interchangeable here:
+       `overflow-x: hidden` beside `overflow-y: auto` makes *both* axes
+       scrollable, which is the thing being removed. `clip` clips and creates no
+       scroll container, so the sticky header goes on sticking. */
     <div
       data-theme="light"
-      className="lp-type oc-scroll-dark h-[var(--oc-layout-height)] overflow-y-auto bg-[#d6ecf9] text-lp-body [scroll-behavior:smooth]"
+      className="lp-type oc-scroll-dark h-[var(--oc-layout-height)] overflow-x-clip overflow-y-auto bg-[#d6ecf9] text-lp-body [scroll-behavior:smooth]"
     >
       {/* The full-width strip rather than the inset capsule. `floating` draws
           the bar as a white pill laid on the hero with a shadow under it; this
@@ -720,7 +737,14 @@ export function MvpLandingPage() {
             weight the title does not want anything competing above it.
 
             `-mt-16` pulls the section up under the floating bar. */}
-        <section className="oc-gradient-field -mt-16 overflow-hidden px-6 pt-44 sm:pt-52">
+        {/* `pt-36` on a phone rather than `pt-44`. The 176px was measured
+            against a desktop bar; under a phone's shorter one it left a field
+            of bare gradient above the mark, and on a 667px screen that is a
+            tenth of everything a visitor gets before they decide whether to
+            scroll. The mark is lifted out of flow above the `h1`, so this is
+            the figure that decides whether it clears the bar — check it rather
+            than trusting the arithmetic. */}
+        <section className="oc-gradient-field -mt-16 overflow-hidden px-6 pt-36 sm:pt-52">
           <div className="mx-auto max-w-3xl text-center">
             {/* Logo mark — floats above the title without displacing it.
                 Absolute + -translate-y lifts it out of flow entirely so
@@ -752,7 +776,7 @@ export function MvpLandingPage() {
                 comfortably on a white ground, and it is Google's own guidance
                 that this button sits on white. The FAQ mounts the identical
                 pair — change one and change both. */}
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <div className="mt-8 flex w-full flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 href="/signup"
                 className="w-full rounded-full bg-lp-accent px-7 py-3 text-[0.9375rem] font-semibold text-lp-accent-ink transition-opacity hover:opacity-90 sm:w-auto"
@@ -760,12 +784,26 @@ export function MvpLandingPage() {
                 Start writing free
               </Link>
               {/* Sign in with Google — styled to match the soft pill beside it. */}
-              <GoogleButton
-                action={signInWithGoogle}
-                next="/signup"
-                label="Sign in with Google"
-                className="flex w-full items-center justify-center gap-2.5 rounded-full border border-lp-edge-strong bg-lp-ground px-7 py-3 text-[0.9375rem] font-semibold text-lp-accent-deep transition-opacity hover:opacity-90 sm:w-auto"
-              />
+              {/* **The wrapper is load-bearing, and it is fixing a bug
+                  rather than tuning a width.** `GoogleButton` puts its button
+                  inside a `<form>` of its own — it posts to its own Server
+                  Action — and that form carried no width. So on a phone the
+                  button's `w-full` resolved against a shrink-wrapped form of
+                  about 215px while the `<Link>` beside it resolved against the
+                  327px column, and the pair came out two different widths. The
+                  same pair in the FAQ sat in a different parent and came out
+                  two *other* widths: one copy-pasted pair, three widths on one
+                  page. A `<form>` is `display: block`, so a width here is all
+                  it takes — and it leaves `GoogleButton` itself untouched for
+                  the four auth screens that use it. */}
+              <div className="w-full sm:w-auto">
+                <GoogleButton
+                  action={signInWithGoogle}
+                  next="/signup"
+                  label="Sign in with Google"
+                  className="flex w-full items-center justify-center gap-2.5 rounded-full border border-lp-edge-strong bg-lp-ground px-7 py-3 text-[0.9375rem] font-semibold text-lp-accent-deep transition-opacity hover:opacity-90 sm:w-auto"
+                />
+              </div>
             </div>
 
 
@@ -816,7 +854,16 @@ export function MvpLandingPage() {
               <span className="text-[#f97316]">wherever they publish</span>
             </p>
 
-            <ul className="mt-10 grid w-full max-w-6xl grid-cols-2 place-items-center gap-x-8 gap-y-6 max-sm:[&>li:last-child]:col-span-2 sm:grid-cols-3 lg:flex lg:items-center lg:justify-between lg:gap-x-6">
+            {/* **The row comes down a whole step on a phone, and the
+                `whitespace-nowrap` below is the reason it has to.** A mark
+                beside its name is one rigid box: at the desktop sizes
+                "WordPress" and "Grammarly" measured about 162px against a
+                147px column, so the row was 15px wider than the page from
+                360px down. The name may not wrap — a mark with its brand
+                broken over two lines is the one thing a logo strip cannot
+                do — so the type and the mark give way instead, and the
+                column gap with them. */}
+            <ul className="mt-10 grid w-full max-w-6xl grid-cols-2 place-items-center gap-x-4 gap-y-6 max-sm:[&>li:last-child]:col-span-2 sm:grid-cols-3 sm:gap-x-8 lg:flex lg:items-center lg:justify-between lg:gap-x-6">
               {LOGO_SETS[0]!.map((_, slot) => (
                 <li key={slot} className="grid place-items-center">
                   {LOGO_SETS.map((set, half) => {
@@ -826,7 +873,7 @@ export function MvpLandingPage() {
                         key={company.name}
                         /* Both children take the same cell, so the slot sizes
                            to the wider of the two and neither is out of flow. */
-                        className={`col-start-1 row-start-1 flex items-center gap-2.5 text-lp-ink ${
+                        className={`col-start-1 row-start-1 flex items-center gap-2 text-lp-ink sm:gap-2.5 ${
                           half === 0 ? "oc-logo-a" : "oc-logo-b"
                         }`}
                         style={{ animationDelay: `${slot * 0.09}s` }}
@@ -834,11 +881,11 @@ export function MvpLandingPage() {
                         <svg
                           aria-hidden="true"
                           viewBox="0 0 24 24"
-                          className="h-8 w-8 shrink-0 fill-current sm:h-9 sm:w-9 lg:h-10 lg:w-10"
+                          className="h-7 w-7 shrink-0 fill-current sm:h-9 sm:w-9 lg:h-10 lg:w-10"
                         >
                           <path d={company.path} />
                         </svg>
-                        <span className="text-[1.5rem] font-semibold tracking-[-0.02em] whitespace-nowrap sm:text-[1.625rem] lg:text-[1.75rem]">
+                        <span className="text-[1rem] font-semibold tracking-[-0.02em] whitespace-nowrap sm:text-[1.625rem] lg:text-[1.75rem]">
                           {company.name}
                         </span>
                       </span>
@@ -1011,19 +1058,23 @@ export function MvpLandingPage() {
                   up looking assembled: same fills, same radius, same measure,
                   same words. The soft one takes `lp-accent-deep` on the pale
                   tint for the contrast reason recorded up there. */}
-              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <div className="mt-8 flex w-full flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link
                   href="/signup"
                   className="w-full rounded-full bg-lp-accent px-7 py-3 text-[0.9375rem] font-semibold text-lp-accent-ink transition-opacity hover:opacity-90 sm:w-auto"
                 >
                   Start writing free
                 </Link>
-                <GoogleButton
-                  action={signInWithGoogle}
-                  next="/signup"
-                  label="Sign in with Google"
-                  className="flex w-full items-center justify-center gap-2.5 rounded-full border border-lp-edge-strong bg-lp-ground px-7 py-3 text-[0.9375rem] font-semibold text-lp-accent-deep transition-opacity hover:opacity-90 sm:w-auto"
-                />
+                {/* The same wrapper as the hero's, for the same reason —
+                    see the note up there. */}
+                <div className="w-full sm:w-auto">
+                  <GoogleButton
+                    action={signInWithGoogle}
+                    next="/signup"
+                    label="Sign in with Google"
+                    className="flex w-full items-center justify-center gap-2.5 rounded-full border border-lp-edge-strong bg-lp-ground px-7 py-3 text-[0.9375rem] font-semibold text-lp-accent-deep transition-opacity hover:opacity-90 sm:w-auto"
+                  />
+                </div>
               </div>
             </div>
 

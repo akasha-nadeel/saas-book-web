@@ -35,9 +35,17 @@ export function PlanTable({
 }) {
   return (
     /* The table scrolls inside its own box rather than pushing the page
-       sideways. Four plan columns plus a label column does not fit a phone, and
-       a horizontally scrolling *page* is the one failure that makes a layout
-       feel broken rather than tight. */
+       sideways. A horizontally scrolling *page* is the one failure that makes a
+       layout feel broken rather than tight, so the box keeps its scroller
+       whatever happens.
+
+       **It used to say "four plan columns" and there are two.** The four plans
+       became Free and Pro on 2026-09-14, which leaves a label column and two
+       others — so the label column's `min-w` is the only thing deciding whether
+       a phone has to scroll this at all, and at `11.875rem` it did. It is
+       `9rem` below `sm` now, which lands the whole table inside a 375px screen;
+       the scroller stays as the backstop for the narrower ones and for a third
+       plan, should there ever be one. */
     <div className="mt-12 overflow-x-auto">
       <table className="w-full border-collapse text-center font-sans text-sm">
         <caption className="sr-only">
@@ -49,7 +57,7 @@ export function PlanTable({
                 plans scroll under it on a narrow window. */}
             <th
               scope="col"
-              className="sticky left-0 z-20 min-w-[11.875rem] bg-surface px-4
+              className="sticky left-0 z-20 min-w-[9rem] sm:min-w-[11.875rem] bg-surface px-4
                          pb-3.5 text-left font-sans text-xs font-semibold
                          tracking-[0.09em] text-faint uppercase"
             >
@@ -97,7 +105,7 @@ export function PlanTable({
                 <tr key={row.label} className="group">
                   <th
                     scope="row"
-                    className="sticky left-0 z-10 min-w-[11.875rem] border-b
+                    className="sticky left-0 z-10 min-w-[9rem] sm:min-w-[11.875rem] border-b
                                border-line bg-surface px-4 py-3 text-left
                                font-sans text-sm font-normal text-muted
                                group-hover:bg-accent/5"

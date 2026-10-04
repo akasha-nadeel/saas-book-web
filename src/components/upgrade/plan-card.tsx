@@ -198,10 +198,23 @@ function BoltIcon() {
  *
  * Decoration and nothing else: hidden from screen readers, never in the way of
  * a press, and placed inside the section's own box so it cannot widen the page.
+ *
+ * **And off below `sm`, because all three are placed against an arrangement
+ * that does not exist there.** Every position here is a percentage across a
+ * box whose one control — the cycle toggle — is pushed to the right on a wide
+ * screen and *centred* on a narrow one. So on a phone the toggle moves under
+ * the marks: the ring landed beside "annually" and the plus struck straight
+ * through the middle of the discount pill, between the figure and the word.
+ * Scattered marks are worth having where there is room to scatter them; on a
+ * 375px box there is no empty quarter for them to sit in, and decoration that
+ * lands on the one thing a visitor has to read is not decoration any more.
  */
 export function PricingDecor() {
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 hidden sm:block"
+    >
       <span className="absolute top-14 left-[9%] h-[1.1rem] w-[1.1rem] rounded-full border-[3px] border-price-gold" />
       <svg
         viewBox="0 0 16 16"

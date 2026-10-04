@@ -172,8 +172,13 @@ export function AppWindow({
             {chrome.nav && (
               <span className="min-w-0 flex-1 overflow-hidden">{chrome.nav}</span>
             )}
+            {/* `min-w-0` rather than `shrink-0`, because `truncate` on an
+                item that may not shrink cannot truncate: on a phone the
+                address simply ran under the glass's edge and was cut
+                mid-string. Allowed to shrink, it ellipsises, which is what
+                the class was always there to do. */}
             <span
-              className={`shrink-0 truncate font-code text-[0.6875rem] text-lp-faint ${
+              className={`min-w-0 truncate font-code text-[0.6875rem] text-lp-faint ${
                 chrome.nav ? "hidden lg:block" : "ml-auto"
               }`}
             >

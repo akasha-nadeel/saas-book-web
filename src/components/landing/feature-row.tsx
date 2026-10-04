@@ -158,7 +158,16 @@ export function FeatureRow({
           round. A layout that put the image first in the markup would hand a
           screen reader a long alt text before it had any idea what the row was
           about. */}
-      <div className={flip ? "lg:order-2" : ""}>
+      {/* **`min-w-0` on both columns, and it is a bug fix.** A grid item's
+          automatic minimum size is its *min-content*, so one wide descendant
+          — a window's address bar, a long word in a card — drags the whole
+          track past the viewport. Below `lg` these two share one track, which
+          is what made that visible in the worst way: the picture overflowed,
+          the track grew with it, and the paragraph beside it then re-wrapped
+          to the oversized width, so the *words* ran off the right of a phone.
+          Allowed to shrink, the track is the container and everything inside
+          wraps to it. */}
+      <div className={`min-w-0 ${flip ? "lg:order-2" : ""}`}>
         {eyebrow && <div className="mb-4">{eyebrow}</div>}
         {badge && <p className={`mb-3 ${FEATURE_EYEBROW}`}>{badge}</p>}
         <h3
@@ -195,7 +204,7 @@ export function FeatureRow({
           edge of its tint reads as a coloured frame, which is a fifth kind of
           box on a page that already has enough. */}
       <div
-        className={`rounded-[1.75rem] p-4 sm:p-7 lg:p-9 ${ground} ${
+        className={`min-w-0 rounded-[1.75rem] p-4 sm:p-7 lg:p-9 ${ground} ${
           flip ? "lg:order-1" : ""
         }`}
       >

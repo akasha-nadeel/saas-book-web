@@ -312,7 +312,19 @@ export function LandingHeader({
           to start on the same line as every heading below it. It was `px-4` up
           to `sm`, which put the bar's left edge 8px inside every section's on
           a phone: small, and exactly the kind of small that reads as the
-          header belonging to a different page. */}
+          header belonging to a different page.
+
+          **`px-4` is back below 360px and only below it**, which is not that
+          decision being undone. This bar never fit a phone at all: the
+          wordmark and the two actions are every one of them `shrink-0`, and at
+          the desktop sizes their min-content came to 408px against a 375px
+          screen — so the page scrolled sideways, because the landing root is
+          `overflow-y-auto` and `auto` on one axis makes the other `auto` too.
+          The width had to come from somewhere. It comes from the wordmark and
+          the pills first (see both below); the gutter is the last thing given
+          up, and is given up only where the alternative is a bar that does not
+          fit. Every phone from 360 up — which is every current one — keeps the
+          aligned measure. */}
       {/* The bar's height is the button height plus this, and the button is
           the part that may not shrink — it is the offer. So the trimming
           happens here. Note that nothing downstream has to be adjusted with
@@ -320,20 +332,33 @@ export function LandingHeader({
           is pushed down by the same `top-16`, which lands the wall on the
           header's bottom edge whatever height the header settles at. */}
       <div
-        className={`relative mx-auto flex items-center justify-between gap-3 transition-[background-color,box-shadow,border-color] duration-200 sm:gap-6 ${
+        className={`relative mx-auto flex items-center justify-between gap-2 transition-[background-color,box-shadow,border-color] duration-200 sm:gap-6 ${
           floating
             ? `max-w-6xl rounded-full px-5 py-2.5 sm:px-7 sm:py-3 ${
                 scrolled
                   ? "border border-lp-line bg-white shadow-[0_8px_32px_-8px_rgba(15,15,16,0.18)]"
                   : "border border-transparent bg-transparent shadow-none"
               }`
-            : "max-w-[88rem] px-6 py-1.5 sm:px-8 sm:py-2 lg:px-10"
+            : "max-w-[88rem] px-4 py-1.5 min-[360px]:px-6 sm:px-8 sm:py-2 lg:px-10"
         }`}
       >
-        {/* Logo — always far left */}
+        {/* Logo — always far left.
+
+            **Three sizes rather than two, and the smallest is the one that
+            matters.** "OpenChapter" is eleven characters of bold tracking-tight
+            type and it may not shrink or truncate — it is the name — so at
+            `text-2xl` it was taking 146 of a phone's 375 pixels on its own.
+            `text-lg` on a phone is the single biggest saving available in this
+            bar and costs nothing: there is nothing beside it to be out of scale
+            with, since the nav is hidden below `md`.
+
+            **`sm` and up is the size it always was**, so nothing on a tablet or
+            a desktop moved; the middle step at 500px is there because 18px to
+            30px in one jump at the `sm` boundary is a visible lurch on a phone
+            turned landscape. */}
         <Link
           href="/"
-          className={`shrink-0 text-2xl font-bold tracking-tight transition-colors sm:text-3xl ${
+          className={`shrink-0 text-lg font-bold tracking-tight transition-colors min-[500px]:text-2xl sm:text-3xl ${
             onDark ? "text-white" : "text-lp-ink"
           }`}
         >
@@ -372,8 +397,33 @@ export function LandingHeader({
           )}
         </nav>
 
-        {/* Buttons — always far right */}
-        <span className="flex shrink-0 items-center gap-2.5">
+        {/* Buttons — always far right.
+
+            **Smaller on a phone, in both directions.** The padding and the
+            type come down a step below `sm` because the horizontal axis is
+            what ran out — the three rigid boxes in this bar measured 408px
+            against a 375px screen.
+
+            **`min-h-11` was here and came off, which is a trade and not an
+            oversight.** These are `<a>`, so the `pointer: coarse` rule in
+            `globals.css` that gives every control a 44px floor does not reach
+            them — it selects `button, [role=button]` — and stating the floor
+            here did put them at 44. It also put 44px of pill around 14px of
+            type, beside a wordmark set at 18, and the bar read as two
+            oversized capsules with a name next to them. The owner called it
+            and the proportion won: about 32px, which is what the rest of the
+            bar is drawn for. Put the floor back only with the type and the
+            wordmark raised to match, or it comes straight back.
+
+            Measured: the three rigid boxes plus the gutter come to about
+            288px, so the bar holds from roughly a 290px viewport up. That
+            covers every mainstream phone with room — 320 is the narrowest in
+            circulation and leaves 30px spare. A folding phone's 280px cover
+            screen is under it, and the root's `overflow-x-clip` would take the
+            right edge off "Start free" there rather than scroll; if that ever
+            matters, the move is to drop the Log in pill's border and padding
+            below `sm`, not to shrink the type again. */}
+        <span className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
           <Link
             href="/signin"
             style={
@@ -381,7 +431,7 @@ export function LandingHeader({
                 ? { borderColor: "#ffffff", color: "#ffffff" }
                 : { borderColor: ink, color: ink }
             }
-            className={`rounded-full border px-5 py-1.5 text-[0.9375rem] font-semibold transition-colors sm:px-6 sm:py-2 ${
+            className={`inline-flex items-center rounded-full border px-3 py-2 text-[0.8125rem] font-semibold transition-colors sm:px-6 sm:text-[0.9375rem] ${
               onDark ? "hover:bg-white/15" : "hover:bg-lp-tint"
             }`}
           >
@@ -390,7 +440,7 @@ export function LandingHeader({
           <Link
             href="/signup"
             style={{ backgroundColor: ink }}
-            className="rounded-full px-5 py-1.5 text-[0.9375rem] font-semibold text-lp-accent-ink hover:opacity-90 sm:px-6 sm:py-2"
+            className="inline-flex items-center rounded-full px-3 py-2 text-[0.8125rem] font-semibold text-lp-accent-ink hover:opacity-90 sm:px-6 sm:text-[0.9375rem]"
           >
             Start free
           </Link>

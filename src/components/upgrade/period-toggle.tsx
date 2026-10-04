@@ -45,20 +45,37 @@ export function PeriodToggle({
 
   return (
     <div
+      /* **The left reserve is desktop-only, and dropping it on a phone is
+          what keeps "Monthly" on the screen.** `pl-[4.5rem]` is room for the
+          pill and the arrow that points out of it; with it, this control's
+          min-content is 279px, and the pricing box around it is
+          `overflow-hidden` — so on a narrow phone the last word was not
+          pushed anywhere, it was silently cut off. Without the reserve the
+          control measures about 204px and fits any phone. The pill stays
+          where it is: it is the saving, and it is read from
+          `uniformAnnualSaving()` rather than typed. */
       className={`relative inline-flex items-center gap-3.5 font-pricing ${
-        badge ? "pt-11 pl-[4.5rem]" : ""
+        badge ? "pt-11 sm:pl-[4.5rem]" : ""
       } ${className}`}
     >
       {badge && (
         <>
+          {/* Centred over the control below `sm`, hard left above it. The
+              left reserve is what put it beside rather than over the row, and
+              the reserve is desktop-only now (see above) — so without this it
+              sat against the left edge pointing at nothing. */}
           <span
-            className="absolute top-0 left-0 rounded-full border-[1.5px] border-price-brand-soft
-                       px-2.5 py-0.5 text-[0.9375rem] leading-snug whitespace-nowrap
-                       text-price-brand-text"
+            className="absolute top-0 left-1/2 -translate-x-1/2 rounded-full border-[1.5px]
+                       border-price-brand-soft px-2.5 py-0.5 text-[0.9375rem] leading-snug
+                       whitespace-nowrap text-price-brand-text sm:left-0 sm:translate-x-0"
           >
             {saving}% discount
           </span>
-          {/* From the pill down and round to the word it is about. */}
+          {/* From the pill down and round to the word it is about — and
+              only where there is room for it to come from. Below `sm` the
+              reserve above is gone, so "annually" starts at the left edge and
+              there is nowhere for an arrow to travel from; the pill sits over
+              the word instead, which says the same thing in less space. */}
           <svg
             aria-hidden="true"
             viewBox="0 0 34 30"
@@ -67,7 +84,7 @@ export function PeriodToggle({
             strokeWidth={1.2}
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="absolute top-[1.85rem] left-[2.3rem] h-[1.9rem] w-[2.1rem] text-price-ink"
+            className="absolute top-[1.85rem] left-[2.3rem] hidden h-[1.9rem] w-[2.1rem] text-price-ink sm:block"
           >
             <path d="M3 1c0 15 8 23 27 23" />
             <path d="m26.5 20.5 3.5 3.5-3.5 3.5" />

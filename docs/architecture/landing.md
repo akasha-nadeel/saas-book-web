@@ -80,6 +80,57 @@ after the Preview step ("Read it before you send it") was added to every format,
 which is exactly the failure mode its own note warns about when a client
 module's strings are quoted by hand. Walk `stepsFor("epub")` before touching it.
 
+## On a phone — read this before adding anything to the MVP page
+
+The page had no mobile case until 2026-10-04: what shipped at 375px was the
+desktop page with the nav hidden. Four things are worth not rediscovering.
+
+**The page is a horizontal scroller by accident, and that is why overflow
+*shows*.** `<body>` is `overflow-hidden` for the editor shell, so the landing
+page scrolls inside its own container — and `overflow-y: auto` with an `x` left
+`visible` makes the `x` compute to `auto`. So anything overhanging got a real
+12px scrollbar rather than being clipped. The root now carries
+`overflow-x-clip` (`clip`, not `hidden` — `hidden` beside `auto` makes *both*
+axes scrollable, which is the thing being removed). **It is a net, not a fix.**
+It hides whatever it catches, so a band that starts disappearing off the right
+is to be fixed where it lives.
+
+**What actually overhung, in case it comes back:**
+
+- the header — wordmark and two actions, all `shrink-0`, min-content 408px
+  against 375. It is sized down below `sm` and fits from about 290px up;
+- the footer's contact address — 26 unbreakable characters in a `grid-cols-2`
+  cell, where a grid item's automatic minimum is its *min-content*. `min-w-0`
+  on the cell, `overflow-wrap: anywhere` on the link;
+- `AppWindow`'s address, which was `shrink-0 truncate` — and `truncate` on an
+  item that may not shrink cannot truncate. Its min-content was 375px on its
+  own, which is what dragged a whole `FeatureRow` off the page;
+- the logo strip, whose `whitespace-nowrap` names plus their marks measured
+  162px in a 147px column.
+
+**`min-w-0` on both `FeatureRow` columns is load-bearing.** Below `lg` the words
+and the picture share one grid track, and a grid item's automatic minimum is its
+min-content — so one wide descendant drags the track past the viewport, and the
+*paragraph beside it* then re-wraps to the oversized width. The symptom is text
+running off the right of a phone, which reads as a copy problem and is a sizing
+one.
+
+**Decoration placed by percentage is placed against one arrangement.**
+`PricingDecor`'s three marks are positioned for the wide layout, where the cycle
+toggle is pushed right; on a phone the toggle is centred and moves under them —
+the ring landed beside "annually" and the plus struck through the discount pill.
+It is `hidden sm:block` now. The same applies to anything else scattered over a
+box by percentage.
+
+**The product pictures are left to shrink, and that is a decision.** The drawn
+screens are sized in `cqw` against a 1000px design, so on a phone their type
+lands at 3–5px. Stripe and Notion art-direct this — a separate, tighter mobile
+asset swapped by `<picture>` + `media` (Stripe's `wave-fallback-mobile`,
+Notion's `capture_mobile.jpg`). Linear and Vercel ship one asset and let it
+shrink. The owner chose the second on 2026-10-04: on a phone the shot is
+atmosphere and the copy carries the argument. For a *drawn* screen art direction
+would cost no new asset, if it is ever wanted.
+
 ---
 
 **The landing page is one Server Component** —
