@@ -19,6 +19,7 @@ import { SupportDialog } from "@/components/shelf/support-dialog";
 import { FeedbackDialog } from "@/components/shelf/feedback-dialog";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
 import { ConfirmDialog } from "@/components/ui/dialog";
+import { SheetGrip, useSheetDrag } from "@/components/ui/sheet-grip";
 import { LoadingScreen } from "@/components/loading-screen";
 import { displayName, firstNameOf, type Account } from "@/lib/account";
 import {
@@ -1131,6 +1132,17 @@ export function Bookshelf({
                         : meta.label}
                   </h1>
                   {!meta.live && <Badge>Not built yet</Badge>}
+
+                  {/* **The phone's copy of the account chip** — see the long
+                      note on the control group below for why there are two of
+                      them and why neither may be deleted in favour of the
+                      other. Below `sm` the header is stacked, this row is the
+                      full width of the column, and `ml-auto` puts the chip in
+                      the top right corner of the screen beside the greeting,
+                      which is where a phone expects it. */}
+                  <div className="ml-auto flex shrink-0 sm:hidden">
+                    <AccountMenu account={account} />
+                  </div>
                 </div>
 
                 {/* **Counted, never flattering.** "You are doing great" is the
@@ -1159,14 +1171,24 @@ export function Bookshelf({
                   would strand exactly the writers least able to work around
                   it.
 
-                  **It sits beside New book rather than beside the heading**,
-                  where it was until 2026-09-26. It was pinned there with
-                  `ml-auto` inside the title column, which only bites while
-                  the header is stacked: from `sm` the row turns, that column
-                  shrinks to its own content, and there is no free space left
-                  to push against — so the chip came to rest wherever the
-                  greeting happened to end, in the middle of the row, on every
-                  tablet.
+                  **It sits beside New book from `sm` up, and beside the
+                  heading below it, and the split is the whole point.** It was
+                  in the title column until 2026-09-26, pinned with `ml-auto`,
+                  which only bites while the header is stacked: from `sm` the
+                  row turns, that column shrinks to its own content, and there
+                  is no free space left to push against — so the chip came to
+                  rest wherever the greeting happened to end, in the middle of
+                  the row, on every tablet. Moving it here fixed that and cost
+                  the phone its top-right corner, which is the one place a
+                  phone looks for an account.
+
+                  So there are two mount points and exactly one is ever
+                  visible: `sm:hidden` on the one in the heading row, `hidden
+                  sm:flex` here. **Not one element moved by `order` or a
+                  grid**, because `ml-auto` is what does the work and it means
+                  different things in the two containers — which is the bug
+                  above, restated. A duplicated 40px chip under a breakpoint is
+                  the cheap half of that trade.
 
                   The chip goes *before* New book. Crossing `md` it folds back
                   into the sidebar, and with the button last that button keeps
@@ -1178,7 +1200,7 @@ export function Bookshelf({
                   and `shrink-0` makes the heading truncate first at the
                   narrow end of the band rather than the controls squeezing. */}
               <div className="ml-auto flex shrink-0 items-center gap-3">
-                <div className="flex md:hidden">
+                <div className="hidden sm:flex md:hidden">
                   <AccountMenu account={account} />
                 </div>
 
@@ -1538,6 +1560,7 @@ function MobileDashboardNavigation({
   ) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const { gripProps, dialogProps } = useSheetDrag(ref);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -1569,27 +1592,24 @@ function MobileDashboardNavigation({
       onClick={(event) => {
         if (event.target === ref.current) ref.current?.close();
       }}
-      className="oc-mobile-navigation fixed inset-0 m-0 h-[var(--oc-visual-height)] max-h-none w-full max-w-none bg-panel p-0 text-fg backdrop:bg-black/65 md:hidden"
+      {...dialogProps}
+      className="oc-mobile-navigation oc-sheet-draggable fixed inset-0 m-0 w-full max-w-none bg-panel p-0 text-fg backdrop:bg-black/65 md:hidden"
     >
       <section className="flex h-full min-h-0 flex-col">
-        <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-line pt-(--oc-safe-top) pr-[max(0.5rem,var(--oc-safe-right))] pl-[max(1rem,var(--oc-safe-left))]">
-          <Link
-            href="/"
-            onClick={onClose}
-            className="min-w-0 flex-1 truncate text-xl font-bold tracking-tight text-fg"
-          >
-            Open<span className="text-wordmark">Chapter</span>
-          </Link>
-          <button
-            type="button"
-            autoFocus
-            onClick={() => ref.current?.close()}
-            aria-label="Close navigation"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted outline-none hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
-          >
-            <span aria-hidden="true" className="text-2xl leading-none">×</span>
-          </button>
-        </header>
+        {/* **A handle, where the wordmark and a × used to be.**
+
+            The sheet is short and every row in it names itself, so a row spent
+            on the product's own name is a row of a phone screen spent telling
+            the writer which app they are in. The ways out are the three a
+            sheet already has — drag it down, press the dimmed page above it,
+            Escape — and two of those work without a pointer, which is what
+            makes dropping the button safe rather than merely tidy. */}
+        <SheetGrip gripProps={gripProps} label="Drag down to close navigation" />
+
+        {/* Nothing carries `autoFocus` now the close button is gone, and that
+            is deliberate rather than an omission: `showModal()` focuses the
+            first focusable child by itself, which here is the first area in
+            the list — the thing the writer opened this to reach. */}
 
         <div className="scroll-slim min-h-0 flex-1 overflow-y-auto py-4 pr-[max(0.75rem,var(--oc-safe-right))] pl-[max(0.75rem,var(--oc-safe-left))]">
           <nav aria-label="Book workflow" className="flex flex-col gap-1">
@@ -1631,8 +1651,27 @@ function MobileDashboardNavigation({
           </div>
         </div>
 
-        <footer className="shrink-0 border-t border-line bg-panel pt-2 pr-[max(0.75rem,var(--oc-safe-right))] pb-[max(0.75rem,var(--oc-safe-bottom))] pl-[max(0.75rem,var(--oc-safe-left))]">
-          <AccountMenu account={account} variant="bar" />
+        <footer className="flex shrink-0 items-center gap-3 border-t border-line bg-panel pt-2 pr-[max(0.75rem,var(--oc-safe-right))] pb-[max(0.75rem,var(--oc-safe-bottom))] pl-[max(0.75rem,var(--oc-safe-left))]">
+          <div className="min-w-0 flex-1">
+            <AccountMenu account={account} variant="bar" />
+          </div>
+
+          {/* The mark, opposite the account chip — the one place the sheet
+              says whose app this is, now the wordmark has come off the top.
+              Decoration: no link, no label, `aria-hidden`, the same shape as
+              `write-band.webp` and `upgrade-card.webp` further up this file.
+              The source is 2000px; this is cropped to the mark and resized,
+              because 772KB for a 28px glyph is a page weight a phone on a slow
+              connection pays for nothing. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/oc-mark.webp"
+            alt=""
+            aria-hidden="true"
+            width={22}
+            height={28}
+            className="pointer-events-none mr-1 h-7 w-auto shrink-0 opacity-70 select-none"
+          />
         </footer>
       </section>
     </dialog>

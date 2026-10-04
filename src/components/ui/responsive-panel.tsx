@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
 
+import { SheetGrip, useSheetDrag } from "@/components/ui/sheet-grip";
+
 export type ResponsivePanelPresentation = "sheet" | "full";
 
 /**
@@ -26,6 +28,12 @@ export function ResponsivePanel({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const { gripProps, dialogProps } = useSheetDrag(ref);
+
+  /* The grip is for the shape that actually rises from the bottom edge. The
+     paged presentation is a right-hand drawer, where a downward drag points at
+     nothing, and `full` is a whole screen rather than a sheet. */
+  const sheet = presentation === "sheet";
 
   useEffect(() => {
     const dialog = ref.current;
@@ -51,9 +59,20 @@ export function ResponsivePanel({
       onClick={(event) => {
         if (event.target === ref.current) dismiss();
       }}
-      className="oc-responsive-panel bg-panel p-0 text-fg backdrop:bg-black/65"
+      {...(sheet ? dialogProps : {})}
+      className={`oc-responsive-panel bg-panel p-0 text-fg backdrop:bg-black/65 ${
+        sheet ? "oc-sheet-draggable" : ""
+      }`}
     >
       <section className="flex h-full min-h-0 flex-col">
+        {/* **The title and its × stay here, where the dashboard's navigation
+            sheet drops both.** Not an inconsistency: "More writing tools" and
+            "Format" name a set of rows that do not name themselves, where
+            "Overview / Write / Title check" are the words a writer came for.
+            And this opens from a toolbar rather than from a pill under the
+            thumb, so the press that closes it is the one that opened it. */}
+        {sheet && <SheetGrip gripProps={gripProps} label={`Drag down to close ${title}`} />}
+
         <header className="oc-responsive-panel-header flex shrink-0 items-center gap-3 border-b border-line px-4 py-2.5">
           <h2 id={titleId} className="min-w-0 flex-1 truncate text-base font-bold">
             {title}

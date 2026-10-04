@@ -4394,15 +4394,85 @@ body {
     padding-bottom: var(--oc-safe-bottom);
   }
 
+  /* **The dashboard's navigation is a bottom sheet, not a full screen**
+     (2026-10-04). It was the second of those, and the shape was wrong for two
+     reasons that are really one: the control that opens it is the pill fixed
+     at the bottom centre, so a panel that fills the screen from the top moves
+     *away* from the press that summoned it and puts its first row at the end
+     of the screen furthest from the hand. Rising from the bottom edge, it
+     arrives where the thumb already is and leaves the page it came from
+     visible above, which is what says this is a layer rather than a
+     destination.
+
+     Same two tokens as every other sheet here, including the editor's
+     (`editor-sheet`, below). Do not give this one its own numbers. */
   dialog[data-dialog-presentation="navigation"] {
-    width: 100vw !important;
+    width: 100% !important;
     max-width: none !important;
-    height: var(--oc-visual-height) !important;
-    max-height: none !important;
-    margin: var(--oc-visual-offset-top) 0 0 !important;
-    border-radius: 0 !important;
+    height: auto !important;
+    max-height: var(--oc-sheet-max-height) !important;
+    margin: auto 0 0 !important;
+    border-radius: var(--oc-sheet-radius) var(--oc-sheet-radius) 0 0 !important;
     padding-bottom: 0;
   }
+}
+
+/* ---- Bottom sheets: the entrance, and the drag ---------------------------
+
+   **The one dialog entrance in this stylesheet**, and it is here because a
+   sheet is defined by the edge it comes from. Appearing in place reads as a
+   box that was always there; rising says which way it will go when dismissed,
+   which is the whole affordance the grab handle then confirms.
+
+   `@starting-style` needs `allow-discrete` on `display` and `overlay`, or the
+   dialog is in the top layer before the transition begins and the first frame
+   is already in place.
+
+   `[data-dragging]` is written by `useSheetDrag` while a finger is down. The
+   transition has to come off then — a sheet easing toward the thumb instead of
+   tracking it reads as lag, not as smoothness — and go back on at release, so
+   a drag too short to dismiss springs back. */
+.oc-sheet-draggable {
+  transition:
+    transform 220ms cubic-bezier(0.22, 0.61, 0.26, 1),
+    display 220ms allow-discrete,
+    overlay 220ms allow-discrete;
+}
+
+.oc-sheet-draggable[data-dragging="true"] {
+  transition: none;
+}
+
+@starting-style {
+  .oc-sheet-draggable[open] {
+    transform: translateY(100%);
+  }
+}
+
+/* The handle still drags; only the easing goes. A sheet that cannot be moved
+   at all would make the gesture the thing that broke, rather than the
+   decoration. */
+@media (prefers-reduced-motion: reduce) {
+  .oc-sheet-draggable {
+    transition: none;
+  }
+
+  @starting-style {
+    .oc-sheet-draggable[open] {
+      transform: none;
+    }
+  }
+}
+
+/* **44px rows inside the navigation sheet, scoped rather than global.**
+   `SideItem`'s own `min-h-10` is the desktop rail's as well, where a pointer
+   is doing the aiming and ten rows at 44px would push the account off the
+   bottom. The sheet is thumbed, so it takes the touch-target floor. */
+.oc-mobile-navigation nav a,
+.oc-mobile-navigation nav button,
+.oc-mobile-navigation .scroll-slim a,
+.oc-mobile-navigation .scroll-slim button {
+  min-height: 2.75rem;
 }
 
 .oc-responsive-panel {

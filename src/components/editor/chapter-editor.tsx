@@ -865,7 +865,12 @@ export function ChapterEditor({
       {moreOpen && (
         <ResponsivePanel
           title="More writing tools"
-          presentation="full"
+          /* A sheet, not a full screen (2026-10-04). It is a list of short
+             settings rows reached from the dock at the bottom of the window,
+             so it belongs in the half of the screen a thumb reaches — and the
+             manuscript staying visible above it is what says the tools act on
+             the page rather than replacing it. */
+          presentation="sheet"
           onClose={() => {
             setMoreOpen(false);
             restoreEditorFocus();
