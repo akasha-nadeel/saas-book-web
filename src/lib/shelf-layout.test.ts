@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_RESEARCH_LAYOUT,
+  DEFAULT_PRICE_CHECK_LAYOUT,
   DEFAULT_SHELF_LAYOUT,
+  DEFAULT_TITLE_CHECK_LAYOUT,
   gridClassFor,
   isGrid,
   isShelfLayout,
@@ -36,24 +37,44 @@ describe("SHELF_LAYOUTS", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("offers the default as one of its own options", () => {
-    expect(SHELF_LAYOUTS.some((l) => l.id === DEFAULT_SHELF_LAYOUT)).toBe(true);
-    expect(SHELF_LAYOUTS.some((l) => l.id === DEFAULT_RESEARCH_LAYOUT)).toBe(
-      true,
-    );
+  it("offers every default as one of its own options", () => {
+    for (const d of [
+      DEFAULT_SHELF_LAYOUT,
+      DEFAULT_TITLE_CHECK_LAYOUT,
+      DEFAULT_PRICE_CHECK_LAYOUT,
+    ]) {
+      expect(SHELF_LAYOUTS.some((l) => l.id === d), `"${d}" is not a mode`).toBe(
+        true,
+      );
+    }
   });
 
   /*
-   * **The two defaults are deliberately different and this is what says so.**
+   * **The three defaults are deliberately different and this is what says so.**
    * The shelf dresses a writer's own handful of books, where a larger jacket
    * is worth the room; the research tools draw a hundred strangers' books,
    * where the question is how many fit on the screen. Folding them back into
    * one constant would move the shelf as a side effect of a decision about
    * search results, and nothing else in the suite would notice.
    */
-  it("keeps the research default apart from the shelf's", () => {
-    expect(DEFAULT_RESEARCH_LAYOUT).not.toBe(DEFAULT_SHELF_LAYOUT);
-    expect(DEFAULT_RESEARCH_LAYOUT).toBe("small");
+  it("keeps the research defaults apart from the shelf's", () => {
+    expect(DEFAULT_TITLE_CHECK_LAYOUT).not.toBe(DEFAULT_SHELF_LAYOUT);
+    expect(DEFAULT_PRICE_CHECK_LAYOUT).not.toBe(DEFAULT_SHELF_LAYOUT);
+    expect(DEFAULT_TITLE_CHECK_LAYOUT).toBe("small");
+  });
+
+  /*
+   * **The two tools split one key on 2026-10-04, and this is the only thing
+   * that would notice them collapsing back.** The title check is a wall of
+   * jackets, swept for a clash; the price check is a column of titles with a
+   * price at the right-hand edge, read down — and prices only line up in
+   * `list`. Equal constants here would not fail anything else in the suite,
+   * and the symptom in the app is subtle: one tool quietly opening in the
+   * other's shape.
+   */
+  it("opens the two tools on different modes", () => {
+    expect(DEFAULT_PRICE_CHECK_LAYOUT).toBe("list");
+    expect(DEFAULT_PRICE_CHECK_LAYOUT).not.toBe(DEFAULT_TITLE_CHECK_LAYOUT);
   });
 });
 

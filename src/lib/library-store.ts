@@ -24,8 +24,9 @@ import type { CollabRole } from "./collab";
 import { clampZoom } from "@/lib/editor/zoom";
 import { isPanelTab, type PanelTab } from "./panel-tabs";
 import {
-  DEFAULT_RESEARCH_LAYOUT,
+  DEFAULT_PRICE_CHECK_LAYOUT,
   DEFAULT_SHELF_LAYOUT,
+  DEFAULT_TITLE_CHECK_LAYOUT,
   isShelfLayout,
   type ShelfLayout,
 } from "./shelf-layout";
@@ -3704,18 +3705,27 @@ export interface Prefs {
    */
   shelfLayout: ShelfLayout;
   /**
-   * How the two searches draw the books they find — same four modes, same
-   * words, `resultsGridClass` rather than `gridClassFor`.
+   * How the searches draw the books they find — same four modes, same words,
+   * `resultsGridClass` rather than `gridClassFor`.
    *
-   * **One pref for both tools, not one each.** "How do I want found books
-   * drawn" is not a different question on the comps shelf than on the title
-   * check's matches, and two settings would let the same writer's answer
-   * disagree with itself when the segmented control switches between them.
+   * **Two keys, and which screens share one is the whole point.**
+   * `titleCheckLayout` is read by the title check *and* the comps shelf,
+   * because one segmented control switches between those two: "how do I want
+   * found books drawn" is not a different question on either side of it, and
+   * two settings would read as the control changing the view. Comps is in
+   * `HIDDEN_BOOK_TOOL_PATHS` today and that argument comes back whole with it.
    *
-   * Stored for the reason `shelfLayout` is: a writer who chose the list meant
-   * it for looking things up, not for one search.
+   * **The price check is deliberately not on that key**, which it was until
+   * 2026-10-04. Nothing switches between it and another search — it is its own
+   * rail row — so moving its view when the title check's moved was a change a
+   * writer could not account for. See the note on the two defaults in
+   * `shelf-layout.ts` for why they open on different modes.
+   *
+   * Both stored for the reason `shelfLayout` is: a writer who chose the list
+   * meant it for looking things up, not for one search.
    */
-  researchLayout: ShelfLayout;
+  titleCheckLayout: ShelfLayout;
+  priceCheckLayout: ShelfLayout;
   /** The colour of the page under the prose. */
   paper: PaperColor;
   /**
@@ -3812,8 +3822,11 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // The grid the shelf has always drawn; a writer who wants another says so.
   shelfLayout: DEFAULT_SHELF_LAYOUT,
   // Denser than the shelf: these walls are a hundred strangers' books rather
-  // than a writer's own handful. See `DEFAULT_RESEARCH_LAYOUT`.
-  researchLayout: DEFAULT_RESEARCH_LAYOUT,
+  // than a writer's own handful. The two differ from each other because a wall
+  // of jackets is swept and a column of prices is read down — see the note
+  // above both constants in `shelf-layout.ts`.
+  titleCheckLayout: DEFAULT_TITLE_CHECK_LAYOUT,
+  priceCheckLayout: DEFAULT_PRICE_CHECK_LAYOUT,
   // Black by default, because the chrome around it is. A white sheet on a black
   // app is the one combination that glares, and a writer arriving for the first
   // time should not have to go and fix that. The other four sheets are still
@@ -3895,9 +3908,16 @@ function parsePrefs(raw: string | null): Prefs {
       shelfLayout: isShelfLayout(parsed.shelfLayout)
         ? parsed.shelfLayout
         : DEFAULT_SHELF_LAYOUT,
-      researchLayout: isShelfLayout(parsed.researchLayout)
-        ? parsed.researchLayout
-        : DEFAULT_RESEARCH_LAYOUT,
+      // `researchLayout`, the one key these two were split out of on
+      // 2026-10-04, is deliberately not read across. A stored value said "this
+      // is how I want *both* drawn", which is the answer being retired; each
+      // tool opening on the mode chosen for it is the point of the split.
+      titleCheckLayout: isShelfLayout(parsed.titleCheckLayout)
+        ? parsed.titleCheckLayout
+        : DEFAULT_TITLE_CHECK_LAYOUT,
+      priceCheckLayout: isShelfLayout(parsed.priceCheckLayout)
+        ? parsed.priceCheckLayout
+        : DEFAULT_PRICE_CHECK_LAYOUT,
       paper: paperFrom(parsed),
       theme: THEMES.includes(parsed.theme as Theme)
         ? (parsed.theme as Theme)

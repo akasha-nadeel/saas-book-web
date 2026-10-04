@@ -182,7 +182,13 @@ export function PriceCheckPage({
   const [browse, setBrowse] = useState<PricedShelf | null>(keptBrowse);
   const [browseLoading, setBrowseLoading] = useState(() => !keptBrowse);
 
-  const layout = usePrefs().researchLayout;
+  /* **Its own key, not the title check's**, which it shared until 2026-10-04.
+     Nothing switches between this screen and another search — it is its own
+     rail row — so a view chosen here moving the title check's, and the other
+     way round, was a change with no cause a writer could see. It opens on
+     `list` rather than the title check's covers because these rows carry a
+     price at the right-hand edge, and prices only line up in a column. */
+  const layout = usePrefs().priceCheckLayout;
 
   /**
    * The browsing wall, fetched once per tab.
@@ -589,7 +595,7 @@ export function PriceCheckPage({
           <PriceList
             look={look}
             layout={layout}
-            onLayout={(next) => setPref("researchLayout", next)}
+            onLayout={(next) => setPref("priceCheckLayout", next)}
           />
         )}
 
@@ -612,7 +618,7 @@ export function PriceCheckPage({
           <BrowseWall
             shelf={browse}
             layout={layout}
-            onLayout={(next) => setPref("researchLayout", next)}
+            onLayout={(next) => setPref("priceCheckLayout", next)}
           />
         )}
       </div>

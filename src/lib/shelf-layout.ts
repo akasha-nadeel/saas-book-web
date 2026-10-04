@@ -28,20 +28,35 @@ export const SHELF_LAYOUTS: readonly { id: ShelfLayout; label: string }[] = [
 export const DEFAULT_SHELF_LAYOUT: ShelfLayout = "covers";
 
 /**
- * What the research tools open on — the comps shelf, the title check's walls,
- * the price check's list.
+ * What the research tools open on — the comps shelf and the title check's
+ * walls on one, the price check on the other.
  *
- * **A second default rather than a shared one, and the difference is what is
+ * **A second default rather than the shelf's, and the difference is what is
  * being looked at.** `DEFAULT_SHELF_LAYOUT` dresses a writer's own handful of
  * books, where a larger jacket is worth the room and the whole shelf fits on
  * the screen anyway. These tools draw a hundred strangers' books, where the
- * question is how many can be taken in at once — so they open denser.
- *
- * They are deliberately not the same constant. Collapsing them back into one
+ * question is how many can be taken in at once — so they open denser. They are
+ * deliberately not the same constant as the shelf's: collapsing them back
  * would move the shelf as a side effect of a decision about search results,
  * which is why `shelf-layout.test.ts` asserts they differ.
+ *
+ * **This was one constant until 2026-10-04, and splitting it is a reversal
+ * worth keeping the reasoning for.** One default was right while the screens
+ * reading it were the comps shelf and the title check, which a single
+ * segmented control switches between — two settings there would read as the
+ * control changing the view. The price check joined that key on 2026-09-26 and
+ * was never one of those: it is its own rail row, reached on its own, with no
+ * control between it and another search. So changing the view in one tool
+ * moved the other for no reason a writer could see.
+ *
+ * They open on different modes because they are different objects. The title
+ * check is a wall of jackets, swept for a clash — small covers fit the most on
+ * the screen while a jacket is still recognisable. The price check is a column
+ * of titles with a price at the right-hand edge, read *down* rather than
+ * across, and the prices only line up in `list`.
  */
-export const DEFAULT_RESEARCH_LAYOUT: ShelfLayout = "small";
+export const DEFAULT_TITLE_CHECK_LAYOUT: ShelfLayout = "small";
+export const DEFAULT_PRICE_CHECK_LAYOUT: ShelfLayout = "list";
 
 /**
  * The container's classes, **written out in full and never interpolated**.

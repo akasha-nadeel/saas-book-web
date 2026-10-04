@@ -91,8 +91,10 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
 
   /* Shared with the title check — one answer to "how do I want found books
      drawn", not one per screen, or the segmented control between them would
-     appear to change the setting. */
-  const layout = usePrefs().researchLayout;
+     appear to change the setting. The price check came off this key on
+     2026-10-04 and has its own: no control switches between it and either of
+     these, so it was the one screen the argument above never covered. */
+  const layout = usePrefs().titleCheckLayout;
 
   const [query, setQuery] = useState("");
   const [books, setBooks] = useState<CompTitle[]>([]);
@@ -505,7 +507,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
                 </p>
                 <ViewMenu
                   value={layout}
-                  onChange={(next) => setPref("researchLayout", next)}
+                  onChange={(next) => setPref("titleCheckLayout", next)}
                 />
               </div>
             )}

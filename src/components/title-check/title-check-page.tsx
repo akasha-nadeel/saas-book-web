@@ -113,9 +113,12 @@ export function TitleCheckPage({
   const shelf = useShelf();
   const book = bookId ? findBook(shelf, bookId) : null;
 
-  /* Shared with the comps screen — see the note on `researchLayout`. The two
-     are switched between by one control, so one setting between them. */
-  const layout = usePrefs().researchLayout;
+  /* Shared with the comps screen — see the note on `titleCheckLayout`. The two
+     are switched between by one control, so one setting between them. **Not
+     shared with the price check**, which had the same key until 2026-10-04:
+     nothing switches between these screens, so moving one view with the other
+     was a change with no cause a writer could see. */
+  const layout = usePrefs().titleCheckLayout;
 
   /* Read once at mount. The dashboard throws this component away on an area
      switch, so without it a writer who glanced at their shelf came back to an
@@ -813,7 +816,7 @@ export function TitleCheckPage({
             <Shelf
               books={genreShelf}
               layout={layout}
-              onLayout={(next) => setPref("researchLayout", next)}
+              onLayout={(next) => setPref("titleCheckLayout", next)}
             />
           )}
 
@@ -872,7 +875,7 @@ export function TitleCheckPage({
                   title={checked ?? ""}
                   clashes={clashes}
                   layout={layout}
-                  onLayout={(next) => setPref("researchLayout", next)}
+                  onLayout={(next) => setPref("titleCheckLayout", next)}
                   suggestion={suggestion}
                   onTrySuggestion={(next) => {
                     setTitle(next);
