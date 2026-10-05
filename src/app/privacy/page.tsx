@@ -91,8 +91,27 @@ export default function PrivacyPage() {
               <Term>Feedback you send</Term> — the message, topic and account it
               came from.
             </>,
+            <>
+              <Term>An activity record</Term> — which parts of OpenChapter you
+              use and when: that you opened the app or a book, wrote, imported
+              or exported a file (and which format), ran a title, price or
+              consistency check, looked at pricing, started a checkout, or
+              reached a free-plan limit (and which one). Each entry is the kind
+              of thing that happened, the time, and your book&rsquo;s internal
+              id where there is one. It never holds a title, a file name or
+              anything you wrote or typed. It is kept while your account exists
+              and deleted with it.
+            </>,
           ]}
         />
+        <p>
+          The person who runs OpenChapter can see, for running and improving
+          the service: your email address and when you signed up, your activity
+          record, your books&rsquo; titles, genres and chapter and word counts,
+          your plan and payments, and any feedback you sent. They do not read
+          your chapters, your notes or your covers from that view &mdash; it
+          cannot show them.
+        </p>
       </Section>
 
       <Section title="Every time something leaves your browser">
@@ -121,6 +140,12 @@ export default function PrivacyPage() {
             <>
               <Term>Sync</Term> — if you are signed in, your library syncs to
               our database.
+            </>,
+            <>
+              <Term>The activity record</Term> — if you are signed in, each of
+              the moments listed above sends one short entry to our database.
+              Opening the app, a book or writing is recorded at most once every
+              half hour. Nothing is sent when you are signed out.
             </>,
             <>
               <Term>Advertising measurement</Term> — we run search ads, and

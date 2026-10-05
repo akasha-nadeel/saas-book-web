@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
 import { GatedTool } from "@/components/upgrade/pro-gate";
 import { onFreePlan } from "@/lib/launch";
 import { usePlan } from "@/lib/use-plan";
+import { noteActivity } from "@/lib/activity-log";
 import { bookWordCount, findBook } from "@/lib/library-store";
 import { PAGE_SIZES } from "@/lib/page-setup";
 import {
@@ -67,6 +68,16 @@ export function PaperbackPage({ bookId, embedded, heading }: ToolPageProps) {
 
   const [pages, setPages] = useState<string>("");
   const [stock, setStock] = useState<PaperStock>("white");
+
+  /* The operator's record, once the plan is known: a free writer meeting the
+     gate is a limit like any other, and a subscriber is a use of the tool. */
+  const decided = hydrated && !plan.loading;
+  const gated = decided && onFreePlan(plan);
+  useEffect(() => {
+    if (!decided) return;
+    if (gated) noteActivity("limit_hit", { detail: "paperback", bookId });
+    else noteActivity("paperback_open", { bookId });
+  }, [decided, gated, bookId]);
 
   /* **The plan is a third state, not a second one**, and it waits with the
      store. `useEntitled()` stood here and answers *true* while the subscription

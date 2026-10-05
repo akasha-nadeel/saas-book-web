@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { noteActivity } from "@/lib/activity-log";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
 import { BookCover } from "@/components/ui/book-cover";
@@ -697,6 +698,7 @@ export function TitleCheckPage({
               // Refused rather than disabled — the eleventh press is what
               // puts the banner and the dialog on screen.
               if (!gate.spend()) return;
+              noteActivity("title_check_run");
               void check(title);
             }}
           >
@@ -883,6 +885,7 @@ export function TitleCheckPage({
                     // the day's, like the button beside the box. A free search
                     // reachable by mistyping is not a limit.
                     if (!gate.spend()) return;
+                    noteActivity("title_check_run");
                     void check(next);
                   }}
                 />

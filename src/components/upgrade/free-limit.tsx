@@ -23,6 +23,7 @@ import {
 import { markToolBook, spendDailyUse } from "@/lib/library-store";
 import { usePrefs } from "@/lib/use-library";
 import { usePlan } from "@/lib/use-plan";
+import { noteActivity } from "@/lib/activity-log";
 
 /**
  * What the counted screens share, so six of them cannot say six different
@@ -153,6 +154,9 @@ export function useLimitGate(ask: LimitAsk): {
 
   const spend = useCallback(() => {
     if (allowance.blocked) {
+      // The refusal is the strongest sign there is that somebody wants Pro,
+      // so it goes in the operator's record — which limit, nothing else.
+      noteActivity("limit_hit", { detail: action, bookId });
       setRefused(true);
       setDialog(true);
       return false;

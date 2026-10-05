@@ -13,6 +13,7 @@ import {
 import { importSummary, type ImportedBook } from "@/lib/import/split";
 import { createBookFromImport } from "@/lib/library-store";
 import { plural } from "@/lib/plural";
+import { noteActivity, noteImport } from "@/lib/activity-log";
 import { keepImportedCover } from "@/lib/cover-save";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 
@@ -44,6 +45,7 @@ export function ImportBook() {
     setError(null);
     try {
       const book = await importFile(file);
+      noteImport(file.name);
       setProposal(book);
       setTitle(book.title);
     } catch (err) {
@@ -78,6 +80,7 @@ export function ImportBook() {
       );
       return;
     }
+    noteActivity("book_created", { detail: "import", bookId: result.bookId });
     void keepImportedCover(result.bookId, proposal.printCover);
     /* **What the import decided, on the path that never said.** The two
        chapters-into-a-book routes have shown this banner since they were

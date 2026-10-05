@@ -8,6 +8,7 @@ import { ImportFailedDialog } from "@/components/editor/import-failed-dialog";
 import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 import { IMPORT_ACCEPT, ImportError, importFile } from "@/lib/import";
+import { noteImport } from "@/lib/activity-log";
 import {
   NOTHING_NEW,
   importAsksFirst,
@@ -65,6 +66,7 @@ export function ImportChapterButton({
     setProblem(null);
     try {
       const parsed = await importFile(file);
+      noteImport(file.name, bookId);
 
       /* **Dropped here rather than inside the store**, so the writer is told
          which pages the book already had instead of meeting a storage error.

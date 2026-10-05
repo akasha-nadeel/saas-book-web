@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { noteActivity } from "@/lib/activity-log";
 import Link from "next/link";
 import { startCheckout, type CheckoutState } from "@/app/upgrade/actions";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
@@ -119,6 +120,12 @@ export function Plans({
      and signed in is shown annual — being handed the monthly price after
      picking the other one reads as a switch somebody made on their behalf. */
   const [period, setPeriod] = useState<Period>(intent?.period ?? "monthly");
+
+  // Recorded only for a signed-in writer — `noteActivity` asks — so a visitor
+  // reading prices before an account exists leaves nothing behind.
+  useEffect(() => {
+    noteActivity("pricing_view");
+  }, []);
 
   /*
    * The transaction being paid for, once there is one.

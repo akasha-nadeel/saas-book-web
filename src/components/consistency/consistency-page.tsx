@@ -16,6 +16,7 @@
  */
 
 import { useMemo, useState } from "react";
+import { noteActivity } from "@/lib/activity-log";
 import Link from "next/link";
 
 import { CheckPicker } from "@/components/consistency/check-picker";
@@ -87,6 +88,7 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
   const run = () => {
     const chosen = [...picked].filter((id) => !locked.has(id));
     if (!book || chosen.length === 0) return;
+    noteActivity("consistency_run", { bookId: book.id });
     /*
      * On Free the Pro checks run as well, so the count under the findings is
      * read off this book rather than made up. They are never shown.
@@ -223,7 +225,10 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
             )}
             <CheckPicker
               locked={locked}
-              onLocked={() => setUpsell(true)}
+              onLocked={() => {
+                noteActivity("limit_hit", { detail: "checks", bookId });
+                setUpsell(true);
+              }}
               picked={picked}
               onToggle={(id) =>
                 setPicked((was) => {

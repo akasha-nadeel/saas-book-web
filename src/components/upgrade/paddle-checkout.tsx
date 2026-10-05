@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PaidTier } from "@/lib/billing/tiers";
 import type { Period } from "@/lib/billing/plans";
+import { noteActivity } from "@/lib/activity-log";
 
 /**
  * The Upgrade button, when Paddle is the gateway.
@@ -56,6 +57,7 @@ export function PaddleUpgradeButton({
   const [error, setError] = useState<string | null>(null);
 
   async function upgrade() {
+    noteActivity("checkout_start", { detail: period });
     setBusy(true);
     setError(null);
 

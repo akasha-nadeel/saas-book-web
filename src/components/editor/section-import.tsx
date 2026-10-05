@@ -18,6 +18,7 @@ import {
   type ChapterMatter,
 } from "@/lib/library-store";
 import { ImportFailedDialog } from "@/components/editor/import-failed-dialog";
+import { noteImport } from "@/lib/activity-log";
 
 /**
  * Bringing a file into **one part** of the book, from that part's own card.
@@ -125,6 +126,7 @@ export function useSectionImport({
          otherwise only "Epilogue" would. See `looksLikeMatterLine`. The body
          has no such vocabulary to add — its names are the standing ones. */
       const parsed = await importFile(file, part === "body" ? undefined : part);
+      noteImport(file.name, bookId);
       const { kept, leftOut } = partOfImport(parsed.chapters, part);
 
       if (!kept.length) {

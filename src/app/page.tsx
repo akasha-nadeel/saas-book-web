@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { MvpLandingPage } from "@/components/landing/mvp-landing-page";
 import { Bookshelf } from "@/components/shelf/bookshelf";
 import { accountFromClaims } from "@/lib/account";
+import { isAdminEmail } from "@/lib/admin/admin-email";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
@@ -53,7 +55,9 @@ export const metadata: Metadata = {
  * is what makes this safe to branch on. With no project configured there are no
  * accounts at all, so everyone gets the shelf — the app runs as it always has.
  */
-export default async function Home() {
+export default async function Home(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   /*
    * The Suspense boundary is only on this branch, and it is load-bearing.
    *
@@ -79,7 +83,17 @@ export default async function Home() {
 
   if (!data?.claims) return <MvpLandingPage />;
 
+  /*
+   * **The operator's home is `/admin`.** A bare `/` sends them there; any
+   * `?area=` means they are moving about their own dashboard, which is why the
+   * dashboard writes `?area=overview` for them rather than `/`. The redirect
+   * reads the claims email only — `/admin` itself runs the full check and
+   * answers 404 if this was wrong.
+   */
+  const admin = isAdminEmail(data.claims.email);
+  if (admin && (await props.searchParams).area === undefined) redirect("/admin");
+
   // Name and photo ride in the verified token itself, so the header can be
   // right on the first paint rather than filling in after a round trip.
-  return <Bookshelf account={accountFromClaims(data.claims)} />;
+  return <Bookshelf account={accountFromClaims(data.claims)} admin={admin} />;
 }

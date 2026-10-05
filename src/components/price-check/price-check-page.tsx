@@ -29,6 +29,7 @@ import { ViewMenu } from "@/components/ui/view-menu";
 import { isGrid, resultsGridClass, type ShelfLayout } from "@/lib/shelf-layout";
 import { remember, recall } from "@/lib/comps/search-memory";
 import { toolShell, type ToolPageProps, toolMeasure } from "@/lib/tool-page";
+import { noteActivity } from "@/lib/activity-log";
 
 /**
  * What comparable ebooks are charging.
@@ -425,6 +426,7 @@ export function PriceCheckPage({
               // Refused rather than disabled — the fourth press is what puts
               // the banner and the dialog on screen.
               if (!gate.spend()) return;
+              noteActivity("price_check_run");
               void check(query);
             }}
           >

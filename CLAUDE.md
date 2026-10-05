@@ -108,6 +108,7 @@ is the thing to read **before changing that area**, not after.
 | Colours, themes, tokens, `src/components/ui/` | `docs/styling.md` |
 | Tests — what is covered, and which ones must not be "fixed" | `docs/testing.md` |
 | `next.config.ts` | `docs/architecture/build-config.md` |
+| `/admin`, the activity record, `ADMIN_EMAILS` | `docs/architecture/admin.md` |
 
 `docs/plans/` holds the original design notes for the bookshelf, export, the
 Supabase persistence design and the mobile editor's chapter icon
@@ -883,8 +884,11 @@ local-only, with the account menu saying why. Every entry point checks
   absent** — PostgREST refuses the whole select for one unknown column, so the
   entire library download would fail for everybody.
 - **Schema changes belong in `supabase/migrations/`**, not only in the
-  dashboard. There are **sixteen**. The first seven were confirmed applied live
-  on 2026-08-20; the fifteenth and the sixteenth on 2026-09-23. The eighth
+  dashboard. There are **seventeen**. The first seven were confirmed applied live
+  on 2026-08-20; the fifteenth and the sixteenth on 2026-09-23. The seventeenth,
+  `20261005000000_admin_insights.sql`, is `/admin`'s and was applied live on
+  2026-10-05, before its code shipped, and checked through PostgREST (the
+  secret key reads, the publishable key gets 42501). The eighth
   through the fourteenth (`20260822071735_launch_mvp_entitlements.sql` through
   `20260914000000_ai_free_pro_plan.sql`, whose own trigger proves it landed)
   have not been confirmed here, so check before blaming a route. **The
@@ -1301,7 +1305,31 @@ and puts a destructive action one stray mouse movement away.
 box rather than a forum. Nothing about the book is sent — no title, no word
 count, and deliberately not the URL, because a URL here carries book and chapter
 ids. The dialog lists exactly what goes above the send button; **add a field and
-add it there too.**
+add it there too.** The operator reads it at `/admin?tab=feedback`; no writer
+can.
+
+### The admin dashboard and the activity record — `docs/architecture/admin.md`
+
+**`/admin` is the operator's home** (2026-10-05): every account, what it does,
+who pays. `ADMIN_EMAILS` (server-only; **unset means nobody is admin**) names
+the operator, `requireAdmin()` locks every page — claims email, then a
+**confirmed** address read with the secret key — and answers 404 to anybody
+else. `/` redirects the operator there unless `?area=` is present, which is
+why the dashboard writes `/?area=overview` for them.
+
+- **The activity record is `activity_events`, and what a row may carry is the
+  whole design**: a CHECK-enum `kind` and `detail`, a book id, a time — no
+  free-text column. Insert-only for `authenticated`, the `feedback` shape;
+  throttled by a trigger. `noteActivity()` in `src/lib/activity-log.ts` is the
+  one caller and is fire-and-forget. **Not `activity.ts`**, the writer's own
+  local words-per-day log. A new kind is a new migration, `ACTIVITY_KINDS`,
+  `KIND_LABELS` and a sentence on /privacy.
+- **The `admin_*` functions are the only cross-account reads**, executable by
+  `service_role` alone, and **none may name `chapter_bodies`, `chapter_notes`
+  or `book_covers`** — /privacy promises the operator sees titles and counts,
+  never prose, and `insights.test.ts` holds the migration to it.
+- **Segments, not scores**: every account is in the first segment whose rule it
+  meets, and the rule is printed beside it. No engagement number.
 
 ### Routes
 
@@ -1320,7 +1348,8 @@ only — the subscription row is written by the webhook and nothing else) ·
 `/book/new` · `/book/import` · `/book/[bookId]` **a redirect into the last
 chapter opened**, not a screen · `/book/[bookId]/chapter/[chapterId]` editor ·
 `/book/[bookId]/read` reading view · `/invite/[token]` (gated, which is what
-makes the link a pointer rather than a credential).
+makes the link a pointer rather than a credential) · `/admin` and
+`/admin/users/[userId]` (the operator only; 404 to everybody else).
 
 The eighteen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
 `paperback`, `listing` · `comps`, `blurb`, `categories`, `covers`,

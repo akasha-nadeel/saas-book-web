@@ -56,6 +56,7 @@ import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 import { type ToolPageProps } from "@/lib/tool-page";
 import { LAUNCH_LIMITS, exportAllowed } from "@/lib/launch";
 import { usePlan } from "@/lib/use-plan";
+import { noteActivity } from "@/lib/activity-log";
 
 /**
  * Getting the book out, as a sequence rather than a wall.
@@ -674,6 +675,9 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
       // Null is a PDF that fell back to the browser's print dialog, where
       // there is nothing we can honestly confirm. See `printBook`.
       if (file) setDone({ format: output, ...file });
+      // Recorded for the print fallback too: the writer exported, whatever
+      // the browser then did with the dialog.
+      noteActivity("export_done", { detail: output, bookId });
     } catch (err) {
       console.error("[export] failed", err);
       /* A refusal is a fact about the book and is shown as written — see

@@ -5,6 +5,7 @@ import { loadFromDisk, syncWithServer } from "@/lib/library-store";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { askToPersist } from "@/lib/storage-space";
 import { flushNow } from "@/lib/sync";
+import { noteActivity } from "@/lib/activity-log";
 
 /**
  * Reconciles this browser with the server once per load, and makes sure queued
@@ -40,12 +41,19 @@ export function LibrarySync() {
 
     void syncWithServer();
 
+    /* The operator's record of a visit. On load, and again when the tab comes
+       back into view, because a session lasts 400 days and a writer who keeps
+       one tab open for a week would otherwise have visited once. Both are held
+       to one row per half hour, here and in the database. */
+    noteActivity("app_open");
+
     // Pushes are batched on a short timer, so a tab closed straight after a
     // save could take the last one with it. visibilitychange fires on the
     // paths that actually matter — closing, switching app, locking the phone —
     // where unload is unreliable on mobile.
     const onHidden = () => {
       if (document.visibilityState === "hidden") flushNow();
+      else noteActivity("app_open");
     };
     document.addEventListener("visibilitychange", onHidden);
     return () => document.removeEventListener("visibilitychange", onHidden);

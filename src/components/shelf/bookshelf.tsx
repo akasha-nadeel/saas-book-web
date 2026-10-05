@@ -432,8 +432,14 @@ const SORT_LABEL: Record<Sort, string> = {
 export function Bookshelf({
   /** The signed-in writer, or null when signed out or accounts are off. */
   account = null,
+  /**
+   * The operator, decided on the server from `ADMIN_EMAILS`. Draws the Admin
+   * row and nothing else — the data behind `/admin` has its own lock.
+   */
+  admin = false,
 }: {
   account?: Account | null;
+  admin?: boolean;
 }) {
   const hydrated = useHydrated();
   /* The band's line distinguishes an empty shelf from one still arriving, and
@@ -516,7 +522,9 @@ export function Bookshelf({
      * neither: one entry, edited in place, so Back still leaves and a reload
      * comes back to where they were.
      */
-    router.replace(next === "overview" ? "/" : `/?area=${next}`, {
+    // The operator's bare `/` is `/admin` (see `app/page.tsx`), so their
+    // Overview has to say its name or pressing it would leave the dashboard.
+    router.replace(next === "overview" && !admin ? "/" : `/?area=${next}`, {
       scroll: false,
     });
     document.getElementById(AREA_SCROLLER)?.scrollTo({ top: 0 });
@@ -978,6 +986,18 @@ export function Bookshelf({
               {/* Getting help, then giving it back. (They sat in the top bar
                   beside New book for part of 2026-09-15 and came back here.) */}
               <div className="mt-3 border-t border-line pt-3 flex flex-col gap-0.5">
+                {/* The operator's way back to `/admin`. Drawn for nobody else;
+                    the page itself is the lock, and answers 404 to anybody
+                    who types the address. */}
+                {admin ? (
+                  <SideItem
+                    icon={shelfIcons.track}
+                    collapsed={sidebarCollapsed}
+                    href="/admin"
+                  >
+                    Admin
+                  </SideItem>
+                ) : null}
                 {/* **`HelpDialog` was reachable from nothing**, which is how it
                     went a fortnight out of date without anybody noticing: it
                     was still rendered on `dialog === "help"` and no control
@@ -1031,6 +1051,7 @@ export function Bookshelf({
         {navigationOpen && (
           <MobileDashboardNavigation
             account={account}
+            admin={admin}
             area={area}
             free={free}
             onArea={goToArea}
@@ -1543,6 +1564,7 @@ export function Bookshelf({
 
 function MobileDashboardNavigation({
   account,
+  admin,
   area,
   free,
   onArea,
@@ -1550,6 +1572,8 @@ function MobileDashboardNavigation({
   onDialog,
 }: {
   account: Account | null;
+  /** The operator — draws the Admin row, as the rail does. */
+  admin: boolean;
   area: Area;
   /** Known to be metered — the drawer draws the same Pro badges the rail does. */
   free: boolean;
@@ -1627,6 +1651,11 @@ function MobileDashboardNavigation({
           </nav>
 
           <div className="mt-4 border-t border-line pt-3 pb-3">
+            {admin ? (
+              <SideItem icon={shelfIcons.track} href="/admin">
+                Admin
+              </SideItem>
+            ) : null}
             <SideItem
               icon={shelfIcons.help}
               onClick={() => showDialog("help")}

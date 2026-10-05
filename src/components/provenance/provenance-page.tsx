@@ -40,6 +40,7 @@ import {
 } from "@/lib/provenance";
 import { useActivity, useHydrated, useShelf } from "@/lib/use-library";
 import { usePlan } from "@/lib/use-plan";
+import { noteActivity } from "@/lib/activity-log";
 
 /**
  * The writing record — the answer to "prove you wrote this".
@@ -79,6 +80,11 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
   const shelf = useShelf();
   const activity = useActivity();
   const book = findBook(shelf, bookId);
+
+  // The operator's record of the screen being opened — the id, nothing from it.
+  useEffect(() => {
+    noteActivity("provenance_open", { bookId });
+  }, [bookId]);
 
   /*
    * **Free reads the last thirty days; Pro reads the whole log** (2026-09-15).

@@ -45,6 +45,7 @@ import {
   UpgradeDialog,
 } from "@/components/upgrade/upgrade-dialog";
 import { usePlan } from "@/lib/use-plan";
+import { noteActivity } from "@/lib/activity-log";
 import { useShelf } from "@/lib/use-library";
 
 /**
@@ -418,6 +419,7 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
 
   const create = () => {
     if (freeBookLimitReached) {
+      noteActivity("limit_hit", { detail: "books" });
       setShowUpgrade(true);
       return;
     }
@@ -457,6 +459,7 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
       return;
     }
     const { bookId, chapterId } = made;
+    noteActivity("book_created", { detail: imported ? "import" : "blank", bookId });
 
     /* **The pages the last two steps asked for, in one commit.** Binding order
        comes from `picksFrom` rather than from the order they were ticked in,

@@ -114,6 +114,7 @@ import {
 } from "@/lib/use-library";
 import { useTypewriter } from "@/lib/use-typewriter";
 import { useAutosave, type SaveStatus } from "@/lib/use-autosave";
+import { noteActivity } from "@/lib/activity-log";
 import { LoadingScreen } from "@/components/loading-screen";
 
 
@@ -515,7 +516,10 @@ export function ChapterEditor({
   // Remembering the open chapter is what lets a book's route land the writer
   // back where they left off, so it is worth a write on every visit.
   useEffect(() => {
-    if (hydrated) touchLastOpened(bookId, chapterId);
+    if (!hydrated) return;
+    touchLastOpened(bookId, chapterId);
+    // The operator's record: which book, by id. Once per half hour at most.
+    noteActivity("book_open", { bookId });
   }, [hydrated, bookId, chapterId]);
 
   // When switching to another tab on the left rail (Consistency check, Notes, Bible, etc.)
@@ -1327,11 +1331,15 @@ function EditorSurface({
        bug upstream rather than something to report at the bottom of the
        screen. */
     save: async ({ doc, words }) => {
-      await saveBody(bookId, chapterId, doc, words);
+      const saved = await saveBody(bookId, chapterId, doc, words);
       /* The rescue slot has done its job the moment the real write lands.
          Left behind, it would be replayed over a *newer* body on the next
          load — the one case where putting writing back would take some away. */
       clearRescue(chapterId);
+      /* That a writing session happened, for the operator's record — never
+         the doc, never the count. After the write, so a save that failed is
+         not a session; `false` is a viewer, who did not write. */
+      if (saved) noteActivity("writing", { bookId });
     },
     /* **The page is closing and there is no time to await anything.** The
        flush below starts an IndexedDB write the browser will not wait for, so

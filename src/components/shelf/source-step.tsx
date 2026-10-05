@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { IMPORT_ACCEPT, ImportError, importFile } from "@/lib/import";
 import type { ImportedBook } from "@/lib/import/split";
 import { plural } from "@/lib/plural";
+import { noteImport } from "@/lib/activity-log";
 
 /**
  * Where a manuscript is coming from. Blank books never reach this step.
@@ -60,7 +61,9 @@ export function SourceStep({
     setBusy(true);
     setError(null);
     try {
-      onBook(await importFile(file));
+      const book = await importFile(file);
+      noteImport(file.name);
+      onBook(book);
     } catch (err) {
       setError(
         err instanceof ImportError
