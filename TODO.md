@@ -3389,6 +3389,47 @@ their characters and bible are **per-novel**; ours read across a series with
 transitive alias merging (`series.ts`), which is the one place we are already
 ahead on their flagship feature.
 
+## Built 2026-10-06 — Amazon's list for Pro, Apple's unlimited for everyone
+
+**Built and tested, not yet live.** The owner decided:
+- Free gets the price check unlimited on Apple Books' lists. The 3-a-day
+  limit is gone.
+- Pro gets Amazon's own Kindle top 100 for the genre, shown first:
+  - real Amazon prices
+  - how many books are in Kindle Unlimited
+  - self-published, traditional and Amazon's own imprints kept apart
+  - series and book 1 prices, length bands, and paperback prices
+- It refreshes weekly, and a genre is fetched only when a Pro writer opens
+  it.
+- Free writers see a locked "Amazon (Pro)" tab that opens the upgrade offer.
+
+**How it holds together:**
+- `/api/price-shelf/amazon` is checked on the server (`requireProData`),
+  because the data is paid for per request.
+- It answers `private, no-store`.
+- The data comes from OpenWeb Ninja (`amazon-source.ts`) and is cached on the
+  server: lists for 7 days, each book for 30.
+- The plan rows, pricing cards, terms, help, billing page, landing row,
+  privacy page and settings example all say the new thing.
+
+**Tested** against a stand-in that replays 100 real Amazon books recorded
+the same day, at no cost:
+- First open: 2 list calls and 100 book calls. A second open: 0.
+- Three sides came out at $4.99 / $5.49 / $4.99.
+- "80 of the 100 are in Kindle Unlimited".
+- Fits a phone.
+
+**Before it can go live (owner):**
+1. Move OpenWeb Ninja to pay-as-you-go. **CUSTOM-PAYG is $0.003 a request.**
+   The free 100 a month cannot fill one genre: about 102 requests, because
+   each book counts. Weekly for all 27 genres is about $6 a month.
+2. Add `OPENWEBNINJA_API_KEY` to Vercel production, then redeploy.
+3. Confirm the eight Amazon category numbers found by search on 2026-10-06
+   (`shelves.ts` names them) once the paid plan is on. Each is one request.
+4. Rotate the Apify, OpenWeb Ninja and Bright Data keys pasted in chat.
+5. Check with a free account that the Amazon tab opens the offer and that
+   `/api/price-shelf/amazon` answers 402.
+
 ## Shipped 2026-10-05 — the price check moves to best-seller lists
 
 The owner asked whether the price check really helped, and the honest answer

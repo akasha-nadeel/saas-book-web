@@ -122,7 +122,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "The price check",
-        desc: `What the top 100 best-selling ebooks in your genre cost, from Apple Books' US store: a middle price for self-published books and one for traditional publishers, and every book listed. Try a price to see where it sits and what Amazon would pay you for a Kindle sale or a paperback. Kindle Unlimited books are sold only on Amazon, so they are not on the list. There is no recommended price and there will not be one. ${TIER_NAMES.free} runs ${plural(FREE_LIMITS.priceCheck.free, "check")} a day.`,
+        desc: `What the top 100 best-selling ebooks in your genre cost: a middle price for self-published books and one for traditional publishers, and every book listed. Try a price to see where it sits and what Amazon would pay you for a Kindle sale or a paperback. ${TIER_NAMES.free} reads Apple Books' US lists as often as you like; Kindle Unlimited books are sold only on Amazon, so they are not on them. ${TIER_NAMES.pro} adds Amazon's own top 100, refreshed weekly: how many are in Kindle Unlimited, series and book 1 prices, lengths and paperback prices. There is no recommended price and there will not be one.`,
       },
       {
         name: "The writing record",
@@ -139,11 +139,11 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     items: [
       {
         name: TIER_NAMES.free,
-        desc: `Free, no card. ${plural(TIER_LIMITS.free.books ?? 0, "book")}, unlimited chapters and words, importing, syncing, every export format, ${plural(FREE_LIMITS.titleCheck.free, "title check")} and ${plural(FREE_LIMITS.priceCheck.free, "price check")} a day, ${plural(FREE_LIMITS.ideas.free, "parked idea")} at a time, ${FREE_CHECKS.length} consistency checks and the last ${FREE_RECORD_DAYS} days of the writing record.`,
+        desc: `Free, no card. ${plural(TIER_LIMITS.free.books ?? 0, "book")}, unlimited chapters and words, importing, syncing, every export format, ${plural(FREE_LIMITS.titleCheck.free, "title check")} a day, unlimited price checks on Apple Books' lists,${plural(FREE_LIMITS.ideas.free, "parked idea")} at a time, ${FREE_CHECKS.length} consistency checks and the last ${FREE_RECORD_DAYS} days of the writing record.`,
       },
       {
         name: TIER_NAMES.pro,
-        desc: `Everything on Free, with unlimited books, title and price checks and parked ideas, all ${ALL_CHECKS.length} consistency checks, twelve months of the writing record with its fingerprint, and paperback setup.`,
+        desc: `Everything on Free, with unlimited books, title checks and parked ideas, Amazon's best-seller prices and Kindle Unlimited in the price check, all ${ALL_CHECKS.length} consistency checks, twelve months of the writing record with its fingerprint, and paperback setup.`,
       },
       {
         name: "Not on sale yet",

@@ -1,7 +1,10 @@
 # Price check rebuild: real best-seller prices, and what the writer keeps — design note, 2026-10-05
 
-**Status: the free Apple version was built on 2026-10-05.** Amazon's own lists
-come later, once paying users can fund a data company.
+**Status:**
+- **The free Apple version** was built on 2026-10-05.
+- **Amazon's list for Pro** (OpenWeb Ninja, weekly, server-checked) was built
+  and tested on 2026-10-06. It goes live when the owner moves OpenWeb Ninja
+  to pay-as-you-go and adds the key to production. `TODO.md` has the steps.
 
 **What changed while building, on measurement:**
 - **The series section was dropped.** Only 125 of 1,800 Apple listings name a
@@ -297,6 +300,87 @@ appear: the Kindle Unlimited count, the list's lengths, and other books' paperba
     are in Kindle Unlimited. **Not worth building on.** Keep the Apple version.
     Revisit only with a source that reads Amazon's book pages reliably, which
     means residential proxies and a paid tool, and test it the same way first.
+- **OpenWeb Ninja passed the same test on 2026-10-06**, on its free Basic plan
+  (100 requests a month, hard limit, no card).
+  - It is the Real-Time Amazon Data API at
+    `api.openwebninja.com/realtime-amazon-data`, with an `x-api-key` header
+    and the key in `.env.local` as `OPENWEBNINJA_API_KEY`.
+  - **`/product-details?asin=A,B,C`** takes up to 10 books in one request and
+    returns:
+    - the Kindle price
+    - **`kindle_unlimited: true`** for *Sweet Ruin* and *Hats off to Boo*,
+      which matches Amazon; the field is absent for *We Chase Shadows*, which
+      is correct
+    - `product_information`, holding:
+      - `Publisher` — "Pamela Dorman Books" on the Penguin title, and **absent
+        on both self-published titles**, which is how Amazon lists KDP books
+      - `Print length`
+      - `File size` — enough for the exact delivery charge
+      - the series ("Book 1 of 2": "Makov Bratva")
+    - **`book_formats`**: paperback and hardcover prices and ASINs. A Kindle
+      Unlimited book's Kindle price shows here as $0.00; `product_price`
+      keeps the list price.
+  - **`/best-sellers?category=digital-text/<node>&type=BEST_SELLERS&page=N`**
+    returns 50 books a page with rank, ASIN, title and price. Cozy Mystery
+    page 1 matched Amazon: *Swamp Shoot* #1, *We Chase Shadows* #5. So a
+    genre's top 100 is 2 requests, and its details are 10.
+  - **The 100-book check (2026-10-06, Cozy Mystery, about 13 of the 100 free
+    requests)** — 2 best-seller pages and 10 detail requests of 10 books each.
+    - ~~A 10-book request counts as one request.~~ **Wrong, corrected the same
+      day: each book almost certainly counts.**
+      - The two tests together asked about roughly 105 books plus 3 list
+        pages, and every call succeeded. That was read as proof of batching.
+      - The very next calls — eight one-page list requests — all answered
+        `429 Too Many Requests`, from Amazon API Gateway's usage-plan limiter.
+      - A plan that "stops hard at 100", counting per book, which settles a
+        little late, explains both.
+      - Confirm on the OpenWeb Ninja dashboard before relying on either
+        reading.
+    - **Coverage:**
+      - price 100, page count 100, file size 100
+      - series 83
+      - paperback price 83 (the rest are ebook-only)
+      - publisher named 73 (27 show none)
+    - **Kindle Unlimited: 80 of 100**, and the flag held up against the one
+      free check that exists. A self-published Kindle Unlimited book must be
+      sold only on Amazon, and none of the self-published books flagged in
+      it (26 with no publisher, plus the writers' own imprints) was found on
+      Apple Books.
+      - The 10 flagged books that Apple *does* sell are all from traditional
+        houses: Harper, William Morrow, Kensington, Pinnacle, Poisoned Pen,
+        HarperVia, and Amazon's Thomas & Mercer. Those houses put chosen
+        titles into Kindle Unlimited by agreement while selling them
+        elsewhere, so this is not an error.
+      - All 20 not-flagged books were on Apple, which is consistent.
+    - **Self-published vs traditional needs three changes before it is used
+      on Amazon data:**
+      - a missing publisher means self-published (26 of 27 such books are in
+        Kindle Unlimited)
+      - Amazon's own imprints get a side of their own: Thomas & Mercer, Lake
+        Union, Amazon Original Stories
+      - these join `publishers.ts`: Poisoned Pen Press (Sourcebooks), Pinnacle
+        (Kensington), HarperVia (HarperCollins), Pamela Dorman Books (Viking)
+      - Writers' own imprints ("J&R Publishing", "Tonya Kappes Books") are
+        correctly left self-published.
+  - **Cost, counted per book (the likely reading):** a genre's top 100 with full
+    details is 102 requests — 2 list pages and 100 books.
+    - All 27 genres once: about 2,750 requests, $8.25 at $0.003 each.
+    - Weekly, caching each book's details for 30 days so only new books are
+      looked up (roughly 15 per genre per week): about 2,000 requests a month,
+      **about $6**, or $10 at $0.005.
+    - Daily: about $17 a month.
+    - **The free 100 requests cannot fill even one genre**, so the Amazon view
+      needs a pay-as-you-go plan before it can serve anyone.
+    - The figures under this heading that said 12 requests a genre ($1.50 a
+      month weekly) assumed batching.
+    - Batched as 1: weekly about $2 a month, daily about $10, at $0.005 per
+      request.
+    - Counted per book: weekly about $10, daily about $25–28.
+    - Both assume a guessed 15% of each list being new books each week.
+  - **What it would change in the code:**
+    - Treat a missing `Publisher` as self-published.
+    - Add more imprints to `publishers.ts` — "Pamela Dorman Books" (Viking,
+      PRH) would land on the wrong side today.
 - **Facts recorded that day:** Amazon's Product Advertising API was retired in 2026. Its
   replacement, the Creators API, needs an Associates account with recent qualifying sales, so it
   is not an option yet.

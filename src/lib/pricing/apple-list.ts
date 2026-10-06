@@ -21,6 +21,17 @@ export interface ListedBook {
   cover: string | null;
   /** The book's page in the store. */
   url: string | null;
+  /*
+   * The fields below come only from Amazon's data (`amazon-list.ts`). Apple's
+   * feed carries none of them and its parser leaves them out, so absent means
+   * "this source cannot say" — never "no". `kindleUnlimited: null` is a book
+   * whose details did not arrive.
+   */
+  kindleUnlimited?: boolean | null;
+  pages?: number | null;
+  series?: { name: string; number: number; of: number } | null;
+  paperbackPrice?: number | null;
+  fileSizeMb?: number | null;
 }
 
 type Json = Record<string, unknown>;

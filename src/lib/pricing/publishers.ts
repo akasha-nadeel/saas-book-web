@@ -17,12 +17,26 @@
  * but not "Mira Lyn Kelly". The test walks both sides.
  */
 
-export type PublisherGroup = "traditional" | "independent";
+export type PublisherGroup = "traditional" | "independent" | "amazon";
 
 export const GROUP_LABEL: Record<PublisherGroup, string> = {
   independent: "Self-published & small presses",
   traditional: "Traditional publishers",
+  amazon: "Amazon’s own publishers",
 };
+
+/**
+ * Amazon Publishing's imprints, which are neither self-published nor a
+ * traditional house selling everywhere: their ebooks are Amazon's own and sit
+ * in Kindle Unlimited. They only appear on Amazon's lists, so on Apple's this
+ * side is simply empty. Checked before `TRADITIONAL`.
+ */
+const AMAZON: readonly RegExp[] = [
+  /^thomas & mercer\b/, /^montlake\b/, /^lake union\b/, /^47north\b/,
+  /^amazon ?crossing\b/, /^amazon publishing\b/, /^amazon original stories\b/,
+  /^amazon encore\b/, /^little a\b/, /^skyscape\b/, /^jet city\b/,
+  /^grand harbor\b/, /^apub\b/,
+];
 
 const TRADITIONAL: readonly RegExp[] = [
   // Penguin Random House
@@ -70,13 +84,23 @@ const TRADITIONAL: readonly RegExp[] = [
      self-published middle for epic fantasy up to $11.49. Boldwood, Tule and
      Bindery, which price at $0.99–$4.99, stay where they are. */
   /^entangled\b/, /^storytide\b/,
+  /* Four the Amazon check put on the wrong side (2026-10-06): Poisoned Pen is
+     Sourcebooks', Pinnacle is Kensington's, HarperVia is HarperCollins' and
+     Pamela Dorman Books is a Viking imprint at Penguin Random House. */
+  /^poisoned pen\b/, /^pinnacle\b/, /^harpervia\b/, /^pamela dorman\b/,
 ];
 
 export function publisherGroup(
   publisher: string | null | undefined,
 ): PublisherGroup {
+  /* No publisher reads as self-published, and on Amazon that is measured
+     rather than assumed: Amazon lists a KDP ebook with no publisher line. In
+     the 100-book check (2026-10-06), 26 of the 27 such books were in Kindle
+     Unlimited, and none of them was on sale at Apple — which is what KDP
+     Select's exclusivity requires of a self-published book. */
   if (!publisher) return "independent";
   const name = publisher.trim().toLowerCase().replace(/[’‘]/g, "'");
+  if (AMAZON.some((pattern) => pattern.test(name))) return "amazon";
   return TRADITIONAL.some((pattern) => pattern.test(name))
     ? "traditional"
     : "independent";

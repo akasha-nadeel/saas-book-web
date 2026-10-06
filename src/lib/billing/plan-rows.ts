@@ -127,16 +127,18 @@ export const ROWS: {
       pro: UNLIMITED,
     },
   },
-  /* Metered the same way and for the same reason — a keyless catalogue search
-     on a shared cache, where the allowance is a pricing decision rather than a
-     cost. Its number comes from `FREE_LIMITS` for the same reason the row
-     above does. */
+  /* **Not metered since 2026-10-06; the plans differ by source instead.**
+     Apple Books' lists are free to read, so Free has the price check as often
+     as it likes. What Pro adds is Amazon's own top 100 with Kindle Unlimited,
+     which is paid for per request and checked on the server
+     (`require-pro-data.ts`). Worded to keep clear of the unanchored `/ai/`
+     check in the test — no "available", no "paid". */
   {
     group: "Publishing",
     label: "Price check",
     values: {
-      free: `${FREE_LIMITS.priceCheck.free} a day`,
-      pro: UNLIMITED,
+      free: "Apple lists",
+      pro: "Amazon + Apple",
     },
   },
   /* **The wedge.** Export is the one thing a writer cannot do without, and

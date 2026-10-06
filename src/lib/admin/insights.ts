@@ -446,7 +446,11 @@ const DETAIL_LABELS: Record<string, string> = {
   annual: "annual",
   books: "book limit",
   titleCheck: "title checks",
-  priceCheck: "price checks",
+  /* Until 6 Oct 2026 the price check's daily limit; since then, a free writer
+     pressing its Amazon tab. Reused rather than renamed because the details
+     are also a CHECK constraint in the database, and a new word would need a
+     migration for one counter. */
+  priceCheck: "price check (Amazon tab)",
   comps: "comparable titles",
   covers: "cover checks",
   blurb: "blurb",

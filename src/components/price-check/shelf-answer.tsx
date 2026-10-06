@@ -1,10 +1,8 @@
 import { MIN_PRICES } from "@/lib/comps/price-check";
+import type { ListedBook } from "@/lib/pricing/apple-list";
 import { GROUP_LABEL, type PublisherGroup } from "@/lib/pricing/publishers";
-import type { ShelfFacts } from "@/lib/pricing/shelf-facts";
+import { kindleUnlimitedCount, type ShelfFacts } from "@/lib/pricing/shelf-facts";
 import { money } from "./money";
-
-/** Self-published first: it is the side most writers here are pricing into. */
-const ORDER: PublisherGroup[] = ["independent", "traditional"];
 
 /**
  * The answer: one middle price for each side of the trade.
@@ -14,32 +12,62 @@ const ORDER: PublisherGroup[] = ["independent", "traditional"];
  * recommendation, and there is no "typical" or "sweet spot" wording — the
  * middle half is named for what it is.
  *
- * **When the self-published side is too thin, Amazon is the next step, and
- * the card says so with a button rather than a dash** (2026-10-06). In
- * thriller, historical, literary and young adult fiction, Apple's top 100
- * holds two to eighteen self-published books — many of them sell only on
- * Amazon, through Kindle Unlimited, where this list cannot see them. A dash
- * there was an honest answer that left the writer nowhere to go.
+ * **Amazon's own publishers are a third tile only when the list has any**,
+ * which in practice means Amazon's list: their ebooks are Amazon's own and are
+ * not sold at Apple.
  *
- * **The Kindle Unlimited sentence is not optional.** Apple's list cannot hold
- * those books, and a writer reading this card without it would underestimate
- * how crowded the cheap end is.
+ * **The Kindle Unlimited sentence depends on the list.** On Amazon's it is the
+ * count — the figure writers asked for most. On Apple's it says plainly that
+ * those books cannot be there, so a writer does not read the Apple list as the
+ * whole market.
+ *
+ * **When the self-published side is too thin on Apple's list, the next step is
+ * Amazon**: a button that switches to the Amazon tab for a Pro writer, and a
+ * link to Amazon's own list for everyone else.
  */
 export function ShelfAnswer({
   facts,
+  books,
+  source,
   amazon,
+  onAmazon,
 }: {
   facts: ShelfFacts;
+  books: readonly ListedBook[];
+  source: "apple" | "amazon";
   amazon: { url: string; label: string };
+  /** Pro only: switch to the Amazon tab instead of leaving for Amazon's site. */
+  onAmazon?: () => void;
 }) {
+  const order: PublisherGroup[] = [
+    "independent",
+    "traditional",
+    ...(facts.groups.amazon.count > 0 ? (["amazon"] as const) : []),
+  ];
+  const ku = kindleUnlimitedCount(books);
+
+  const amazonAction = (className: string) =>
+    onAmazon ? (
+      <button type="button" onClick={onAmazon} className={className}>
+        See Amazon&rsquo;s list for this genre
+      </button>
+    ) : (
+      <a href={amazon.url} target="_blank" rel="noreferrer" className={className}>
+        {amazon.label}
+        <span aria-hidden="true"> &#8599;</span>
+      </a>
+    );
+
   return (
     <>
-      <div className="mt-5 grid gap-3 @2xl:grid-cols-2">
-        {ORDER.map((group) => {
+      <div
+        className={`mt-5 grid gap-3 ${order.length === 3 ? "@3xl:grid-cols-3" : "@2xl:grid-cols-2"}`}
+      >
+        {order.map((group) => {
           const side = facts.groups[group];
           const s = side.summary;
 
-          if (!s && group === "independent") {
+          if (!s && group === "independent" && source === "apple") {
             return (
               <div
                 key={group}
@@ -55,16 +83,9 @@ export function ShelfAnswer({
                   Self-published books in this genre may be selling only on
                   Amazon, where Apple&rsquo;s list can&rsquo;t see them.
                 </p>
-                <a
-                  href={amazon.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-1.5 self-start
-                             rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink"
-                >
-                  {amazon.label}
-                  <span aria-hidden="true">&#8599;</span>
-                </a>
+                {amazonAction(
+                  "mt-4 inline-flex min-h-11 items-center justify-center gap-1.5 self-start rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink",
+                )}
               </div>
             );
           }
@@ -114,26 +135,32 @@ export function ShelfAnswer({
         </p>
       )}
 
-      <p className="mt-4 max-w-prose text-sm text-muted">
-        Kindle Unlimited books are sold only on Amazon, so none of them are on
-        Apple&rsquo;s list, and self-published books may be fewer here than on
-        Amazon.
-        {/* Only when the card above has not already drawn the same link as
-            its button — the same place twice, a few lines apart. */}
-        {facts.groups.independent.summary && (
-          <>
-            {" "}
-            <a
-              href={amazon.url}
-              target="_blank"
-              rel="noreferrer"
-              className="font-semibold text-accent hover:underline"
-            >
-              {amazon.label}&nbsp;&#8599;
-            </a>
-          </>
-        )}
-      </p>
+      {source === "amazon" ? (
+        <p className="mt-4 max-w-prose text-sm text-fg">
+          <span className="font-semibold tabular-nums">
+            {ku.inIt} of the {ku.known === ku.of ? ku.of : ku.known}
+          </span>{" "}
+          {ku.known === ku.of
+            ? "books are in Kindle Unlimited,"
+            : `books Amazon gave details for are in Kindle Unlimited (${ku.of - ku.known} more had none),`}{" "}
+          where Amazon also pays for each page read. A self-published book in
+          it may be sold only on Amazon.
+        </p>
+      ) : (
+        <p className="mt-4 max-w-prose text-sm text-muted">
+          Kindle Unlimited books are sold only on Amazon, so none of them are on
+          Apple&rsquo;s list, and self-published books may be fewer here than on
+          Amazon.
+          {/* Only when the card above has not already drawn the same step as
+              its button — the same place twice, a few lines apart. */}
+          {facts.groups.independent.summary && (
+            <>
+              {" "}
+              {amazonAction("font-semibold text-accent hover:underline")}
+            </>
+          )}
+        </p>
+      )}
     </>
   );
 }

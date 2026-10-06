@@ -450,9 +450,12 @@ export function BillingPage({
                   until you are under that.
                 </li>
                 <li>
-                  {plural(FREE_LIMITS.titleCheck.free, "title check")} and{" "}
-                  {plural(FREE_LIMITS.priceCheck.free, "price check")} a day
+                  {plural(FREE_LIMITS.titleCheck.free, "title check")} a day
                   instead of unlimited.
+                </li>
+                <li>
+                  Price checks on Apple Books&rsquo; lists only, without
+                  Amazon&rsquo;s prices and Kindle Unlimited.
                 </li>
                 <li>
                   Room for {plural(FREE_LIMITS.ideas.free, "parked idea")} at a

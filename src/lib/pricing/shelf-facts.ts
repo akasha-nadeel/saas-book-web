@@ -69,11 +69,18 @@ export function shelfFacts(books: readonly ListedBook[]): ShelfFacts {
     groups: {
       independent: side("independent"),
       traditional: side("traditional"),
+      amazon: side("amazon"),
     },
   };
 }
 
-/** One whole dollar of the chart: books priced from `from` to `from + 0.99`. */
+/**
+ * One whole dollar of the chart: books priced from `from` to `from + 0.99`.
+ *
+ * Two sides only, because the chart has two halves: self-published books above
+ * the line, every kind of publisher below it. Amazon’s own imprints are
+ * counted below, with the houses; the tiles above the chart keep them apart.
+ */
 export interface PriceBin {
   from: number;
   independent: number;
@@ -94,7 +101,8 @@ export function priceBins(
   }));
   for (const book of inCurrency(books)) {
     const at = Math.min(ceiling, Math.floor(book.price));
-    bins[at][publisherGroup(book.publisher)] += 1;
+    const side = publisherGroup(book.publisher);
+    bins[at][side === "independent" ? "independent" : "traditional"] += 1;
   }
   return bins;
 }
@@ -131,5 +139,101 @@ export function standingBySide(
       kept.filter((b) => publisherGroup(b.publisher) === group),
       price,
     );
-  return { independent: side("independent"), traditional: side("traditional") };
+  return {
+    independent: side("independent"),
+    traditional: side("traditional"),
+    amazon: side("amazon"),
+  };
+}
+
+/*
+ * The facts below need Amazon’s data. On Apple’s list every field they read is
+ * absent, so each answers with zero counts and no summaries — never a guess.
+ */
+
+export interface KindleUnlimitedCount {
+  /** Books flagged as in Kindle Unlimited. */
+  inIt: number;
+  /** Books whose flag arrived at all. Fewer than `of` when some details failed. */
+  known: number;
+  of: number;
+}
+
+export function kindleUnlimitedCount(books: readonly ListedBook[]): KindleUnlimitedCount {
+  const kept = inCurrency(books);
+  return {
+    inIt: kept.filter((b) => b.kindleUnlimited === true).length,
+    known: kept.filter((b) => typeof b.kindleUnlimited === "boolean").length,
+    of: kept.length,
+  };
+}
+
+const paidPrices = (books: readonly ListedBook[]) =>
+  books.filter((b) => b.price > 0).map((b) => b.price);
+
+const factsOf = (prices: number[]): GroupFacts => ({
+  count: prices.length,
+  summary: summarise(prices),
+});
+
+export interface SeriesSplit {
+  /** Book 1 of a series. */
+  firsts: GroupFacts;
+  /** Book 2 and on. */
+  later: GroupFacts;
+  /** Books the details named no series for. */
+  standalone: number;
+}
+
+/**
+ * What first books in a series charge against later ones — the "make book 1
+ * cheap" question, answered with what the list actually charges rather than
+ * with advice.
+ */
+export function seriesSplit(books: readonly ListedBook[]): SeriesSplit {
+  const kept = inCurrency(books);
+  const inSeries = kept.filter((b) => b.series);
+  return {
+    firsts: factsOf(paidPrices(inSeries.filter((b) => b.series!.number === 1))),
+    later: factsOf(paidPrices(inSeries.filter((b) => b.series!.number > 1))),
+    standalone: kept.filter((b) => b.series === null).length,
+  };
+}
+
+export interface LengthBand extends GroupFacts {
+  label: string;
+}
+
+const BANDS: { label: string; from: number; to: number }[] = [
+  { label: "Under 200 pages", from: 0, to: 199 },
+  { label: "200–399 pages", from: 200, to: 399 },
+  { label: "400 pages and over", from: 400, to: Infinity },
+];
+
+/** What short, standard and long books on the list charge. Amazon’s print length. */
+export function lengthBands(books: readonly ListedBook[]): LengthBand[] {
+  const kept = inCurrency(books).filter((b) => typeof b.pages === "number");
+  return BANDS.map((band) => ({
+    label: band.label,
+    ...factsOf(paidPrices(kept.filter((b) => b.pages! >= band.from && b.pages! <= band.to))),
+  }));
+}
+
+/** What the paperbacks of each side’s books cost, where there is one. */
+export function paperbackBySide(
+  books: readonly ListedBook[],
+): Record<PublisherGroup, GroupFacts> {
+  const kept = inCurrency(books);
+  const side = (group: PublisherGroup) =>
+    factsOf(
+      kept
+        .filter((b) => publisherGroup(b.publisher) === group)
+        .map((b) => b.paperbackPrice)
+        .filter((p): p is number => typeof p === "number" && p > 0),
+    );
+  return {
+    independent: side("independent"),
+    traditional: side("traditional"),
+    amazon: side("amazon"),
+  };
 }

@@ -55,7 +55,7 @@ import {
  * on both plans now, so the refusal it headlined cannot happen. Gone rather
  * than left as a dialog for a state the app has no way to reach.
  */
-export type UpgradeReason = "books" | "restore" | "checks" | "themes";
+export type UpgradeReason = "books" | "restore" | "checks" | "themes" | "amazon";
 
 /**
  * Which plan each refusal is answered by.
@@ -69,6 +69,7 @@ const SELLS: Record<UpgradeReason, PaidTier> = {
   restore: "pro",
   checks: "pro",
   themes: "pro",
+  amazon: "pro",
 };
 
 /* **Each headline names the plan it is selling**, and the count it quotes is
@@ -95,6 +96,13 @@ const HEADLINES: Record<UpgradeReason, { lead: string; title: string }> = {
   themes: {
     lead: "Every colour, and both dark papers.",
     title: `${TIER_NAMES.free} comes with ${plural(FREE_TINTS.length, "colour")} and ${FREE_PAPERS.length} papers. ${TIER_NAMES.pro} opens all ${SHOWN_TINTS.length} and all ${FREE_PAPERS.length + PRO_PAPERS.length}.`,
+  },
+  /* Pressed on the price check's Amazon tab (2026-10-06). It hides nothing:
+     the Apple list stays the writer's, unlimited. What it sells is Amazon's
+     own top 100, which costs money per request and is checked on the server. */
+  amazon: {
+    lead: "Amazon's own best sellers, with Kindle Unlimited.",
+    title: `${TIER_NAMES.free} reads Apple Books' lists. ${TIER_NAMES.pro} adds Amazon's top 100 for your genre: how many are in Kindle Unlimited, what series and paperbacks cost, refreshed weekly.`,
   },
 };
 
@@ -208,6 +216,7 @@ const ROW_ICON: Record<string, React.ReactNode> = {
   "Autosave and sync": icons.sync,
   Export: icons.word,
   "Title check": icons.books,
+  "Price check": icons.books,
   "Consistency check": icons.everything,
   Ideas: icons.ideas,
   "Paperback setup": icons.ruler,

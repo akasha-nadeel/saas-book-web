@@ -31,7 +31,7 @@ const LADDER = [
 const cents = (n: number) => `${Math.round(n * 100)}¢`;
 
 /** Self-published first: it is the side most writers here are pricing into. */
-const SIDES: PublisherGroup[] = ["independent", "traditional"];
+const SIDES: PublisherGroup[] = ["independent", "traditional", "amazon"];
 
 /** "30 cost less, 8 the same, 3 more" — or that the side has no books at all. */
 function compared(s: Standing): string {
@@ -162,7 +162,9 @@ export function YourPrice({ books }: { books: readonly ListedBook[] }) {
                 a $4.99 indie novel was being measured against $12.99 trade
                 editions it is not competing with. */}
             <ul className="mt-1 space-y-1.5 text-sm text-fg">
-              {SIDES.map((side) => (
+              {SIDES.filter(
+                (side) => side !== "amazon" || where.amazon.cheaper + where.amazon.same + where.amazon.dearer > 0,
+              ).map((side) => (
                 <li key={side}>
                   <span className="font-semibold">{GROUP_LABEL[side]}:</span>{" "}
                   <span className="tabular-nums">{compared(where[side])}</span>

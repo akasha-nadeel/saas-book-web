@@ -131,6 +131,16 @@ export default function PrivacyPage() {
               so Apple sees that your browser asked for them.
             </>,
             <>
+              <Term>The price check&rsquo;s Amazon view</Term> (Pro) — our server
+              asks OpenWeb Ninja, a data company, for Amazon&rsquo;s best-seller
+              list in the genre you pick and for the details of the books on it.
+              Only the genre and those books&rsquo; Amazon ids are sent; nothing
+              about you or your book. The answers are kept on our server for up
+              to a week (a book&rsquo;s details for up to a month) and shared by
+              every Pro member who opens the same genre. The covers load
+              straight from Amazon&rsquo;s servers.
+            </>,
+            <>
               <Term>Dictation</Term> — the microphone buttons use your
               browser&rsquo;s own speech recognition, not ours. While you are
               dictating, the browser sends the audio to its maker&rsquo;s

@@ -9,7 +9,8 @@ import type { PriceBin } from "@/lib/pricing/shelf-facts";
  * side of one line.
  *
  * **Position does the separating, not colour.** Self-published books stand
- * above the line and traditional ones hang below it. So the two clusters a
+ * above the line and publishers’ books — traditional houses and Amazon’s own
+ * imprints — hang below it. So the two clusters a
  * genre usually has can be told apart without telling hues apart — in either
  * theme, for any eye — and the chart needs no palette outside the app's own
  * tokens.
@@ -162,7 +163,7 @@ export function PriceHistogram({
           <>
             <span className="font-semibold text-fg">{binLabel(shown, ceiling)}</span>
             {": "}
-            {shown.independent} self-published, {shown.traditional} traditional
+            {shown.independent} self-published, {shown.traditional} from publishers
           </>
         ) : (
           "Point at a bar, or tap it, to see how many books sit at that price."
@@ -176,7 +177,7 @@ export function PriceHistogram({
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm bg-muted/60" />
-          Traditional publishers, below it
+          Publishers, below it
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm border border-line bg-raised" />

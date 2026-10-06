@@ -17,11 +17,19 @@
  * - wholesome romance, family fiction and detective novels, with too few
  *   self-published books to add anything
  *
- * **Nothing from Amazon is ever fetched here.** `amazonBestsellers` names
- * Amazon's own Kindle top-100 page for the same genre, found by search and
- * recorded with Amazon's own name for it. Where no page matched cleanly the
- * field is left out and the link falls back to a Kindle-store search, saying
- * that it is one.
+ * **`amazonBestsellers` is Amazon's own Kindle top-100 list for the genre**,
+ * found by search and recorded under Amazon's own name for it.
+ * - It is the link a free writer is sent to.
+ * - It is the category Pro's Amazon view reads (`amazon-source.ts`).
+ * - Every shelf has one since 2026-10-06. Nineteen were found on 2026-10-05.
+ *   The last eight — paranormal and historical romance, LGBTQ+ romance,
+ *   action & adventure, horror, historical fiction, literary fiction and
+ *   memoir — were found by search the next day. A live request to confirm
+ *   them was refused because the free plan's allowance had run out, so
+ *   **confirm those eight** (OpenWeb Ninja's `category_name` names the list)
+ *   the first time a paid plan is on.
+ * - `amazonLink` still falls back to a labelled Kindle-store search for any
+ *   shelf without one.
  */
 
 export const SHELF_FAMILIES = [
@@ -55,12 +63,12 @@ export const BESTSELLER_SHELVES: readonly BestsellerShelf[] = [
   { id: "contemporary-romance", label: "Contemporary romance", family: "Romance", appleGenre: 10057, amazonWords: "contemporary romance", amazonBestsellers: { node: "158568011", name: "Contemporary Romance" } },
   { id: "romantic-comedy", label: "Romantic comedy", family: "Romance", appleGenre: 11042, amazonWords: "romantic comedy", amazonBestsellers: { node: "6487841011", name: "Romantic Comedy" } },
   { id: "romantic-suspense", label: "Romantic suspense", family: "Romance", appleGenre: 10061, amazonWords: "romantic suspense", amazonBestsellers: { node: "158574011", name: "Romantic Suspense" } },
-  { id: "paranormal-romance", label: "Paranormal romance", family: "Romance", appleGenre: 10058, amazonWords: "paranormal romance" },
-  { id: "historical-romance", label: "Historical romance", family: "Romance", appleGenre: 10059, amazonWords: "historical romance" },
+  { id: "paranormal-romance", label: "Paranormal romance", family: "Romance", appleGenre: 10058, amazonWords: "paranormal romance", amazonBestsellers: { node: "6190484011", name: "Paranormal Romance" } },
+  { id: "historical-romance", label: "Historical romance", family: "Romance", appleGenre: 10059, amazonWords: "historical romance", amazonBestsellers: { node: "158571011", name: "Historical Romance" } },
   { id: "military-romance", label: "Military romance", family: "Romance", appleGenre: 11233, amazonWords: "military romance", amazonBestsellers: { node: "6487836011", name: "Military Romance" } },
   { id: "western-romance", label: "Western romance", family: "Romance", appleGenre: 10062, amazonWords: "western romance", amazonBestsellers: { node: "6190489011", name: "Western & Frontier Romance" } },
   { id: "holiday-romance", label: "Holiday romance", family: "Romance", appleGenre: 11231, amazonWords: "holiday romance", amazonBestsellers: { node: "6487831011", name: "Holiday Romance" } },
-  { id: "lgbtq-romance", label: "LGBTQIA+ romance", family: "Romance", appleGenre: 11043, amazonWords: "lgbtq romance" },
+  { id: "lgbtq-romance", label: "LGBTQIA+ romance", family: "Romance", appleGenre: 11043, amazonWords: "lgbtq romance", amazonBestsellers: { node: "10886541011", name: "LGBTQ+ Romance" } },
   { id: "new-adult-romance", label: "New adult romance", family: "Romance", appleGenre: 11040, amazonWords: "new adult romance", amazonBestsellers: { node: "6487838011", name: "New Adult & College Romance" } },
   { id: "erotic-romance", label: "Erotic romance", family: "Romance", appleGenre: 10056, amazonWords: "erotic romance", amazonBestsellers: { node: "7620225011", name: "Romantic Erotica" } },
   // Mystery & thriller
@@ -78,12 +86,12 @@ export const BESTSELLER_SHELVES: readonly BestsellerShelf[] = [
   { id: "historical-fantasy", label: "Historical fantasy", family: "Fantasy & sci-fi", appleGenre: 11003, amazonWords: "historical fantasy", amazonBestsellers: { node: "158582011", name: "Historical Fantasy" } },
   { id: "science-fiction", label: "Science fiction", family: "Fantasy & sci-fi", appleGenre: 10064, amazonWords: "science fiction", amazonBestsellers: { node: "158591011", name: "Science Fiction" } },
   // More fiction & memoir
-  { id: "action-adventure", label: "Action & adventure", family: "More fiction & memoir", appleGenre: 10039, amazonWords: "action adventure fiction" },
-  { id: "horror", label: "Horror", family: "More fiction & memoir", appleGenre: 10048, amazonWords: "horror" },
-  { id: "historical-fiction", label: "Historical fiction", family: "More fiction & memoir", appleGenre: 10047, amazonWords: "historical fiction" },
-  { id: "literary-fiction", label: "Literary fiction", family: "More fiction & memoir", appleGenre: 10049, amazonWords: "literary fiction" },
+  { id: "action-adventure", label: "Action & adventure", family: "More fiction & memoir", appleGenre: 10039, amazonWords: "action adventure fiction", amazonBestsellers: { node: "157055011", name: "Action & Adventure Fiction" } },
+  { id: "horror", label: "Horror", family: "More fiction & memoir", appleGenre: 10048, amazonWords: "horror", amazonBestsellers: { node: "157060011", name: "Horror" } },
+  { id: "historical-fiction", label: "Historical fiction", family: "More fiction & memoir", appleGenre: 10047, amazonWords: "historical fiction", amazonBestsellers: { node: "157059011", name: "Historical Fiction" } },
+  { id: "literary-fiction", label: "Literary fiction", family: "More fiction & memoir", appleGenre: 10049, amazonWords: "literary fiction", amazonBestsellers: { node: "157053011", name: "Literary Fiction" } },
   { id: "young-adult", label: "Young adult fiction", family: "More fiction & memoir", appleGenre: 11177, amazonWords: "young adult fiction", amazonBestsellers: { node: "3511261011", name: "Teen & Young Adult eBooks" } },
-  { id: "memoir", label: "Biography & memoir", family: "More fiction & memoir", appleGenre: 9008, amazonWords: "memoir" },
+  { id: "memoir", label: "Biography & memoir", family: "More fiction & memoir", appleGenre: 9008, amazonWords: "memoir", amazonBestsellers: { node: "154754011", name: "Biographies & Memoirs" } },
 ];
 
 export function shelfById(id: string): BestsellerShelf | null {

@@ -497,7 +497,7 @@ const ROWS: Row[] = [
     id: "price-check",
     badge: "Price check",
     title: "See what books like yours are selling for",
-    lead: `Pick your genre and see what its top 100 best-selling ebooks cost — self-published and traditional publishers kept apart, every book listed — and what Amazon would pay you at any price you try. It never tells you what to charge. Free runs ${FREE_LIMITS.priceCheck.free} a day.`,
+    lead: `Pick your genre and see what its top 100 best-selling ebooks cost — self-published and traditional publishers kept apart, every book listed — and what Amazon would pay you at any price you try. It never tells you what to charge. ${TIER_NAMES.free} reads Apple Books' lists as often as you like; ${TIER_NAMES.pro} adds Amazon's own top 100, with how many are in Kindle Unlimited.`,
     figure: (
       <Shot
         src="/shot-price-check.webp"

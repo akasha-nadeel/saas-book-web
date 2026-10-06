@@ -61,8 +61,16 @@
  * every other gate here.
  */
 
-/** The four that ask a catalogue something, counted per day. */
-export type DailyLimit = "comps" | "covers" | "titleCheck" | "priceCheck";
+/**
+ * The three that ask a catalogue something, counted per day.
+ *
+ * **The price check left this list on 2026-10-06**, by the owner's decision:
+ * its Apple lists are free to read and cached for a day, so it is unlimited on
+ * every plan, and what Pro buys there is Amazon's data — a server-checked gate
+ * (`require-pro-data.ts`) rather than a count, because that data costs money
+ * per request.
+ */
+export type DailyLimit = "comps" | "covers" | "titleCheck";
 
 /** The ones that work on one manuscript, counted in distinct books. */
 export type BookLimit = "blurb" | "prose" | "track";
@@ -120,21 +128,6 @@ export const FREE_LIMITS: Record<Limited, { free: number; pro: number | null }> 
    * `workOne` stays, so a daily limit of one would still read in the singular.
    */
   titleCheck: { free: 3, pro: null },
-  /*
-   * **Three, matching the title check**, because it is the same shape of work:
-   * a keyless catalogue search on a free cache, metered as a pricing decision
-   * rather than because it costs anything to run. The two tools sit in the
-   * same group and a writer moving between them should not have to learn two
-   * different allowances.
-   *
-   * **Since 2026-10-05 a check is opening a genre's best-seller list**, not a
-   * keyword search: opening one spends one, and opening the same genre again
-   * in the same tab spends nothing, because the writer is looking back at an
-   * answer they already have. Every list is a full hundred priced books, so
-   * the old caveat — that four searches in ten found too few prices to
-   * summarise — no longer applies.
-   */
-  priceCheck: { free: 3, pro: null },
   blurb: { free: 5, pro: null },
   prose: { free: 6, pro: null },
   track: { free: 2, pro: null },
@@ -387,7 +380,6 @@ const SHAPE: Record<Limited, Shape> = {
   comps: "daily",
   covers: "daily",
   titleCheck: "daily",
-  priceCheck: "daily",
   blurb: "book",
   prose: "book",
   track: "book",
@@ -428,7 +420,6 @@ const WORDS: Record<
   comps: { one: "search", many: "searches", short: "searches", shortOne: "search", work: "comp searches", workOne: "comp search" },
   covers: { one: "search", many: "searches", short: "searches", shortOne: "search", work: "cover searches", workOne: "cover search" },
   titleCheck: { one: "check", many: "checks", short: "checks", shortOne: "check", work: "title checks", workOne: "title check" },
-  priceCheck: { one: "check", many: "checks", short: "checks", shortOne: "check", work: "price checks", workOne: "price check" },
   blurb: { one: "book", many: "books", short: "books", shortOne: "book", work: "the blurb" },
   prose: { one: "book", many: "books", short: "books", shortOne: "book", work: "the prose report" },
   track: { one: "book", many: "books", short: "books", shortOne: "book", work: "money tracking" },

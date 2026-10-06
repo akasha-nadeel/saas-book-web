@@ -447,12 +447,27 @@ measurement are in `docs/plans/2026-10-05-price-check-amazon-design.md`.
   $9.99 on 2026-07-07), $0.15/MB delivery, print at $2.30 flat to 108 pages or
   $1.00 + $0.012/page, paperback 50% to $9.98 and 60% from $9.99. Its test
   reproduces KDP's own worked example; re-read the pages yearly.
-- **There is no Amazon data, and that is a budget decision, not a gap to fill
-  quietly.** Amazon's Product Advertising API was retired in 2026 and its
-  replacement needs an affiliate account with sales. The plan — Apify's free
-  $5 a month as a test first, then a daily paid fetch stored in Supabase — is
-  in the design note and `TODO.md`. The screen's "What this list can't tell
-  you" card says what is missing; keep it true when anything is added.
+- **Amazon's data is Pro, since 2026-10-06, and it costs money per request.**
+  - `/api/price-shelf/amazon` reads OpenWeb Ninja's Real-Time Amazon Data API
+    (`amazon-source.ts`, parsed by the pure `amazon-list.ts`).
+  - It is **checked on the server** by `requireProData()`
+    (`billing/require-pro-data.ts`), because a browser gate is only honest
+    for things that cost nothing.
+  - It answers `private, no-store`, so a gated answer never sits in a shared
+    cache.
+  - The saving lives in Next's data cache instead: lists for 7 days, each
+    book's details for 30, one book per request.
+  - **OpenWeb Ninja almost certainly bills each book in a batched request as
+    a request** (the free plan's 100 ran out at about 105 books), so a genre
+    is about 102 requests. A weekly refresh of all 27 is about $6 a month.
+  - `OPENWEBNINJA_API_KEY` is the switch. Unset, the route answers 503.
+  - `OPENWEBNINJA_BASE_URL` points the route at a stand-in for tests, and is
+    never set in production.
+  - The free tab is Apple, unlimited. Amazon is a locked tab that opens
+    `UpgradeDialog reason="amazon"`.
+  - **Apify was tested first and failed**: its Kindle Unlimited flag said "no"
+    for every book. Do not re-propose it as untested.
+  - The full reckoning is in the design note.
 - **The price field starts empty on purpose** — any number it opened on would
   read as the price to charge.
 
@@ -1061,11 +1076,10 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   names rather than mapping them.
 - **Pro buys eight things since 2026-09-26**, and `plan-rows.test.ts` pins the
   list: unlimited books (Free holds **three**); unlimited title checks (Free
-  runs **three a day**, `FREE_LIMITS.titleCheck`); unlimited **price checks**
-  (Free runs **three a day** too, `FREE_LIMITS.priceCheck`, and the two are
-  deliberately the same number — the same catalogues, the same free cache, and
-  a writer moving between the two tools should not have to learn two
-  allowances); unlimited parked ideas (Free
+  runs **three a day**, `FREE_LIMITS.titleCheck`); **Amazon's best-seller
+  prices and Kindle Unlimited in the price check** (since 2026-10-06 Free has
+  the price check unlimited on Apple Books' lists, and the daily limit it had
+  for a day is gone from `FREE_LIMITS`); unlimited parked ideas (Free
   parks **five at a time**, `FREE_LIMITS.ideas` — occupancy, so forgetting one
   makes room); all **11** consistency checks (Free runs **5**, `FREE_CHECKS` in
   `consistency-ids.ts`, and is told how many things the other six found); the
@@ -1073,8 +1087,9 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   **30 days**, `FREE_RECORD_DAYS`, and the file says so); and **paperback
   setup, which Free does not get at all** — `PaperbackPage` opens `GatedTool`
   and the dashboard's Paperback area draws `ProCard`, and it is the one row
-  allowed to say "Not included". **Only the book count is enforced by the
-  server**; the rest are
+  allowed to say "Not included". **Only the book count and the Amazon data are
+  enforced by the server** — the Amazon data because it is paid for per
+  request (`requireProData`); the rest are
   browser gates through `onFreePlan` / `useLimitGate` / `useEntitled`, which the
   owner chose knowingly. Nothing a writer typed is hidden by any of them — the
   log keeps recording, parked ideas past five stay — so upgrading opens what
@@ -1222,7 +1237,7 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
 
   | Shape | Tools | Free |
   |---|---|---|
-  | **Per day** | comps, covers, title check, price check | 3 a day each |
+  | **Per day** | comps, covers, title check | 3 a day each |
   | **Per book** | blurb, prose report, track | 5 / 6 / 2 books |
   | **By occupancy** | ARC readers, seats | 10 a book / 2 a book |
   | **Held, across the library** | parked ideas | 5 at a time |
@@ -1434,6 +1449,7 @@ went back on the same day, 2026-09-15, so the count is the thing that moves
 most often here.
 
 **API routes:** `/api/comps` · `/api/comps/subjects` · `/api/price-shelf` ·
+`/api/price-shelf/amazon` (Pro, server-checked) ·
 `/api/export/pdf` ·
 `/api/plan-interest` ·
 `/api/billing/*` (`subscription`, `cancel`, `resume`, `history`, `notify`,
