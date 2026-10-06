@@ -5058,7 +5058,7 @@ function PriceCheckArea() {
            16:9 file in a 4:1 band keeps the empty sky and loses the subject. */
         crop="45% 86%"
         title="What the shelf beside yours charges"
-        subtitle="Real prices from real listings — and no recommended price, because that is yours to decide."
+        subtitle="Real prices from real best-seller lists — and no recommended price, because that is yours to decide."
       />
 
       {/* The child override, as on the title check above: `toolShell` makes

@@ -340,3 +340,11 @@ half-typed page count does not follow a change of book. It mounts the real
 override `TitleCheckArea` explains. Ideas mounts the editor's `IdeasPanel` and
 has no picker, since ideas belong to the writer rather than a book. The Story
 bible and Advance copies had areas here for a day and were taken back out.
+
+The price check has no picker either, because it reads a genre's best-seller
+list rather than a book. Since 2026-10-05 that list is Apple Books' public top
+100 per genre, read through `/api/price-shelf`, and every figure on the screen
+comes from the pure modules in `src/lib/pricing/`. Its paperback card lists the
+writer's books in a `Picker` of its own, and uses them for the page count only.
+`docs/plans/2026-10-05-price-check-amazon-design.md` explains why the list is
+Apple's rather than Amazon's, and what changes when Amazon data is affordable.

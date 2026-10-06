@@ -127,11 +127,12 @@ export const FREE_LIMITS: Record<Limited, { free: number; pro: number | null }> 
    * same group and a writer moving between them should not have to learn two
    * different allowances.
    *
-   * Worth knowing when this number is next argued about: roughly four searches
-   * in ten come back with too few prices to summarise — measured across ten
-   * genre queries on 2026-09-26, see `MIN_PRICES` in `comps/price-check.ts`.
-   * A search that reports nothing still spends one, because it really did ask
-   * both catalogues; but that is the reason three is not obviously generous.
+   * **Since 2026-10-05 a check is opening a genre's best-seller list**, not a
+   * keyword search: opening one spends one, and opening the same genre again
+   * in the same tab spends nothing, because the writer is looking back at an
+   * answer they already have. Every list is a full hundred priced books, so
+   * the old caveat — that four searches in ten found too few prices to
+   * summarise — no longer applies.
    */
   priceCheck: { free: 3, pro: null },
   blurb: { free: 5, pro: null },

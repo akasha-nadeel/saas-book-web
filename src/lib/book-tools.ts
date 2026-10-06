@@ -81,7 +81,7 @@ export const LOOK_OUTWARD: ToolGroup = {
       path: "price-check",
       icon: "coins",
       name: "Price check",
-      what: "What comparable ebooks are actually charging, every one of them listed with its price, and how many carried no price at all. A median and a spread, never a recommended price.",
+      what: "What the top 100 best-selling ebooks in your genre cost, self-published and traditional kept apart, and what Amazon would pay you at any price you try. Never a recommended price.",
     },
   ],
 };

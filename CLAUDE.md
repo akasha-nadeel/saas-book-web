@@ -61,7 +61,8 @@ assuming a screen or a route is live.
   record), and since 2026-09-26 `/book/[bookId]/price-check`, plus Ideas in the
   dashboard's side panel, upgrade/billing and the
   legal pages — and `/api/comps`, which was un-gated on 2026-09-02 because it is
-  the route the title check runs on, and which the price check runs on too.
+  the route the title check runs on. The price check ran on it too until
+  2026-10-05 and now reads `/api/price-shelf` (see the catalogue section).
   **What is gated**: `/api/comps/subjects` and the twelve other tool screens.
   Advance copies, the Story bible panel and the editor's Ideas tab were live
   for a day on 2026-09-15 and the owner took them back out.
@@ -71,9 +72,10 @@ assuming a screen or a route is live.
   written once so it cannot go missing a part in a fourth call site.
   `trashedBookClosed()` reads the **book**, never the
   shelf view, so a pasted editor URL and a card press answer the same question.
-  **`PLANS_ON_SALE` is false since 2026-09-07**: Paddle is configured with live
-  prices, but no checkout has been proven end to end, so every paid button
-  opens "Available Soon" and the press is recorded (see Billing).
+  **`PLANS_ON_SALE` is true since 2026-09-16 (`f70954a`)** and Pro is sold
+  live. From 2026-09-07 until then it was false, every paid button opened
+  "Available Soon" and the press was recorded (see Billing); setting it back
+  to false is how the plans come off sale.
   **Never take the plans off sale by unsetting the Paddle variables** — with
   `billingConfigured()` false there are no plans and nothing is held back, so
   every writer gets Pro for nothing, which is the state production sat
@@ -94,7 +96,7 @@ is the thing to read **before changing that area**, not after.
 | The store, IndexedDB, cross-tab notes, storage limits, React hooks | `docs/architecture/storage.md` |
 | Dashboard, checkup findings, roadmap, the sixteen tool screens, save bars | `docs/architecture/dashboard-and-tools.md` |
 | Why there is no AI, and the Free/Pro decision | `docs/plans/2026-09-14-ai-free-pro-plan-design.md` |
-| The price check — its search shape, and every figure behind it | `docs/plans/2026-09-26-price-check-guided-search-design.md` |
+| The price check — best-seller lists, what Amazon pays, and the Amazon-data plan | `docs/plans/2026-10-05-price-check-amazon-design.md` (the Google-search version it replaced: `docs/plans/2026-09-26-price-check-guided-search-design.md`) |
 | Tiptap editor, rails, panels, front/back matter pages, series bible | `docs/architecture/editor.md` |
 | Reading view, pagination, the export wizard's Preview | `docs/architecture/reader.md` |
 | Export (EPUB, PDF, Word, Markdown), typesetting, front matter, covers | `docs/architecture/export.md` |
@@ -145,13 +147,20 @@ do not treat its absence of a subject as a gap to fill unless somebody asks.
   `public/write-band.webp`). Also one-shot, also reads sources from outside the
   tree, and it needs `sharp`, which is **not a dependency** — install it by hand
   to run this.
+- `node scripts/apify-amazon-test.cjs` — the one-off test of Amazon's own Kindle
+  data through Apify. It needs `APIFY_TOKEN` in `.env.local` and **spends real
+  credit** ($0.40 of the free $5 on 2026-10-06). It changes nothing in the app
+  and writes its results to the system temp folder (`openchapter-apify-test`),
+  never the repo.
+  - **It has already answered its question**, so read the result in the
+    design note before running it again.
 - `assets/social/*.html` — social-post generators (e.g. an eight-slide
   1080×1350 carousel) drawn on canvas and saved as PNGs. Open the file in a
   browser; no dependencies, no network, not part of the build. Its palette is
   copied from `globals.css`, so it goes stale when the tokens move.
 
-The suite is 109 files / 2,119 tests and takes a little over a minute
-(measured 2026-09-23 after the idea board, all green, run on its own); jsdom prints `HTMLCanvasElement's getContext()` warnings
+The suite is 112 files / 2,219 tests and takes about a minute and a half
+(measured 2026-10-05, all green, run on its own); jsdom prints `HTMLCanvasElement's getContext()` warnings
 from the image recoder and `Not implemented: navigation to another Document`
 from the routing tests — both are expected, not failures.
 
@@ -356,9 +365,10 @@ uses the shared frame `BookToolArea` and book picker `WorkingOn` (out of
 `Tools`, where it was first written), mounting `PaperbackPage` with `embedded`
 as a `dynamic` chunk inside the same child override `TitleCheckArea` uses;
 Ideas mounts the editor's `IdeasPanel`. **The price check takes neither frame**
-— like the title check it searches a description of a book rather than this
-writer's manuscript, so `PriceCheckArea` is a banner and the tool, with no
-`bookId` and no book picker. The writing record is reached from the
+— it reads a genre's best-seller list rather than this writer's manuscript, so
+`PriceCheckArea` is a banner and the tool, with no `bookId` and no book picker;
+its paperback card offers the writer's books in a picker of its own, for the
+page count only. The writing record is reached from the
 Export screen's Format step and the export-done dialog rather than from the
 rail. **How it works, Support, Send feedback and Pricing sit at the foot of the
 side panel**, under a rule; they were tried in the top bar beside New book for
@@ -405,8 +415,46 @@ keyless catalogue search.
 server-side for a shared cache and to keep a reader's browser off two third
 parties. Records merge **field by field** on ISBN, or title-plus-author.
 **The manuscript never goes** — what leaves is a query. `/api/comps` is live
-because the title check and the price check both run on it;
-`/api/comps/subjects` is behind the launch flag and answers 404.
+because the title check runs on it; `/api/comps/subjects` is behind the launch
+flag and answers 404.
+
+**The price check no longer uses this search (2026-10-05)** — the Google
+bullets below about prices describe what it ran on until then, and the
+`price` field and `comps/price-check.ts` stay, tested, read by nothing live.
+It now reads **Apple Books' public top 100 per genre**
+(`itunes.apple.com/us/rss/toppaidebooks/limit=100/genre=<id>/json`) through
+`/api/price-shelf`, cached a day on both sides; the design and every
+measurement are in `docs/plans/2026-10-05-price-check-amazon-design.md`.
+
+- **`src/lib/pricing/` is the whole of it and all of it is pure and tested**:
+  `shelves.ts` (27 genres in four families, each fetched and counted before
+  it went in, with Amazon's own top-100 page where one was found — 18 of
+  27 — and a Kindle-store search, labelled as one, where not),
+  `apple-list.ts` (the parser, and `ListedBook` — **the boundary Amazon data
+  plugs into later, with no screen change**), `publishers.ts`, `shelf-facts.ts`
+  (two middle prices, never one, on the same `MIN_PRICES` of six),
+  `kdp-terms.ts` and `stats.ts` (the median the old module shares).
+- **The feed's own cover URLs answer 400.** `…/0x170bb.png` failed for every
+  entry on 2026-10-05; the parser rewrites the size to `400x400bb.jpg`, which
+  answers 200. Do not "simplify" that back.
+- **Self-published vs traditional is decided by the publisher's name alone**,
+  anchored regexes so `Harper` does not catch "Harper Sloan". Entangled and
+  Storytide were added on measurement (they price like big houses);
+  Dragonsteel, Archway and BookBaby stay self-published on purpose. The screen
+  says the rule. A name on the wrong side is fixed in the table, with a test.
+- **`kdp-terms.ts` is Amazon's published US rules, dated, with the help page
+  beside each constant** — 70% from $2.99 to **$12.99** (the ceiling moved from
+  $9.99 on 2026-07-07), $0.15/MB delivery, print at $2.30 flat to 108 pages or
+  $1.00 + $0.012/page, paperback 50% to $9.98 and 60% from $9.99. Its test
+  reproduces KDP's own worked example; re-read the pages yearly.
+- **There is no Amazon data, and that is a budget decision, not a gap to fill
+  quietly.** Amazon's Product Advertising API was retired in 2026 and its
+  replacement needs an affiliate account with sales. The plan — Apify's free
+  $5 a month as a test first, then a daily paid fetch stored in Supabase — is
+  in the design note and `TODO.md`. The screen's "What this list can't tell
+  you" card says what is missing; keep it true when anything is added.
+- **The price field starts empty on purpose** — any number it opened on would
+  read as the price to charge.
 
 - `openLibraryQuery()` translates dialects: Google wants `intitle:`, Open
   Library wants `title:`, and **Open Library answers an unknown prefix with zero
@@ -443,7 +491,10 @@ because the title check and the price check both run on it;
   measured against prints one average beside an invented competitive score.
 - **No search volume, no competition score, no rank — anywhere in this
   cluster.** It cannot be had honestly; the modules have tests asserting their
-  shape carries no such number, and those tests are not to be "fixed".
+  shape carries no such number, and those tests are not to be "fixed". **One
+  exception, approved by the owner on 2026-10-05**: the price check prints a
+  store's *own* list position (#1–#100), labelled as that store's, because it
+  is the store's fact rather than one we derived.
 - **The comps screen searches and does not judge.** Its "Rank these" button and
   the translation of plain words into a catalogue query were model calls and
   are gone; the words in the box are the search.
@@ -1069,7 +1120,8 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   keeps its **boolean** signature deliberately — teaching it what a tier is would
   make narrowing it a plausible edit again.
 - **While `PLANS_ON_SALE` is false, every press on a paid button is recorded**
-  rather than lost. `notePlanInterest()` (`src/lib/plan-interest.ts`) is the
+  rather than lost. (It is true today, so this path is idle until the plans
+  come off sale again.) `notePlanInterest()` (`src/lib/plan-interest.ts`) is the
   one caller-side function, and it sends with `sendBeacon` first because the
   landing page's buttons are `<Link>`s that navigate on the same press and
   would cancel a `fetch`. `/api/plan-interest` is public on purpose (the
@@ -1186,8 +1238,8 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   costs money to run, and the book count is the one limit Postgres holds. Do
   not add a Pro row whose value depends on a browser gate being unbreakable.
 - **Four legal pages exist because a gateway reviews the site signed out** — they
-  are in `PUBLIC_EXACT` in `src/proxy.ts`, and `src/lib/legal.ts` states each
-  fact once. **The privacy page names every route that sends anything**, so
+  are in `PUBLIC_PAGES` in `src/lib/site.ts` (the proxy's `PUBLIC_EXACT` and
+  the sitemap both read it), and `src/lib/legal.ts` states each fact once. **The privacy page names every route that sends anything**, so
   adding such a route is an obligation to add it there.
 
 ### The landing page — `docs/architecture/landing.md`
@@ -1199,9 +1251,11 @@ browser, the two plans, a FAQ, the closing ask and the footer. **It says "No
 AI" in the hero, as the first FAQ and on both pricing cards**, and the FAQ names
 voice typing as the one thing that sends audio anywhere — keep that sentence, or
 the claim is no longer true. It sells the
-smaller product and reads `LAUNCH_LIMITS`, `plans.ts`, `IMPORT_FORMATS`,
-`MAX_SNAPSHOTS`, `DESTINATIONS` and `legal.ts` so no figure on it can drift
-from the thing that enforces it. `landing-page.tsx` is the fuller sixteen-tool
+smaller product and reads `LAUNCH_LIMITS`, `FREE_LIMITS`, `FREE_RECORD_DAYS`,
+`PRO_CHECKS`, `TIER_NAMES`, `IMPORT_FORMATS`, `MAX_SNAPSHOTS` and `legal.ts`
+(prices arrive through `pricing-cards.tsx`) so no figure on it can drift from
+the thing that enforces it. Its testimonials came out on 2026-10-03
+(`7905af0`) and the title check and price check went in. `landing-page.tsx` is the fuller sixteen-tool
 page beside it, still built and tested and currently mounted by nothing — the
 same standing as the other finished-but-unreachable code below. Both are Server
 Components. `/tools` is the second marketing page, over the pure
@@ -1214,16 +1268,14 @@ over an empty column — **the proxy redirects it home under the launch flag**.
   invitation cannot be accepted), the reading view is gated, and the sixteen
   tools are gated. **`HIDDEN_BOOK_TOOL_PATHS` is the list to check before adding
   a sentence to this page.**
-- **Its figures are four drawn screens** in `mvp-screens.tsx` — shelf, editor,
-  versions, import — plus the export wizard's own `ExportScreen`. All
-  five are markup at a fixed design mapped onto `cqw`, so no figure on the page
-  ships a line of script. **The page itself ships two islands** —
-  `landing-header.tsx` and `pricing-cards.tsx`, which holds the cycle toggle and
-  the Free and Pro cards. **The drawn design is ~770px wide, not the 1000px
-  `export-screen.tsx` uses**, and the note on `W` in that file records why: a
-  1000px design in this page's figure column renders its body text at 8.5px.
-  The hero is capped at `max-w-4xl` and the export at `max-w-5xl` for the same
-  reason — the slot's measure *is* the zoom.
+- **Its figures are mostly product shots now**: `Shot` frames
+  `public/shot-*.webp` in `AppWindow` at `quality={95}`, a value
+  `next.config.ts` must list or it silently falls back to 75. Two drawn
+  screens remain from `mvp-screens.tsx` (`NewBookMenuScreen`,
+  `WritingRecordScreen`, markup on a 1000px design mapped onto `cqw`);
+  `ShelfScreen` and `VersionsScreen` stay there unmounted, and `ExportScreen`
+  gave way to `FormatCards`. The client islands are `landing-header.tsx`,
+  `pricing-cards.tsx` and the Google button from `auth/auth-shell.tsx`.
 
 - **Every claim has to be true of the code**, and everything countable is
   imported and counted (`STEPS`, `PHASES`, `ALL_TOOLS`, `DESTINATIONS`, prices
@@ -1233,22 +1285,25 @@ over an empty column — **the proxy redirects it home under the launch flag**.
   of 7" over five groups after the Preview step was added to every format.
 - **No number a SaaS page would invent** — no user count, no rating, no
   testimonial, until there is a real one.
-- **The figures are drawn in markup, never screenshotted**, and three are
-  *computed* from the pure modules. The handful of bitmaps that remain are the
-  standing exception and **start lying silently when the screen moves** —
-  re-shoot them when the editor chrome or the ARC statuses change.
-- **The hero carries the real check**, not a picture of one: the visitor's file
+- **A bitmap starts lying silently when the screen it shows moves** — nothing
+  fails and nothing warns. Re-shoot the `shot-*.webp` files when the editor,
+  the dashboard, the title check, the price check or the export formats step
+  change. `landing-page.tsx` still follows the older rule (figures drawn in
+  markup, three *computed* from the pure modules).
+- **`landing-page.tsx`'s hero carries the real check** (`book-check.tsx`), not a
+  picture of one; the MVP page has no file check. The visitor's file
   is parsed in their own browser through the ordinary `importFile` path, findings
   go through `fromReadiness()` like every other screen, they are never held back
   for an email, and nothing is written until a press.
-- **Each landing page pins its own ground on its root div**, and the two now
-  differ: the MVP page is `[data-theme="dark"]` and `landing-page.tsx` is still
-  `[data-theme="light"]`. **Neither may be removed rather than swapped** — with
-  no attribute a page inherits whatever the bootstrap wrote on `<html>` from
-  the visitor's `prefers-color-scheme`, so a visitor in daylight would get the
-  light token set under the MVP's dark gradient hero. Both token sets stay live
-  (the four legal pages read the dark one). Nothing else below either root may
-  write that attribute.
+- **Each landing page pins its own ground on its root div**, and both pin
+  `[data-theme="light"]` today — the MVP page under a pale sky
+  (`bg-[#d6ecf9]`), with `.oc-footer-dark` re-pointing the footer back to a
+  dark set. (`docs/architecture/landing.md` still says the MVP page is dark;
+  the code is the authority.) **Neither may be removed rather than swapped** —
+  with no attribute a page inherits whatever the bootstrap wrote on `<html>`
+  from the visitor's `prefers-color-scheme`, and its artwork is measured
+  against a known ground. Both token sets stay live (the four legal pages read
+  the dark one). Nothing else below either root may write that attribute.
 - **`[data-theme="dark"]` exists only because of that**, and it is the mirror of
   the light block rather than a new idea: dark is `@theme`'s default on `:root`,
   which a subtree inside a light tree has no way to get back to. It is generated
@@ -1283,7 +1338,7 @@ of components so they can be tested and changed in one place: `book-kinds.ts`,
 *parameter*, since English plurals are not derivable), `resume.ts` (which stores
 nothing: the "where you left off" card is read back out of what already exists),
 `account.ts` (a chain of fallbacks, taking whatever is in the JWT rather than a
-typed user), `auth-redirect.ts` (`safeNext()`), `panel-tabs.ts` (the eleven left-rail
+typed user), `auth-redirect.ts` (`safeNext()`), `panel-tabs.ts` (the ten left-rail
 tabs and their titles) and `areas.ts` (the six dashboard areas by id and by
 name). The last of those exists because a tool screen fills the window with none
 of the dashboard around it, so a link in may carry `?from=<area>` and the tool
@@ -1351,6 +1406,14 @@ chapter opened**, not a screen · `/book/[bookId]/chapter/[chapterId]` editor ·
 makes the link a pointer rather than a credential) · `/admin` and
 `/admin/users/[userId]` (the operator only; 404 to everybody else).
 
+**SEO (2026-10-03):** `/robots.txt` (`app/robots.ts`; its disallow list is not
+a security measure), `/sitemap.xml` (`app/sitemap.ts`) and the link card
+(`app/opengraph-image.png`). The sitemap and the proxy's public list are one
+array, `PUBLIC_PAGES` in `src/lib/site.ts`, with `SITE_URL` beside it;
+`site.test.ts` fails if a page on it is one `hiddenLaunchRoute` sends home. The
+proxy matcher lets `xml` and `opengraph-image` through, or the sitemap and the
+card answer with the sign-in page.
+
 The eighteen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
 `paperback`, `listing` · `comps`, `blurb`, `categories`, `covers`,
 `title-check` · `structure`, `prose`, `progress`, `provenance` · `money`,
@@ -1366,7 +1429,8 @@ came off it on 2026-09-02 and went back on 2026-09-03, and `arc` came off and
 went back on the same day, 2026-09-15, so the count is the thing that moves
 most often here.
 
-**API routes:** `/api/comps` · `/api/comps/subjects` · `/api/export/pdf` ·
+**API routes:** `/api/comps` · `/api/comps/subjects` · `/api/price-shelf` ·
+`/api/export/pdf` ·
 `/api/plan-interest` ·
 `/api/billing/*` (`subscription`, `cancel`, `resume`, `history`, `notify`,
 `invoice/[id]`, `paddle/checkout`, `paddle/notify`, `paddle/change-plan`,

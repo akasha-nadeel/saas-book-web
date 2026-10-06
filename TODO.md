@@ -3389,6 +3389,90 @@ their characters and bible are **per-novel**; ours read across a series with
 transitive alias merging (`series.ts`), which is the one place we are already
 ahead on their flagship feature.
 
+## Shipped 2026-10-05 — the price check moves to best-seller lists
+
+The owner asked whether the price check really helped, and the honest answer
+was not much. Research found six things writers want from one:
+1. Amazon prices.
+2. Self-published prices kept apart from big publishers'.
+3. What the best sellers charge.
+4. How many are in Kindle Unlimited.
+5. What they would keep from a sale.
+6. Series, length and paperback.
+
+The Google keyword search answered almost none of them. The design and every
+measurement are in `docs/plans/2026-10-05-price-check-amazon-design.md`.
+
+**What changed.**
+- **The list.** It is now Apple Books' public top 100 per genre, US store, read
+  through `/api/price-shelf` and cached a day. Sixteen genres, every one
+  measured at 100 priced books. Since 2026-10-06 there are 27, grouped in
+  four families; see the next block.
+- **The middle price.** There are two now: self-published and small presses on
+  one side, traditional publishers on the other. `pricing/publishers.ts` sorts
+  them by the publisher's name, and the screen says so.
+- **A price to try.** The chart puts self-published books above a line and
+  traditional ones below it, with Amazon's 70% band behind.
+- **What Amazon would pay**, for a Kindle sale and for a paperback, from KDP's
+  published rules in `pricing/kdp-terms.ts`. That includes the $12.99 ceiling
+  of 2026-07-07, and the test reproduces KDP's own worked example.
+
+**Still not answered, and why.**
+- **Amazon prices and the Kindle Unlimited count** need Amazon's data, and
+  there is no free official way to get it. Its Product Advertising API was
+  retired in 2026, and the replacement needs an affiliate account with
+  sales.
+- **Series and length** are dropped too. Only 125 of 1,800 Apple listings
+  named a series number, and Apple gives no page counts.
+
+The screen says all of this in a card of its own, "What this list can't tell
+you".
+
+**Next, when there is money or paying users:**
+- **Try Amazon data on Apify's free $5 a month first**, before paying anyone.
+  `getascraper/kdp-book-niche-analyzer` (about $1 per 1,000 books, 72 users,
+  97% of runs succeed) has prices, publishers and pages but no Kindle
+  Unlimited. `conceivable_extension/kdp-market-intel-scraper` has Kindle
+  Unlimited but one user, so it is the thing the test has to prove.
+- **Amazon becomes a second source behind `ListedBook`**, and the screen does
+  not change. The paid version's design is in the same note: a daily fetch,
+  stored in Supabase, migration first.
+- **Then Amazon UK and India.** Each shop roughly doubles the data cost.
+
+**The landing shot was retaken on 2026-10-06**, Contemporary romance at 1897×860,
+so `public/shot-price-check.webp` and its alt text show the new screen. The
+figures in it are that day's list, and they drift as Apple's list changes.
+
+**Three free improvements, 2026-10-06**, after a review found that most
+self-published writers outside romance and cozy mystery got little from it:
+- **"Your price" is compared with each side on its own**
+  (`standingBySide`). Compared with all hundred, a $4.99 indie novel was
+  measured against $12.99 trade editions.
+- **Eleven more genres, chosen because their lists hold plenty of
+  self-published books**: military, western, holiday, LGBTQIA+, new adult and
+  erotic romance; women sleuths and hard-boiled mysteries; paranormal and
+  historical fantasy; action & adventure. That is 27 shelves, grouped as
+  tiles under four family headings.
+  - The rejects and why are in the header of `shelves.ts`. Religious fiction
+    and light novels wait on their publishers being added to
+    `publishers.ts`.
+- **A thin self-published side now ends in a button to Amazon** rather than a
+  dash. It opens Amazon's own top 100 for the genre where one was found (18
+  of 27), named with Amazon's own words, and a labelled Kindle-store search
+  where not.
+
+**The Apify test ran on 2026-10-06 and said no.** It cost $0.40 of the free
+$5.
+- Amazon's list, rank and price came back, but only 30 per genre.
+- **The Kindle Unlimited field was wrong for every book.** It said "no" even
+  for books Amazon shows in Kindle Unlimited.
+- The tool for publisher and pages was stopped by Amazon's CAPTCHA.
+- The one good finding: the five books on both stores' lists had the same
+  price in each.
+
+So the Apple version stays. The full result is in the design note. **Rotate the
+Apify key** — it was pasted into a chat on the day it was added.
+
 ## Shipped 2026-09-26 — the price check found more prices, then got a form
 
 Two rounds after the tool shipped, both driven by the same complaint: a real

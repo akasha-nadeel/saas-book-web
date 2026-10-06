@@ -48,24 +48,24 @@ export const TOOL_GUIDES: ToolGuide[] = [
   },
   {
     path: "price-check",
-    headline: "What the books beside yours are actually charging",
-    claim: "What comparable ebooks cost",
+    headline: "What the best sellers in your genre actually charge",
+    claim: "What best-selling ebooks cost",
     lead: " — the real figures, with no recommended price.",
     points: [
       {
-        term: "Every book, not an average",
+        term: "Self-published and traditional, kept apart",
         detail:
-          "A genre usually has two clusters in it, one near five dollars and one near twelve, and a single average sits in the empty space between them describing nothing. Each book is drawn where its own price falls, and each one links out to the listing so you can go and look.",
+          "A genre usually has two clusters in it, one near five dollars and one near ten, and a single average sits in the empty space between them describing nothing. Each side gets its own middle price, with the count it was drawn from, and the chart draws every book where its price falls.",
       },
       {
-        term: "The median, and how many books it came from",
+        term: "What Amazon would pay you",
         detail:
-          "A search that turned up four prices says so instead of summarising them, because four books are not a shelf. When there are enough, the figure comes with the count it was drawn from and the range the middle half sits in.",
+          "Try a price and see what a Kindle sale or a paperback would bring in under Amazon's own published rules: 70% from $2.99 to $12.99 and 35% outside it, with printing taken off a paperback first. The sum is shown working, so you can check it.",
       },
       {
-        term: "Nothing is filtered for being awkward",
+        term: "Where the list comes from",
         detail:
-          "A reference book at seventy-five dollars stays in the list where you can see it, rather than being quietly dropped for spoiling the shape. Deciding which books are comparable is your judgement about your own genre, not something a search can make for you.",
+          "Apple Books' top 100 for each genre, in the US store, with every book linked to its listing. Books in Amazon's own subscription library are sold only on Amazon, so none of them are on it, and the screen says so rather than letting the gap pass for a cheap shelf.",
       },
     ],
   },

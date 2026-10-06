@@ -1,4 +1,5 @@
 import type { CompTitle } from "./comps";
+import { median, nearestRank as rank } from "../pricing/stats";
 
 /**
  * What comparable ebooks actually charge.
@@ -347,19 +348,6 @@ export function shelfForGenre(genre: string | undefined): PriceShelf | null {
   if (!genre) return null;
   const label = SHELF_FOR_GENRE[genre];
   return PRICE_SHELVES.find((shelf) => shelf.label === label) ?? null;
-}
-
-/** Nearest-rank order statistic, on a list already sorted ascending. */
-function rank(sorted: number[], fraction: number): number {
-  const at = Math.min(sorted.length - 1, Math.floor(sorted.length * fraction));
-  return sorted[at];
-}
-
-function median(sorted: number[]): number {
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
 }
 
 /**

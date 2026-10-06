@@ -497,14 +497,14 @@ const ROWS: Row[] = [
     id: "price-check",
     badge: "Price check",
     title: "See what books like yours are selling for",
-    lead: `Pick your genre and get the real prices of the ebooks a reader would see beside yours — the median, the spread, and every book it found, cheapest first. It never tells you what to charge. Free runs ${FREE_LIMITS.priceCheck.free} a day.`,
+    lead: `Pick your genre and see what its top 100 best-selling ebooks cost — self-published and traditional publishers kept apart, every book listed — and what Amazon would pay you at any price you try. It never tells you what to charge. Free runs ${FREE_LIMITS.priceCheck.free} a day.`,
     figure: (
       <Shot
         src="/shot-price-check.webp"
         width={1897}
         height={860}
         url="openchapter.app/?area=price-check"
-        alt="The price check: a genre picker with two optional boxes for where and what happens, a Check prices button, and the answer — $7.49 is the median of 18 prices, from 20 of 81 books that carried one, half of them between $3.99 and $11.99 — with a note that these are Google Play US ebook prices and say nothing about print, above the books it found, cheapest first."
+        alt="The price check on Contemporary romance, from Apple Books' US top 100 best-selling ebooks: self-published and small presses at a middle price of $4.99 across 41 books, half between $3.99 and $6.99, and traditional publishers at $6.99 across 59, half between $3.99 and $9.99 — with a note that Kindle Unlimited books are sold only on Amazon and a link to search the genre there, above a Try a price card with $4.99 entered."
       />
     ),
   },

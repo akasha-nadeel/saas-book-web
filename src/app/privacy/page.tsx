@@ -124,6 +124,13 @@ export default function PrivacyPage() {
               of your manuscript goes with them.
             </>,
             <>
+              <Term>The price check</Term> — the genre you pick is sent to our
+              server, which reads Apple Books&rsquo; public list of best-selling
+              ebooks for it. Nothing about you or your book is sent to Apple.
+              The covers in the list load straight from Apple&rsquo;s servers,
+              so Apple sees that your browser asked for them.
+            </>,
+            <>
               <Term>Dictation</Term> — the microphone buttons use your
               browser&rsquo;s own speech recognition, not ours. While you are
               dictating, the browser sends the audio to its maker&rsquo;s

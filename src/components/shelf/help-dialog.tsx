@@ -122,7 +122,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "The price check",
-        desc: `What comparable ebooks are actually charging: every book the search found that had a price, the median of them, and the range the middle half sits in. Google Play's US ebook prices — neither catalogue carries paperback prices, so it says nothing about print. There is no recommended price and there will not be one. ${TIER_NAMES.free} runs ${plural(FREE_LIMITS.priceCheck.free, "check")} a day.`,
+        desc: `What the top 100 best-selling ebooks in your genre cost, from Apple Books' US store: a middle price for self-published books and one for traditional publishers, and every book listed. Try a price to see where it sits and what Amazon would pay you for a Kindle sale or a paperback. Kindle Unlimited books are sold only on Amazon, so they are not on the list. There is no recommended price and there will not be one. ${TIER_NAMES.free} runs ${plural(FREE_LIMITS.priceCheck.free, "check")} a day.`,
       },
       {
         name: "The writing record",
