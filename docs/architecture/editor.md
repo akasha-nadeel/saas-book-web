@@ -530,6 +530,20 @@ answers to one question. It returns a part rather than a boolean, and one part
 is open at a time: an open list takes the height the other two cards give up, so
 two at once would be three rows and a scrollbar each.
 
+**Arriving opens the list; after that the writer decides** (2026-10-07, the
+owner's call). Coming into a book — from the dashboard, a new book, an import,
+a pasted link — opens the list of the part the opened page belongs to, which
+for a chapter is the Body. Until then every card started shut (`aa3ba19`, *a
+list is what you ask for, not what you arrive at*), and a writer who had just
+imported forty chapters met three closed cards and had to press one to see any
+of them. The memory is keyed by **visit and book**: `BookVisit`
+(`editor/book-visit.tsx`) is a token mounted by `app/book/[bookId]/layout.tsx`,
+which stays mounted between chapters and out to Export and back, and mounts
+afresh on the way in. Inside a visit a shut list stays shut from chapter to
+chapter, as it always did. Opening by the page's part rather than always the
+Body keeps the panel and the sheet's edge agreeing when the page opened is a
+front- or back-matter one.
+
 **Front and back matter are lists of pages, and `src/lib/matter.ts` is the
 whole of what they offer.** They used to be *one page each*, whose template
 carried every standard division as a heading — so a writer met eight printer's

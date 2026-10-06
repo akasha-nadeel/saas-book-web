@@ -1,3 +1,4 @@
+import { BookVisit } from "@/components/editor/book-visit";
 import { ImportBannerHost } from "@/components/editor/import-banner-host";
 import { TrashedBookGate } from "@/components/upgrade/trashed-book";
 
@@ -21,7 +22,12 @@ export default async function BookLayout(props: LayoutProps<"/book/[bookId]">) {
           mounted once around all of them. A guard on the redirect page alone
           would be answered by pasting a chapter URL. */}
       <TrashedBookGate bookId={bookId}>
-        <div className="min-h-0 flex-1">{props.children}</div>
+        {/* One visit to this book, for the navigator's open card: a new one
+            each time the writer comes in, the same one while they move about
+            inside. See `BookVisit`. */}
+        <BookVisit>
+          <div className="min-h-0 flex-1">{props.children}</div>
+        </BookVisit>
       </TrashedBookGate>
     </div>
   );

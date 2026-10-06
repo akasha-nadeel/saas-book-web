@@ -382,7 +382,7 @@ export function ChapterEditor({
   // writer's statement of what they are working on, so the page's edge follows
   // the selection rather than the page.
   const chapterPart = chapter ? chapterMatterOf(chapter) : "body";
-  const body = useOpenPart();
+  const body = useOpenPart(bookId, chapterPart);
 
   const selectedPart = body.open ?? chapterPart;
 

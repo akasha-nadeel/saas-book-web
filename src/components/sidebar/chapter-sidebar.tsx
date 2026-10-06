@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { BookPanel, useOpenPart } from "@/components/editor/book-panel";
-import { findBook } from "@/lib/library-store";
+import { chapterMatterOf, findBook } from "@/lib/library-store";
 import { useCover, usePrefs, useShelf } from "@/lib/use-library";
 
 /**
@@ -33,13 +33,15 @@ export function ChapterSidebar({
   const book = findBook(shelf, bookId);
   const prefs = usePrefs();
   const cover = useCover(bookId);
-  const body = useOpenPart();
   const pathname = usePathname();
 
   const prefix = `/book/${bookId}/chapter/`;
   const activeId = pathname.startsWith(prefix)
     ? decodeURIComponent(pathname.slice(prefix.length))
     : null;
+  // The part an arrival opens: the open page's own, the Body for a chapter.
+  const active = book?.chapters.find((c) => c.id === activeId);
+  const body = useOpenPart(bookId, active ? chapterMatterOf(active) : "body");
 
   if (!book) return null;
 

@@ -763,7 +763,11 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   measurements. **Which card is
   open lives in `useOpenPart`, called by the *screen*** — the page sheet's edge takes the
   colour of the selected part, and two copies of that state would be two
-  answers to one question.
+  answers to one question. **Coming into a book opens the list of the open
+  page's part** — the Body, for a chapter — by the owner's decision of
+  2026-10-07, which reverses `aa3ba19`'s shut-to-begin-with. A visit is the
+  `BookVisit` token the book's layout mounts; inside one, the writer's last
+  choice holds from chapter to chapter, as before.
 - **The two rules from the selected card to the paper are portalled and
   `fixed`** (`PageConnector`). They were `absolute; left: 100%` inside the card
   and were cut off at the panel's edge, a third of the way to the page. The

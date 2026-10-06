@@ -36,6 +36,7 @@ import {
   type RowMenuItem,
 } from "@/components/sidebar/row-menu";
 import { useSectionImport } from "@/components/editor/section-import";
+import { useBookVisit } from "@/components/editor/book-visit";
 import { ConfirmDialog, PromptDialog } from "@/components/ui/dialog";
 
 /**
@@ -247,18 +248,27 @@ const CARD_EDGE_ACTIVE = "border-fg";
 const CARD_EDGE_VAR = "--color-fg";
 
 /**
- * Which part's list is open, remembered at module scope. Null is all three
- * shut, which is the panel's resting state.
+ * Which part's list is open, remembered at module scope — for one visit to one
+ * book. Null is all three shut.
  *
  * The panel is remounted every time the writer opens a different chapter, so
  * component state would put the list back to its default on each click —
  * clicking through a book would keep re-opening a list a writer had just shut.
  * Same reason the panel's face is held this way in the editor.
  *
- * Shut to begin with. The panel's first face is the book's three parts, whole
- * and equal; a list is what you ask for, not what you arrive at. It used to
- * open itself whenever the writer was in a numbered chapter, which is nearly
- * always — so nearly always the panel opened straight past its own front page.
+ * **Open on arrival, by the owner's decision of 2026-10-07.** Coming into a
+ * book — from the dashboard, a new book, an import — opens the list of the
+ * part the page being opened belongs to, which for a chapter is the Body. It
+ * was the other way round from `aa3ba19` until then: shut to begin with, on
+ * the argument that the panel's first face is the three parts whole and a list
+ * is what you ask for. In use that meant a writer who had just imported forty
+ * chapters arrived at three closed cards and had to press one to find any of
+ * them. Do not put the shut default back without the owner.
+ *
+ * **Only on arrival.** Once the writer shuts the list or opens another part,
+ * that holds from chapter to chapter for the rest of the visit, exactly as it
+ * did. A visit is `BookVisit`'s token, mounted by the book's layout, so a trip
+ * out to Export and back is the same visit and a trip to the dashboard is not.
  *
  * **One part at a time, and that is a layout fact rather than a preference.**
  * An open list takes the height the other two cards give up; two of them open
@@ -270,7 +280,21 @@ const CARD_EDGE_VAR = "--color-fg";
  * pages now, so all three cards open, and the question changed from "is it
  * open" to "which one".
  */
-let openPartMemory: ChapterMatter | null = null;
+let openPartMemory: {
+  visit: object;
+  bookId: string;
+  part: ChapterMatter | null;
+} | null = null;
+
+/** The remembered part, or — on arrival — the part of the page being opened. */
+function partFor(
+  visit: object,
+  bookId: string,
+  pagePart: ChapterMatter,
+): ChapterMatter | null {
+  const m = openPartMemory;
+  return m && m.visit === visit && m.bookId === bookId ? m.part : pagePart;
+}
 
 /**
  * A shape change that has to survive a page opening.
@@ -293,13 +317,19 @@ let arriving: {
 } | null = null;
 
 /** Open this part's list, or shut it if it is the one already open. */
-function togglePart(part: ChapterMatter): ChapterMatter | null {
-  openPartMemory = openPartMemory === part ? null : part;
-  return openPartMemory;
+function togglePart(
+  visit: object,
+  bookId: string,
+  current: ChapterMatter | null,
+  part: ChapterMatter,
+): ChapterMatter | null {
+  const next = current === part ? null : part;
+  openPartMemory = { visit, bookId, part: next };
+  return next;
 }
 
-function closeParts(): null {
-  openPartMemory = null;
+function closeParts(visit: object, bookId: string): null {
+  openPartMemory = { visit, bookId, part: null };
   return null;
 }
 
@@ -311,7 +341,12 @@ function closeParts(): null {
  * and pressing Chapters selects the body. Two copies of this would be two
  * answers to the same question.
  */
-export function useOpenPart() {
+export function useOpenPart(
+  bookId: string,
+  /** The part the open page belongs to — what an arrival opens. */
+  pagePart: ChapterMatter,
+) {
+  const visit = useBookVisit();
   /**
    * The move to finish, taken once and then held.
    *
@@ -329,8 +364,22 @@ export function useOpenPart() {
 
   // Mounted wearing the shape the writer left, when there is a move to finish.
   const [open, setOpen] = useState(() =>
-    entrance && entrance.from !== entrance.to ? entrance.from : openPartMemory,
+    entrance && entrance.from !== entrance.to
+      ? entrance.from
+      : partFor(visit, bookId, pagePart),
   );
+
+  /* An arrival opened `pagePart` without writing it down; write it now, so the
+     next chapter's remount reads the writer's state rather than arriving again.
+     Nothing can be pressed between that render and this effect. */
+  useEffect(() => {
+    const m = openPartMemory;
+    if (!m || m.visit !== visit || m.bookId !== bookId) {
+      openPartMemory = { visit, bookId, part: open };
+    }
+    // Once, for the mount: later changes write the memory themselves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     arriving = null;
@@ -353,8 +402,9 @@ export function useOpenPart() {
   return {
     /** The part whose list is showing, or null when all three are shut. */
     open,
-    toggle: (part: ChapterMatter) => setOpen(togglePart(part)),
-    close: () => setOpen(closeParts()),
+    toggle: (part: ChapterMatter) =>
+      setOpen(togglePart(visit, bookId, partFor(visit, bookId, pagePart), part)),
+    close: () => setOpen(closeParts(visit, bookId)),
     /**
      * Record a shape change that a page opening is about to interrupt.
      *
@@ -363,8 +413,8 @@ export function useOpenPart() {
      * it to the next one to play out in full.
      */
     remember: (next: ChapterMatter | null) => {
-      arriving = { from: openPartMemory, to: next };
-      openPartMemory = next;
+      arriving = { from: partFor(visit, bookId, pagePart), to: next };
+      openPartMemory = { visit, bookId, part: next };
     },
   };
 }
