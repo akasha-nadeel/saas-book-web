@@ -2,7 +2,9 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   SEGMENTS,
+  WATCHED_FEATURES,
   describeEvent,
+  featureUsers,
   funnel,
   isPaying,
   lastActive,
@@ -16,8 +18,11 @@ import {
   type AdminPayment,
   type AdminUser,
   type FeatureUse,
+  type FeatureUserRow,
   type SegmentId,
+  type WatchedFeature,
 } from "@/lib/admin/insights";
+import { FEATURE_USERS_MIGRATION, type ReadProblem } from "@/lib/admin/insights-server";
 import {
   Bars,
   DailyColumns,
@@ -490,9 +495,16 @@ export function CustomersTab({
 export function FeaturesTab({
   week,
   month,
+  users,
+  people,
+  now,
 }: {
   week: FeatureUse[];
   month: FeatureUse[];
+  users: AdminUser[];
+  /** Who made each watched kind, or why that read came back empty. */
+  people: FeatureUserRow[] | ReadProblem;
+  now: Date;
 }) {
   const bars = (use: FeatureUse[]) =>
     use.map((f) => ({
@@ -502,18 +514,112 @@ export function FeaturesTab({
     }));
 
   return (
-    <div className="grid gap-x-8 lg:grid-cols-2">
-      <Section title="Last 7 days" note="Events, and how many different accounts made them.">
-        <Panel className="px-3 py-3">
-          <Bars rows={bars(week)} empty="Nothing recorded in the last 7 days." />
+    <>
+      <div className="grid gap-x-8 lg:grid-cols-2">
+        <Section title="Last 7 days" note="Events, and how many different accounts made them.">
+          <Panel className="px-3 py-3">
+            <Bars rows={bars(week)} empty="Nothing recorded in the last 7 days." />
+          </Panel>
+        </Section>
+        <Section title="Last 30 days" note="Opening the app, a book, Ideas or writing counts once per half hour.">
+          <Panel className="px-3 py-3">
+            <Bars rows={bars(month)} empty="Nothing recorded in the last 30 days." />
+          </Panel>
+        </Section>
+      </div>
+
+      <h2 className="mt-12 font-display text-2xl font-bold tracking-tight text-fg">Who uses them</h2>
+      <p className="mt-1 font-sans text-sm text-muted">
+        Every account that has used each feature since the activity record began, most
+        recent first. Counts are events; open an account for its full record.
+      </p>
+
+      {Array.isArray(people) ? (
+        WATCHED_FEATURES.map((feature) => (
+          <WhoUses
+            key={feature.id}
+            feature={feature}
+            rows={people}
+            users={users}
+            now={now}
+          />
+        ))
+      ) : people.kind === "missing" ? (
+        <Problem title="The feature-users migration is not on this project">
+          Apply <code>{FEATURE_USERS_MIGRATION}</code> in the Supabase SQL editor, then
+          reload. Until it is, this list cannot be read and Ideas is not recorded.
+        </Problem>
+      ) : (
+        <Problem title="A read failed">
+          <code>{people.message}</code>
+        </Problem>
+      )}
+    </>
+  );
+}
+
+function WhoUses({
+  feature,
+  rows,
+  users,
+  now,
+}: {
+  feature: WatchedFeature;
+  rows: FeatureUserRow[];
+  users: AdminUser[];
+  now: Date;
+}) {
+  const who = featureUsers(rows, feature);
+  const byId = new Map(users.map((u) => [u.id, u]));
+  const count = `${who.length} ${who.length === 1 ? "account" : "accounts"}`;
+
+  return (
+    <Section title={`${feature.title} · ${count}`} note={feature.note}>
+      {who.length === 0 ? (
+        <Panel>
+          <Empty>{feature.empty}</Empty>
         </Panel>
-      </Section>
-      <Section title="Last 30 days" note="Opening the app, a book or writing counts once per half hour.">
-        <Panel className="px-3 py-3">
-          <Bars rows={bars(month)} empty="Nothing recorded in the last 30 days." />
-        </Panel>
-      </Section>
-    </div>
+      ) : (
+        <TableFrame
+          head={
+            <>
+              <Th>Account</Th>
+              {feature.columns.map((c) => (
+                <Th key={`${c.kind}|${c.detail ?? ""}`} className="text-right">
+                  {c.label}
+                </Th>
+              ))}
+              <Th>Last used</Th>
+              <Th>First used</Th>
+              <Th>Plan</Th>
+              <Th>Segment</Th>
+            </>
+          }
+        >
+          {who.map((w) => {
+            const user = byId.get(w.owner);
+            return (
+              <tr key={w.owner} className="hover:bg-raised/50">
+                <Td>
+                  <Link href={`/admin/users/${w.owner}`} className="font-medium text-accent hover:underline">
+                    {user?.email ?? w.owner}
+                  </Link>
+                </Td>
+                {w.counts.map((n, i) => (
+                  <Td key={i} className={`text-right tabular-nums ${n === 0 ? "text-muted" : ""}`}>
+                    {n === 0 ? "—" : n.toLocaleString()}
+                  </Td>
+                ))}
+                <Td className="whitespace-nowrap">{ago(w.lastAt, now)}</Td>
+                <Td className="whitespace-nowrap">{fmtDate(w.firstAt)}</Td>
+                <Td className="whitespace-nowrap">{user ? planLabel(user, now) : "—"}</Td>
+                <Td>{user ? <SegmentBadge id={segmentOf(user, now)} /> : "—"}</Td>
+              </tr>
+            );
+          })}
+        </TableFrame>
+      )}
+    </Section>
   );
 }
 

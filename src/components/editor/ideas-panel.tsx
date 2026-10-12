@@ -17,6 +17,7 @@ import {
   createBook,
   saveIdeasRaw,
 } from "@/lib/library-store";
+import { noteActivity } from "@/lib/activity-log";
 import { LAUNCH_LIMITS, onFreePlan } from "@/lib/launch";
 import { relativeTime } from "@/lib/relative-time";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -107,6 +108,12 @@ export function IdeasPanel({ bookId }: { bookId?: string }) {
    */
   const gate = useLimitGate({ action: "ideas", items: ideas.length });
 
+  // The operator's record of the board being opened. Never the ideas: they
+  // stay in this browser, and the record has nowhere to put a word of them.
+  useEffect(() => {
+    noteActivity("ideas_open", { bookId });
+  }, [bookId]);
+
   /* The board searches over everything parked, never over what is on screen,
      so the count in the header and the limit above stay about the lot rather
      than about the filter. */
@@ -130,6 +137,7 @@ export function IdeasPanel({ bookId }: { bookId?: string }) {
         ...(bookId ? { from: bookId } : {}),
       }),
     );
+    noteActivity("idea_parked", { bookId });
     setText("");
   }
 
@@ -256,6 +264,7 @@ export function IdeasPanel({ bookId }: { bookId?: string }) {
                   return;
                 }
                 const { bookId: made } = createBook(titleFromIdea(idea.text));
+                noteActivity("book_created", { detail: "idea", bookId: made });
                 commit(removeIdea(ideas, idea.id));
                 router.push(`/book/${made}`);
               }}

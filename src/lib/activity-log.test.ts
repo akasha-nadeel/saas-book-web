@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ACTIVITY_DETAILS,
   ACTIVITY_KINDS,
+  PRESENCE_KINDS,
   allDetails,
   cleanBookId,
   importDetail,
@@ -10,12 +11,20 @@ import {
 } from "./activity-log";
 
 /*
- * SQL cannot import TypeScript, so the test reads the migration — the browser
+ * SQL cannot import TypeScript, so the test reads the migrations — the browser
  * sending a kind Postgres then refuses is the drift this catches, and it would
  * be silent: `noteActivity` swallows its errors by design.
+ *
+ * The table is created in the first and its lists are restated in the second,
+ * which is the one the database now holds. A third migration that changes the
+ * lists moves `LISTS` on to itself.
  */
 const SQL = readFileSync(
   "supabase/migrations/20261005000000_admin_insights.sql",
+  "utf8",
+);
+const LISTS = readFileSync(
+  "supabase/migrations/20261012000000_feature_users.sql",
   "utf8",
 );
 
@@ -25,13 +34,36 @@ function quoted(block: string | undefined): string[] {
 
 describe("the activity record's lists", () => {
   it("names the same kinds as the migration's CHECK", () => {
-    const block = SQL.match(/kind\s+text not null check \(kind in \(([\s\S]*?)\)\)/)?.[1];
+    const block = LISTS.match(
+      /add constraint activity_events_kind_check check \(kind in \(([\s\S]*?)\)\)/,
+    )?.[1];
     expect(quoted(block)).toEqual([...ACTIVITY_KINDS]);
   });
 
   it("names the same details as the migration's CHECK", () => {
-    const block = SQL.match(/detail\s+text check \(detail in \(([\s\S]*?)\)\)/)?.[1];
+    const block = LISTS.match(
+      /add constraint activity_events_detail_check check \(detail in \(([\s\S]*?)\)\)/,
+    )?.[1];
     expect(new Set(quoted(block))).toEqual(new Set(allDetails()));
+  });
+
+  /*
+   * A restated list may only grow: an existing row with a kind the new CHECK
+   * leaves out would make Postgres refuse to add the constraint at all.
+   */
+  it("keeps every kind and detail the first migration allowed", () => {
+    const kinds = quoted(SQL.match(/kind\s+text not null check \(kind in \(([\s\S]*?)\)\)/)?.[1]);
+    const details = quoted(SQL.match(/detail\s+text check \(detail in \(([\s\S]*?)\)\)/)?.[1]);
+    expect(kinds.length).toBeGreaterThan(0);
+    for (const kind of kinds) expect(ACTIVITY_KINDS).toContain(kind);
+    for (const detail of details) expect(allDetails()).toContain(detail);
+  });
+
+  it("throttles the same kinds to half an hour as the browser does", () => {
+    const block = LISTS.match(
+      /when new\.kind in \(([^)]*)\)\s*then interval '30 minutes'/,
+    )?.[1];
+    expect(new Set(quoted(block))).toEqual(new Set(PRESENCE_KINDS));
   });
 
   it("gives a detail list only to kinds that exist", () => {
@@ -68,6 +100,7 @@ describe("shouldSend", () => {
     expect(shouldSend("app_open", t, t + 29 * 60_000)).toBe(false);
     expect(shouldSend("app_open", t, t + 30 * 60_000)).toBe(true);
     expect(shouldSend("writing", t, t + 10 * 60_000)).toBe(false);
+    expect(shouldSend("ideas_open", t, t + 10 * 60_000)).toBe(false);
   });
 
   it("holds anything else for ten seconds — a double click, not a second export", () => {

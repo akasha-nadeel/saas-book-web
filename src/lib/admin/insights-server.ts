@@ -5,6 +5,7 @@ import {
   toAdminDay,
   toAdminUser,
   toFeatureUse,
+  toFeatureUserRow,
   toFeedback,
   toInterest,
   toPayment,
@@ -16,6 +17,8 @@ import {
   type AdminUser,
   type AdminUserDetail,
   type FeatureUse,
+  type FeatureUserRow,
+  WATCHED_KINDS,
 } from "./insights";
 
 /**
@@ -28,6 +31,9 @@ import {
  */
 
 export const MIGRATION = "supabase/migrations/20261005000000_admin_insights.sql";
+
+/** Who uses which feature, and the Ideas board's kinds — the second part. */
+export const FEATURE_USERS_MIGRATION = "supabase/migrations/20261012000000_feature_users.sql";
 
 /**
  * Why a read came back empty. A function that does not exist is the migration
@@ -72,6 +78,13 @@ export function readDaily(db: AdminDb, days: number): Promise<Result<AdminDay[]>
 
 export function readFeatureUse(db: AdminDb, days: number): Promise<Result<FeatureUse[]>> {
   return call(db, "admin_feature_use", { p_days: days }, (d) => rows(d).map(toFeatureUse));
+}
+
+/** Every account that made one of the watched kinds, per kind and detail. */
+export function readFeatureUsers(db: AdminDb): Promise<Result<FeatureUserRow[]>> {
+  return call(db, "admin_feature_users", { p_kinds: WATCHED_KINDS }, (d) =>
+    rows(d).map(toFeatureUserRow),
+  );
 }
 
 export function readUserDetail(db: AdminDb, id: string): Promise<Result<AdminUserDetail>> {

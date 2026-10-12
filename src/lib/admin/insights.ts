@@ -1,4 +1,8 @@
-import { ACTIVITY_KINDS, type ActivityKind } from "@/lib/activity-log";
+import {
+  ACTIVITY_KINDS,
+  type ActivityKind,
+  type DetailOf,
+} from "@/lib/activity-log";
 import { asPeriod, perMonthOf, type Period } from "@/lib/billing/plans";
 import {
   asSubscriptionStatus,
@@ -6,6 +10,7 @@ import {
   type SubscriptionStatus,
 } from "@/lib/billing/subscription";
 import { asPaidTier } from "@/lib/billing/tiers";
+import { FREE_LIMITS } from "@/lib/free-limits";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 
 /**
@@ -430,11 +435,14 @@ export const KIND_LABELS: Record<ActivityKind, string> = {
   pricing_view: "Looked at pricing",
   checkout_start: "Started a checkout",
   limit_hit: "Was refused by a free limit",
+  ideas_open: "Opened Ideas",
+  idea_parked: "Parked an idea",
 };
 
 const DETAIL_LABELS: Record<string, string> = {
   blank: "from scratch",
   import: "from a file",
+  idea: "from an idea",
   docx: "Word",
   epub: "EPUB",
   md: "Markdown",
@@ -510,6 +518,158 @@ export function toFeatureUse(row: Record<string, unknown>): FeatureUse {
     events: num(row.events),
     users: num(row.users),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Who uses what
+// ---------------------------------------------------------------------------
+
+/** One row of `admin_feature_users()`: one kind and detail, one account. */
+export interface FeatureUserRow {
+  kind: string;
+  detail: string | null;
+  owner: string;
+  events: number;
+  firstAt: Date | null;
+  lastAt: Date | null;
+}
+
+export function toFeatureUserRow(row: Record<string, unknown>): FeatureUserRow {
+  return {
+    kind: String(row.kind),
+    detail: text(row.detail),
+    owner: String(row.owner),
+    events: num(row.events),
+    firstAt: date(row.first_at),
+    lastAt: date(row.last_at),
+  };
+}
+
+/**
+ * One column of a feature's table. A column with a detail counts only that
+ * detail, so `limit_hit · titleCheck` is not swollen by every other limit.
+ */
+export type FeatureColumn = {
+  [K in ActivityKind]: {
+    kind: K;
+    label: string;
+  } & ([DetailOf<K>] extends [never] ? { detail?: never } : { detail?: DetailOf<K> });
+}[ActivityKind];
+
+export interface WatchedFeature {
+  id: "title_check" | "price_check" | "ideas";
+  title: string;
+  /** Said under the heading: what the columns count and where they come from. */
+  note: string;
+  /** Said when nobody has used it yet. */
+  empty: string;
+  columns: readonly FeatureColumn[];
+}
+
+/**
+ * The features whose users the operator asked to see by name, and what counts
+ * as using each. Every column is an event the app already records; the test
+ * holds each one to `ACTIVITY_KINDS` and the kind's own detail list.
+ */
+export const WATCHED_FEATURES: readonly WatchedFeature[] = [
+  {
+    id: "title_check",
+    title: "Title check",
+    note: `A check is one search run. Free runs ${FREE_LIMITS.titleCheck.free} a day.`,
+    empty: "Nobody has run a title check yet.",
+    columns: [
+      { kind: "title_check_run", label: "Checks run" },
+      { kind: "limit_hit", detail: "titleCheck", label: "Refused, daily limit" },
+    ],
+  },
+  {
+    id: "price_check",
+    title: "Price check",
+    note: "A genre opened is one list read. The Amazon tab is Pro; a Free account pressing it is counted on its own.",
+    empty: "Nobody has opened the price check yet.",
+    columns: [
+      { kind: "price_check_run", label: "Genres opened" },
+      { kind: "limit_hit", detail: "priceCheck", label: "Pressed the locked Amazon tab" },
+    ],
+  },
+  {
+    id: "ideas",
+    title: "Ideas",
+    note: `A visit counts once per half hour. Free parks ${FREE_LIMITS.ideas.free} at a time. The ideas themselves stay in the writer's browser and are never seen here.`,
+    empty: "Nobody yet. Ideas is recorded only from the release that added this table; nothing before it is known.",
+    columns: [
+      { kind: "ideas_open", label: "Visits" },
+      { kind: "idea_parked", label: "Ideas parked" },
+      { kind: "book_created", detail: "idea", label: "Books started from one" },
+      {
+        kind: "limit_hit",
+        detail: "ideas",
+        label: `Refused at ${FREE_LIMITS.ideas.free} parked`,
+      },
+    ],
+  },
+];
+
+/** Every kind a watched column names, once — what the read asks for. */
+export const WATCHED_KINDS: readonly ActivityKind[] = [
+  ...new Set(WATCHED_FEATURES.flatMap((f) => f.columns.map((c) => c.kind))),
+];
+
+export interface FeatureUser {
+  owner: string;
+  /** One count per column of the feature, in the feature's column order. */
+  counts: number[];
+  firstAt: Date | null;
+  lastAt: Date | null;
+}
+
+function earlier(a: Date | null, b: Date | null): Date | null {
+  if (!a) return b;
+  if (!b) return a;
+  return a.getTime() <= b.getTime() ? a : b;
+}
+
+function later(a: Date | null, b: Date | null): Date | null {
+  if (!a) return b;
+  if (!b) return a;
+  return a.getTime() >= b.getTime() ? a : b;
+}
+
+/**
+ * Everybody who did any of a feature's things, with a count for each column,
+ * most recently active first. A row matching no column is not counted, so an
+ * account refused only by the book limit is not on the title check's list.
+ */
+export function featureUsers(
+  rows: readonly FeatureUserRow[],
+  feature: WatchedFeature,
+): FeatureUser[] {
+  const byOwner = new Map<string, FeatureUser>();
+
+  for (const row of rows) {
+    const column = feature.columns.findIndex(
+      (c) => c.kind === row.kind && (c.detail === undefined || c.detail === row.detail),
+    );
+    if (column < 0 || row.events <= 0) continue;
+
+    let user = byOwner.get(row.owner);
+    if (!user) {
+      user = {
+        owner: row.owner,
+        counts: feature.columns.map(() => 0),
+        firstAt: null,
+        lastAt: null,
+      };
+      byOwner.set(row.owner, user);
+    }
+    user.counts[column] += row.events;
+    user.firstAt = earlier(user.firstAt, row.firstAt);
+    user.lastAt = later(user.lastAt, row.lastAt);
+  }
+
+  return [...byOwner.values()].sort(
+    (a, b) => (b.lastAt?.getTime() ?? 0) - (a.lastAt?.getTime() ?? 0),
+  );
 }
 
 /** The earliest event anybody has — the day the activity record began. */

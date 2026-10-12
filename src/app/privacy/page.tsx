@@ -95,12 +95,13 @@ export default function PrivacyPage() {
               <Term>An activity record</Term> — which parts of OpenChapter you
               use and when: that you opened the app or a book, wrote, imported
               or exported a file (and which format), ran a title, price or
-              consistency check, looked at pricing, started a checkout, or
-              reached a free-plan limit (and which one). Each entry is the kind
+              consistency check, opened Ideas, parked an idea or started a book
+              from one, looked at pricing, started a checkout, or reached a
+              free-plan limit (and which one). Each entry is the kind
               of thing that happened, the time, and your book&rsquo;s internal
-              id where there is one. It never holds a title, a file name or
-              anything you wrote or typed. It is kept while your account exists
-              and deleted with it.
+              id where there is one. It never holds a title, a file name, an
+              idea or anything else you wrote or typed. It is kept while your
+              account exists and deleted with it.
             </>,
           ]}
         />
@@ -161,8 +162,8 @@ export default function PrivacyPage() {
             <>
               <Term>The activity record</Term> — if you are signed in, each of
               the moments listed above sends one short entry to our database.
-              Opening the app, a book or writing is recorded at most once every
-              half hour. Nothing is sent when you are signed out.
+              Opening the app, a book or Ideas, and writing, is recorded at most
+              once every half hour. Nothing is sent when you are signed out.
             </>,
             <>
               <Term>Advertising measurement</Term> — we run search ads, and

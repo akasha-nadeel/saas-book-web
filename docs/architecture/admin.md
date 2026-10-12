@@ -61,6 +61,8 @@ that reads it alongside what the database already held.
 | `consistency_run` | `consistency-page.tsx` `run` |
 | `limit_hit` | `useLimitGate.spend()` when refused (all metered tools at once), the new-book limit, a locked consistency check, the paperback gate |
 | `paperback_open` / `provenance_open` | those screens, once the plan is known |
+| `ideas_open` / `idea_parked` | `ideas-panel.tsx` — on mount, and after a successful `gate.spend()` (added 2026-10-12) |
+| `book_created` · `idea` | `ideas-panel.tsx`, starting a book from a parked idea |
 | `pricing_view` | `Plans` on mount (signed-in only — `noteActivity` asks) |
 | `checkout_start` | `PaddleUpgradeButton` press |
 
@@ -69,11 +71,25 @@ one is history), `ACTIVITY_KINDS`, and `KIND_LABELS` in `insights.ts`. The
 tests fail until all three agree. **/privacy lists the moments in words**, so a
 new kind is a fourth edit there.
 
+**The lists now live in the second migration**,
+`20261012000000_feature_users.sql`, which drops and re-adds
+`activity_events_kind_check` and `activity_events_detail_check` with the Ideas
+pair and `idea` added, and restates the throttle with `ideas_open` among the
+half-hour kinds. `activity-log.test.ts` reads the lists from there, holds the
+throttle's half-hour list to `PRESENCE_KINDS`, and fails if a restated list
+drops a value the first one allowed — an existing row with that value would
+stop Postgres adding the constraint at all. The next change to the lists is a
+third migration, and the test's `LISTS` moves on to it.
+
 ## The read side
 
-Seven `security definer` functions with `search_path = ''`: `admin_users`,
+Eight `security definer` functions with `search_path = ''`: `admin_users`,
 `admin_daily`, `admin_feature_use`, `admin_user_detail`, `admin_feedback`,
-`admin_interest`, `admin_payments`.
+`admin_interest`, `admin_payments`, and — in the second migration —
+`admin_feature_users(p_kinds text[])`, which says *who* made each kind and
+detail (count, first, last) over the whole record. It reads no address; the
+page joins the accounts `admin_users` already returned. `insights.test.ts`
+reads both migrations for the revoke, the grant and the forbidden tables.
 
 - **Executable by `service_role` only.** Each is revoked from `public, anon,
   authenticated` by name — Postgres grants EXECUTE to PUBLIC by default and
@@ -136,6 +152,15 @@ Server Components except `users-table.tsx`. Pure logic in
   somebody can pay without writing 100 words.
 - **Monthly revenue is derived from `plans.ts`** (`perMonthOf`) over active
   subscriptions, never from a copy of the prices.
+- **Features names names** (2026-10-12). Under the two bar charts, "Who uses
+  them" draws one table per entry in `WATCHED_FEATURES` (`insights.ts`) — the
+  title check, the price check and Ideas — with a column per thing that counts
+  as using it, last and first used, plan and segment, each account linking to
+  its own page. `featureUsers` is the pure grouping; a column with a detail
+  counts only that detail, so the book limit does not land in the title
+  check's list. If the second migration is missing, the bars still draw and
+  the section names the file. **Ideas knows nothing before that release** —
+  the board is kept in the writer's browser, so there was nothing to read.
 - **The record is younger than the accounts** and the screens say when it
   began. Anything that rests on it knows nothing before the first event;
   "last seen" also reads `chapters.updated_at` and `last_sign_in_at` so older

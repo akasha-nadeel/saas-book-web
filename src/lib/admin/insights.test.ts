@@ -1,21 +1,26 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ACTIVITY_KINDS } from "@/lib/activity-log";
+import { ACTIVITY_DETAILS, ACTIVITY_KINDS } from "@/lib/activity-log";
 import { perMonthOf } from "@/lib/billing/plans";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 import {
   KIND_LABELS,
   SEGMENTS,
+  WATCHED_FEATURES,
+  WATCHED_KINDS,
   cameBack,
   describeEvent,
+  featureUsers,
   funnel,
   isPaying,
   revenue,
   segmentCounts,
   segmentOf,
   toAdminUser,
+  toFeatureUserRow,
   toUserDetail,
   type AdminUser,
+  type FeatureUserRow,
 } from "./insights";
 
 const NOW = new Date("2026-10-05T12:00:00Z");
@@ -67,10 +72,12 @@ const pro = (over: Partial<NonNullable<AdminUser["subscription"]>> = {}) => ({
  * first: the migration explains the rule, and explaining it is not breaking it.
  */
 describe("what the admin functions may read", () => {
-  const sql = readFileSync(
+  const sql = [
     "supabase/migrations/20261005000000_admin_insights.sql",
-    "utf8",
-  )
+    "supabase/migrations/20261012000000_feature_users.sql",
+  ]
+    .map((file) => readFileSync(file, "utf8"))
+    .join("\n")
     .split("\n")
     .map((line) => line.replace(/--.*$/, ""))
     .join("\n");
@@ -274,5 +281,96 @@ describe("toUserDetail", () => {
 
   it("survives null", () => {
     expect(toUserDetail(null).books).toEqual([]);
+  });
+});
+
+describe("who uses what", () => {
+  const at = (iso: string) => new Date(iso);
+  const row = (over: Partial<FeatureUserRow>): FeatureUserRow => ({
+    kind: "title_check_run",
+    detail: null,
+    owner: "a",
+    events: 1,
+    firstAt: at("2026-10-06T10:00:00Z"),
+    lastAt: at("2026-10-06T10:00:00Z"),
+    ...over,
+  });
+  const feature = (id: string) => WATCHED_FEATURES.find((f) => f.id === id)!;
+
+  it("narrows a row from admin_feature_users()", () => {
+    const r = toFeatureUserRow({
+      kind: "limit_hit",
+      detail: "ideas",
+      owner: "abc",
+      events: "4",
+      first_at: "2026-10-06T10:00:00Z",
+      last_at: null,
+    });
+    expect(r).toEqual({
+      kind: "limit_hit",
+      detail: "ideas",
+      owner: "abc",
+      events: 4,
+      firstAt: at("2026-10-06T10:00:00Z"),
+      lastAt: null,
+    });
+  });
+
+  it("names only kinds the record has, with details those kinds allow", () => {
+    for (const f of WATCHED_FEATURES) {
+      for (const c of f.columns) {
+        expect(ACTIVITY_KINDS).toContain(c.kind);
+        if (c.detail !== undefined) {
+          const allowed = (ACTIVITY_DETAILS as Record<string, readonly string[]>)[c.kind];
+          expect(allowed).toContain(c.detail);
+        }
+      }
+    }
+  });
+
+  it("asks for every kind a column names, once", () => {
+    const named = WATCHED_FEATURES.flatMap((f) => f.columns.map((c) => c.kind));
+    expect(new Set(WATCHED_KINDS)).toEqual(new Set(named));
+    expect(WATCHED_KINDS.length).toBe(new Set(WATCHED_KINDS).size);
+  });
+
+  it("puts each account once, a count in each column, newest first", () => {
+    const rows = [
+      row({ owner: "old", events: 2, lastAt: at("2026-10-06T00:00:00Z") }),
+      row({ owner: "new", events: 5, lastAt: at("2026-10-09T00:00:00Z") }),
+      row({
+        owner: "new",
+        kind: "limit_hit",
+        detail: "titleCheck",
+        events: 1,
+        firstAt: at("2026-10-05T00:00:00Z"),
+        lastAt: at("2026-10-08T00:00:00Z"),
+      }),
+    ];
+    const who = featureUsers(rows, feature("title_check"));
+    expect(who.map((w) => w.owner)).toEqual(["new", "old"]);
+    expect(who[0].counts).toEqual([5, 1]);
+    expect(who[0].firstAt).toEqual(at("2026-10-05T00:00:00Z"));
+    expect(who[0].lastAt).toEqual(at("2026-10-09T00:00:00Z"));
+    expect(who[1].counts).toEqual([2, 0]);
+  });
+
+  it("counts a detailed column only for its own detail", () => {
+    const rows = [
+      row({ owner: "books-only", kind: "limit_hit", detail: "books" }),
+      row({ owner: "ideas", kind: "limit_hit", detail: "ideas", events: 3 }),
+    ];
+    expect(featureUsers(rows, feature("title_check"))).toEqual([]);
+    const ideas = featureUsers(rows, feature("ideas"));
+    expect(ideas.map((w) => w.owner)).toEqual(["ideas"]);
+    expect(ideas[0].counts).toEqual([0, 0, 0, 3]);
+  });
+
+  it("does not count a book made from scratch as one started from an idea", () => {
+    const rows = [
+      row({ owner: "blank", kind: "book_created", detail: "blank" }),
+      row({ owner: "idea", kind: "book_created", detail: "idea" }),
+    ];
+    expect(featureUsers(rows, feature("ideas")).map((w) => w.owner)).toEqual(["idea"]);
   });
 });

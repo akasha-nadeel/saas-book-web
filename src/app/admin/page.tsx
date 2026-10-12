@@ -14,6 +14,7 @@ import {
   MIGRATION,
   readDaily,
   readFeatureUse,
+  readFeatureUsers,
   readFeedback,
   readInterest,
   readPayments,
@@ -35,7 +36,8 @@ export const metadata: Metadata = {
  * books" goes back to their own dashboard.
  *
  * One tab is read per request — the users list is the expensive call and the
- * Features and Feedback tabs do not need it.
+ * Feedback tab does not need it. Features reads it for the plan and segment
+ * beside each name in "Who uses them".
  */
 export default async function AdminRoute(props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -73,12 +75,27 @@ export default async function AdminRoute(props: {
   );
 
   if (tab === "features") {
-    const [week, month] = await Promise.all([readFeatureUse(db, 7), readFeatureUse(db, 30)]);
+    // Who-uses-what comes from the second admin migration, so a project with
+    // only the first still gets the bars: that read failing is said inside
+    // the tab rather than in place of it.
+    const [week, month, people, users] = await Promise.all([
+      readFeatureUse(db, 7),
+      readFeatureUse(db, 30),
+      readFeatureUsers(db),
+      readUsers(db),
+    ]);
     if (!week.ok) return missing(week.problem);
     if (!month.ok) return missing(month.problem);
+    if (!users.ok) return missing(users.problem);
     return (
       <AdminFrame email={session.email} tab={tab}>
-        <FeaturesTab week={week.value} month={month.value} />
+        <FeaturesTab
+          week={week.value}
+          month={month.value}
+          users={users.value}
+          people={people.ok ? people.value : people.problem}
+          now={now}
+        />
       </AdminFrame>
     );
   }

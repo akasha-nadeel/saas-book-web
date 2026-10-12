@@ -954,11 +954,15 @@ local-only, with the account menu saying why. Every entry point checks
   absent** — PostgREST refuses the whole select for one unknown column, so the
   entire library download would fail for everybody.
 - **Schema changes belong in `supabase/migrations/`**, not only in the
-  dashboard. There are **seventeen**. The first seven were confirmed applied live
+  dashboard. There are **eighteen**. The first seven were confirmed applied live
   on 2026-08-20; the fifteenth and the sixteenth on 2026-09-23. The seventeenth,
   `20261005000000_admin_insights.sql`, is `/admin`'s and was applied live on
   2026-10-05, before its code shipped, and checked through PostgREST (the
-  secret key reads, the publishable key gets 42501). The eighth
+  secret key reads, the publishable key gets 42501). **The eighteenth,
+  `20261012000000_feature_users.sql`, must be applied before its code ships**:
+  it re-adds the activity record's CHECKs with the Ideas kinds and adds
+  `admin_feature_users`; until it is, the new kinds are refused (a console
+  warning, nothing worse) and `/admin?tab=features` names the file. The eighth
   through the fourteenth (`20260822071735_launch_mvp_entitlements.sql` through
   `20260914000000_ai_free_pro_plan.sql`, whose own trigger proves it landed)
   have not been confirmed here, so check before blaming a route. **The
@@ -1397,13 +1401,21 @@ why the dashboard writes `/?area=overview` for them.
   throttled by a trigger. `noteActivity()` in `src/lib/activity-log.ts` is the
   one caller and is fire-and-forget. **Not `activity.ts`**, the writer's own
   local words-per-day log. A new kind is a new migration, `ACTIVITY_KINDS`,
-  `KIND_LABELS` and a sentence on /privacy.
+  `KIND_LABELS` and a sentence on /privacy — and since 2026-10-12 the lists
+  live in the second migration, `20261012000000_feature_users.sql`, so the
+  next change to them is a third.
 - **The `admin_*` functions are the only cross-account reads**, executable by
   `service_role` alone, and **none may name `chapter_bodies`, `chapter_notes`
   or `book_covers`** — /privacy promises the operator sees titles and counts,
   never prose, and `insights.test.ts` holds the migration to it.
 - **Segments, not scores**: every account is in the first segment whose rule it
   meets, and the rule is printed beside it. No engagement number.
+- **The Features tab names who uses the title check, the price check and
+  Ideas** (2026-10-12) — `WATCHED_FEATURES` and `featureUsers` in
+  `insights.ts`, read through `admin_feature_users`. Ideas is recorded only
+  from that release: the board lives in the writer's browser, so the event
+  (`ideas_open`, `idea_parked`, `book_created · idea`) is all the server sees,
+  and never an idea's words.
 
 ### Routes
 

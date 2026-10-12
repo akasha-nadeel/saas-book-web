@@ -25,7 +25,11 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
  * `20261005000000_admin_insights.sql` behaves exactly as before.
  */
 
-/** Matches the `kind` CHECK in the migration, in the same order. */
+/**
+ * Matches the `kind` CHECK, in the same order. The first fourteen came with
+ * `20261005000000_admin_insights.sql`; the Ideas pair with
+ * `20261012000000_feature_users.sql`, which holds the list now.
+ */
 export const ACTIVITY_KINDS = [
   "app_open",
   "book_open",
@@ -41,6 +45,8 @@ export const ACTIVITY_KINDS = [
   "pricing_view",
   "checkout_start",
   "limit_hit",
+  "ideas_open",
+  "idea_parked",
 ] as const;
 
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
@@ -52,7 +58,7 @@ export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
  * own name (`Format` in `export/index.ts`), so both are on the list.
  */
 export const ACTIVITY_DETAILS = {
-  book_created: ["blank", "import"],
+  book_created: ["blank", "import", "idea"],
   import_done: ["docx", "epub", "md", "txt", "html"],
   export_done: ["docx", "epub", "markdown", "pdf"],
   checkout_start: ["monthly", "annual"],
@@ -89,13 +95,17 @@ export function allDetails(): string[] {
 /**
  * The kinds worth one row per half hour: being here, rather than doing a
  * thing. The database collapses them over the same window, so sending more
- * often would only be requests it drops.
+ * often would only be requests it drops — and the throttle's list in the
+ * newest migration is held to this one by a test.
  */
-const PRESENCE: ReadonlySet<ActivityKind> = new Set([
+export const PRESENCE_KINDS = [
   "app_open",
   "book_open",
   "writing",
-]);
+  "ideas_open",
+] as const satisfies readonly ActivityKind[];
+
+const PRESENCE: ReadonlySet<ActivityKind> = new Set(PRESENCE_KINDS);
 
 const PRESENCE_MS = 30 * 60 * 1000;
 const REPEAT_MS = 10 * 1000;
