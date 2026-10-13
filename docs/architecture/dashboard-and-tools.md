@@ -325,10 +325,28 @@ and say "a different kind of row" without a heading; there was a "Tools"
 heading for a day and it came out. The book lists sit under Write because they
 are Write seen through a filter, and Trash stays the last row.
 
-**How it works, Support, Send feedback and Pricing sit at the foot of the side
-panel**, under a rule, and in `MobileDashboardNavigation` on a phone. For part of
-2026-09-15 they were in the top bar left of New book; the owner moved them back
-the same day, so the top bar holds only the heading and New book.
+**Help, Support, Feedback, Pricing and Search are one-word buttons left of
+New book** (2026-10-13, the owner's call), and the side panel holds places
+only. The order is Admin (the operator alone), Help, Support, Feedback,
+Pricing, a rule, then Search beside New book. Each is `HeaderAction` in
+`bookshelf.tsx`. The word is the accessible name, with no `aria-label` to
+disagree with it. Only Search has a tooltip, because it adds something: what
+it searches and the `/` keycap.
+
+Icons alone were tried first, the same day, and the owner asked for short names
+instead. "Help" is How it works, which is also what that dialog calls itself.
+
+The five are `md` and up, like the rail they came from. On a phone they stay as
+labelled rows in `MobileDashboardNavigation`, which is the phone's rail. Search
+shows at every width, which gave the phone a search button for the first time.
+
+The header row wraps from `sm` (the title has `basis-80`). On a tablet or a
+small laptop with the rail open, the buttons drop to a second line rather than
+truncating the greeting.
+
+**This is the second time they have been here**: for part of 2026-09-15 they
+sat left of New book under their full names, and the owner moved them back the
+same day.
 
 Paperback works on one book, and shares two pieces with `Tools`:
 **`WorkingOn`**, the cover-and-title card with the Change book menu (lifted out
