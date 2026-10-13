@@ -235,14 +235,17 @@ const AREAS: {
    *
    * The glyph moved with the name. A compass reads as *looking outward across
    * a field*, which is what two searches were; a magnifier is what one lookup
-   * is. Both come from `shelf-icons.tsx`, so it stays the same alphabet as the
-   * rest of the column.
+   * is. **Since 2026-10-13 it is a T with a small magnifier** (the owner's
+   * call): the magnifier alone was the same drawing as Search in the page
+   * header, so two different things wore one mark. The T says *title*, the
+   * magnifier says it is a search for one. Both come from `shelf-icons.tsx`,
+   * so it stays the same alphabet as the rest of the column.
    */
   {
     id: "title-check",
     label: "Title check",
     live: true,
-    icon: shelfIcons.search,
+    icon: shelfIcons.titleCheck,
     stage: true,
   },
   /*

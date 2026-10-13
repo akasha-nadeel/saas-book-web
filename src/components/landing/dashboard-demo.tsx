@@ -460,7 +460,9 @@ function Glyph({ name }: { name: string }) {
     favourites:
       "M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0112 7.3 4.3 4.3 0 0119.5 10c0 5.4-7.5 10-7.5 10z",
     archived: "M3.5 5h17v4h-17zM5 9h14v10H5zM10 13h4",
-    "title-check": "M10.5 17a6.5 6.5 0 100-13 6.5 6.5 0 000 13zM15.5 15.5L20 20",
+    // A big T with a small magnifier — `shelfIcons.titleCheck`, as one path.
+    "title-check":
+      "M3 4h14M10 4v16.5M16.5 10.5a3 3 0 100 6 3 3 0 000-6zM18.62 15.62l2.88 2.88",
     search: "M10.5 17a6.5 6.5 0 100-13 6.5 6.5 0 000 13zM15.5 15.5L20 20",
     ideas: "M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z",
     paperback: "M14.5 4.5l5 5L9 20H4v-5L14.5 4.5zM12 7l5 5M7.5 12.5l2 2",
