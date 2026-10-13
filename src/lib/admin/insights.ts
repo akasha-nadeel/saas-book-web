@@ -11,7 +11,6 @@ import {
 } from "@/lib/billing/subscription";
 import { asPaidTier } from "@/lib/billing/tiers";
 import { FREE_LIMITS } from "@/lib/free-limits";
-import { LAUNCH_LIMITS } from "@/lib/launch";
 
 /**
  * What the admin dashboard says about the people using OpenChapter.
@@ -250,7 +249,7 @@ export const SEGMENTS: readonly Segment[] = [
   {
     id: "limit",
     label: "Hit a free limit",
-    rule: `On Free, and either refused by a limit in the last 30 days or holding ${LAUNCH_LIMITS.freeBooks}+ books. The ones to ask about Pro.`,
+    rule: "On Free, and refused by a limit in the last 30 days. The ones to ask about Pro.",
     tone: "note",
   },
   {
@@ -298,9 +297,8 @@ export function segmentOf(user: AdminUser, now: Date): SegmentId {
     return within(seen, 14, now) ? "paying" : "paying_quiet";
   }
   if (!user.emailConfirmed) return "unconfirmed";
-  if (within(user.lastLimitAt, 30, now) || user.books >= LAUNCH_LIMITS.freeBooks) {
-    return "limit";
-  }
+  // Holding the free book count stopped counting on 2026-10-13: there is none.
+  if (within(user.lastLimitAt, 30, now)) return "limit";
   if (user.books === 0) return "no_book";
   if (user.words === 0) return "no_words";
   if (within(user.lastWritingAt, 7, now) || within(user.lastChangeAt, 7, now)) {
@@ -428,7 +426,7 @@ export const KIND_LABELS: Record<ActivityKind, string> = {
   import_done: "Imported a file",
   export_done: "Exported",
   title_check_run: "Ran a title check",
-  price_check_run: "Ran a price check",
+  price_check_run: "Ran a market check",
   consistency_run: "Ran a consistency check",
   paperback_open: "Opened paperback setup",
   provenance_open: "Opened the writing record",
@@ -458,7 +456,7 @@ const DETAIL_LABELS: Record<string, string> = {
      pressing its Amazon tab. Reused rather than renamed because the details
      are also a CHECK constraint in the database, and a new word would need a
      migration for one counter. */
-  priceCheck: "price check (Amazon tab)",
+  priceCheck: "market check (Amazon tabs)",
   comps: "comparable titles",
   covers: "cover checks",
   blurb: "blurb",
@@ -584,12 +582,12 @@ export const WATCHED_FEATURES: readonly WatchedFeature[] = [
   },
   {
     id: "price_check",
-    title: "Price check",
-    note: "A genre opened is one list read. The Amazon tab is Pro; a Free account pressing it is counted on its own.",
-    empty: "Nobody has opened the price check yet.",
+    title: "Market check",
+    note: "A genre opened is one list read. Its Amazon tabs (prices, categories, trends) are Pro Plus; a press on one from a plan without them is counted on its own.",
+    empty: "Nobody has opened the market check yet.",
     columns: [
       { kind: "price_check_run", label: "Genres opened" },
-      { kind: "limit_hit", detail: "priceCheck", label: "Pressed the locked Amazon tab" },
+      { kind: "limit_hit", detail: "priceCheck", label: "Pressed a locked Amazon tab" },
     ],
   },
   {

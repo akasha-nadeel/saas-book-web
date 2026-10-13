@@ -28,9 +28,10 @@ function toSubscription(row: Record<string, unknown> | null): Subscription | nul
   const status = asSubscriptionStatus(row.status);
   const period = asPeriod(row.period);
   /* `plan` was written on every purchase and read by nothing until the tiers
-     arrived. Narrowed here with the other two, so a row carrying the retired
-     'pro' — or anything else the CHECK constraint would now refuse — is treated
-     as undescribable rather than silently mapped onto a plan nobody bought. */
+     arrived. Narrowed here with the other two, so a row carrying a retired
+     name ('draft', 'writer', 'studio') — or anything else the CHECK constraint
+     would now refuse — is treated as undescribable rather than silently mapped
+     onto a plan nobody bought. */
   const tier = asPaidTier(row.plan);
   if (!status || !period || !tier) return null;
 

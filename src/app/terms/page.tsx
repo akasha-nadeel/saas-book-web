@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
+import { TIER_NAMES } from "@/lib/billing/tiers";
 import Link from "next/link";
 import { LegalPage, List, Note, Section, Term } from "@/components/legal/legal-shell";
 import { displayPrice, priceOf } from "@/lib/billing/plans";
@@ -17,7 +17,7 @@ import {
 export const metadata: Metadata = {
   title: "Terms · OpenChapter",
   description:
-    "The terms of using OpenChapter: your account, your book, the two plans, and what each side is responsible for.",
+    "The terms of using OpenChapter: your account, your book, the three plans, and what each side is responsible for.",
   alternates: { canonical: "/terms" },
 };
 
@@ -25,7 +25,7 @@ export default function TermsPage() {
   return (
     <LegalPage
       title="Terms of service"
-      intro="The agreement between you and us. These terms describe the launch MVP: a focused book-writing workspace, free to write in, with three paid plans above it."
+      intro="The agreement between you and us. These terms describe the launch MVP: a focused book-writing workspace, free to write in, with two paid plans above it."
     >
       <Section title="1. Who you are agreeing with">
         <p>
@@ -71,30 +71,32 @@ export default function TermsPage() {
 
       <Section title="5. The plans">
         <p>
-          The Free plan includes {plural(TIER_LIMITS.free.books ?? 0, "book")},
-          unlimited chapters and words, autosave and sync where accounts are
+          The Free plan includes unlimited books, chapters and words, autosave and sync where accounts are
           configured, Word, EPUB and PDF export,{" "}
           {plural(FREE_LIMITS.titleCheck.free, "title check")} a day,
-          unlimited price checks on Apple Books&rsquo; best-seller lists,{" "}
+          unlimited market checks on Apple Books&rsquo; best-seller lists,{" "}
           {plural(FREE_LIMITS.ideas.free, "parked idea")} at a time,{" "}
           {FREE_CHECKS.length} of the {ALL_CHECKS.length} consistency checks,
           and the last {FREE_RECORD_DAYS} days of the writing record.
         </p>
         <p>
-          {TIER_NAMES.pro} adds unlimited books, title checks and parked ideas,
-          Amazon&rsquo;s best-seller prices and Kindle Unlimited in the price
-          check, all {ALL_CHECKS.length} consistency checks, the writing record for the
-          twelve months the app keeps, and paperback setup. Every export format
-          is included on every plan, paid or not.
+          {TIER_NAMES.pro} adds unlimited title checks and parked ideas,
+          all {ALL_CHECKS.length} consistency checks, the writing record for the
+          twelve months the app keeps, and paperback setup. {TIER_NAMES.plus}{" "}
+          is everything in {TIER_NAMES.pro}{" "}
+          and Amazon&rsquo;s own lists in the
+          Market check: the top 100 for a genre with Kindle Unlimited, the
+          categories those books rank in, and Amazon&rsquo;s new-release, movers
+          and most-wished-for lists. Every export format is included on every
+          plan, paid or not.
         </p>
         <p>
           {TRADING_NAME} {TIER_NAMES.pro} costs{" "}
           {displayPrice(priceOf("pro", "monthly"))} a month or{" "}
-          {displayPrice(priceOf("pro", "annual"))} a year; the{" "}
+          {displayPrice(priceOf("pro", "annual"))} a year, and {TIER_NAMES.plus}{" "}
+          {displayPrice(priceOf("plus", "monthly"))} a month or{" "}
+          {displayPrice(priceOf("plus", "annual"))} a year; the{" "}
           <Link href="/upgrade" className="text-lp-accent-text hover:underline">
-            plans page
-          </Link>{" "}
-          carries both.          <Link href="/upgrade" className="text-lp-accent-text hover:underline">
             plans page
           </Link>{" "}
           carries each one. Both cycles renew automatically

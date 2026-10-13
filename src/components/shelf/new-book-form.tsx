@@ -16,7 +16,7 @@ import {
 } from "@/lib/image-import";
 import { saveCover } from "@/lib/cover-save";
 import {
-  booksAgainstPlan,
+  atBookLimit,
   createBook,
   createBookFromImport,
   createMatterPages,
@@ -40,7 +40,7 @@ import {
 import { MatterPartRows } from "@/components/editor/matter-rows";
 import { SwitchTrack } from "@/components/ui/switch";
 import { BookCover } from "@/components/shelf/book-cover";
-import { LAUNCH_LIMITS } from "@/lib/launch";
+import { bookLimitFor } from "@/lib/launch";
 import {
   UpgradeDialog,
 } from "@/components/upgrade/upgrade-dialog";
@@ -244,17 +244,11 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
   const router = useRouter();
   const shelf = useShelf();
   const plan = usePlan();
-  const storedBookCount = booksAgainstPlan(shelf).length;
-  /* `!plan.loading` rather than `plan.loading ||`, which is the fix the
-     dashboard's restore gate carries the long note on: `usePlan()` starts at
-     UNKNOWN with `pro: false`, so gating while it loads refuses a Pro writer
-     for the width of one request. Not knowing yet is not a reason to refuse,
-     and the Postgres trigger is what actually enforces this. */
-  const freeBookLimitReached =
-    !plan.loading &&
-    plan.billing &&
-    !plan.pro &&
-    storedBookCount >= LAUNCH_LIMITS.freeBooks;
+  /* **Never true since 2026-10-13**: every plan holds unlimited books, so
+     `bookLimitFor` answers null. Kept as the one place a limit brought back
+     would refuse a new book — read through `onFreePlan`'s three parts, so it
+     could never fire while the plan is still loading. */
+  const freeBookLimitReached = atBookLimit(shelf, bookLimitFor(plan));
 
   /* Which door the writer came through, from `?source=`. Read with
      `useSearchParams` for the reason the dashboard's `?area=` is: a lazy

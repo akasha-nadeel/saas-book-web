@@ -8,9 +8,10 @@ import {
   isPaddleSetupFault,
   paddleErrorCode,
   paddlePriceId,
+  paddleTierOnSale,
 } from "@/lib/billing/paddle";
 import { currentSubscription } from "@/lib/billing/server";
-import { asPaidTier } from "@/lib/billing/tiers";
+import { TIER_NAMES, asPaidTier } from "@/lib/billing/tiers";
 
 /**
  * Move an existing subscription onto a different plan or cycle.
@@ -77,6 +78,16 @@ export async function POST(request: Request) {
   const period = asPeriod(body?.period);
   if (!tier || !period) {
     return Response.json({ error: "Pick a plan and a cycle." }, { status: 400 });
+  }
+
+  /* A plan whose Paddle prices are not set yet is "Available soon" on the
+     cards. Refused here too, so a stale page cannot send Paddle an empty
+     price id (`paddleTierOnSale`). */
+  if (!paddleTierOnSale(tier)) {
+    return Response.json(
+      { error: `${TIER_NAMES[tier]} isn't on sale yet.` },
+      { status: 409 },
+    );
   }
 
   if (tier === subscription.tier && period === subscription.period) {

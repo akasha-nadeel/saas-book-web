@@ -3781,6 +3781,13 @@ export interface Prefs {
    */
   dismissed: string[];
   /**
+   * Product announcements this reader has answered, by notice id
+   * (`whats-new.ts`). Here for the reason `matterAsked` is: it is about the
+   * reader, not a book. For a signed-in writer the same ids are also written
+   * to the account's `user_metadata`, so a second device does not ask again.
+   */
+  noticesSeen: string[];
+  /**
    * Today's count for each per-day tool, with the local day it belongs to.
    *
    * The day travels with the counts so a stale record reads as nought without
@@ -3839,6 +3846,7 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // pushed to; `rememberMatterAsked` writes a new array.
   matterAsked: [],
   dismissed: [],
+  noticesSeen: [],
   // Nothing spent yet, which is also what a library stored before this existed
   // reads as. Erring low is deliberate: charging a writer for work they cannot
   // be shown any evidence of is the wrong way round to be wrong. Frozen with
@@ -3930,6 +3938,9 @@ function parsePrefs(raw: string | null): Prefs {
         : [],
       matterAsked: Array.isArray(parsed.matterAsked)
         ? parsed.matterAsked.filter((id): id is string => typeof id === "string")
+        : [],
+      noticesSeen: Array.isArray(parsed.noticesSeen)
+        ? parsed.noticesSeen.filter((id): id is string => typeof id === "string")
         : [],
       // Narrowed on the way in for the same reason, and once more where they are
       // used: the allowance functions refuse anything that is not a whole
@@ -4215,6 +4226,13 @@ export function dismissBanner(bookId: string, fix: number, note: number) {
     (s) => !s.startsWith(`${bookId}:`),
   );
   setPref("dismissed", [...kept, signature]);
+}
+
+/** Records that a product notice has been answered on this machine. */
+export function rememberNoticeSeen(id: string) {
+  const seen = getPrefs().noticesSeen;
+  if (seen.includes(id)) return;
+  setPref("noticesSeen", [...seen, id]);
 }
 
 /** Records that the question has been put, whatever the answer was. */
@@ -4996,6 +5014,12 @@ export function booksIn(shelf: Shelf, view: BookView): Book[] {
 /**
  * The books that count against a plan's book limit: everything but the trash.
  *
+ * **No plan has a book limit since 2026-10-13** — Free went unlimited and the
+ * trigger was dropped (`20261013000000_free_unlimited_books.sql`). The count
+ * and its rules stay because they are what a limit would read if one came
+ * back; `atBookLimit` answers false for every plan today. What follows is the
+ * reasoning the rules were written under.
+ *
  * **Archived books count, and the archive is therefore not a way round the
  * limit.** It did not use to: the rule was the Trello/Figma one, where
  * archiving opens a slot and coming back out is gated instead. That is a
@@ -5026,14 +5050,22 @@ export function booksIn(shelf: Shelf, view: BookView): Book[] {
  * reads as books appearing from nowhere: an editor invitation lands two books
  * on the shelf, and the plan appears to have been spent by them.
  *
- * `enforce_launch_book_limit` in Postgres counts the same way and is the half
- * that enforces it; this one only decides what the browser offers. Change one
- * and change the other.
+ * `enforce_launch_book_limit` in Postgres counted the same way while it
+ * existed; a limit brought back needs a trigger that counts like this again.
  */
 export function booksAgainstPlan(shelf: Shelf): Book[] {
   return [...booksIn(shelf, "active"), ...booksIn(shelf, "archived")].filter(
     (book) => !isSharedBook(book),
   );
+}
+
+/**
+ * Whether the shelf has reached `limit` (null is no limit, which is every
+ * plan since 2026-10-13). The one test the new-book form, the restore and the
+ * idea board ask, so they cannot count three ways.
+ */
+export function atBookLimit(shelf: Shelf, limit: number | null): boolean {
+  return limit !== null && booksAgainstPlan(shelf).length >= limit;
 }
 
 /**

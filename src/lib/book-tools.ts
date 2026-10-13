@@ -65,7 +65,9 @@ export interface ToolGroup {
  * **That is exactly what the price check turned out to be** (2026-09-26): the
  * same two catalogues, the same kind of query, a field on the same response
  * that nothing had been reading. It is the second entry now, and the group's
- * note has widened past names because of it.
+ * note has widened past names because of it. **Renamed the Market check on
+ * 2026-10-12**, when Amazon's categories and trend lists joined its prices as
+ * two more tabs; the path stays `price-check`, so no link breaks.
  */
 export const LOOK_OUTWARD: ToolGroup = {
   title: "Before you name it",
@@ -80,8 +82,8 @@ export const LOOK_OUTWARD: ToolGroup = {
     {
       path: "price-check",
       icon: "coins",
-      name: "Price check",
-      what: "What the top 100 best-selling ebooks in your genre cost, self-published and traditional kept apart, and what Amazon would pay you at any price you try. Never a recommended price.",
+      name: "Market check",
+      what: "What the top 100 best-selling ebooks in your genre cost, self-published and traditional kept apart, and what Amazon would pay you at any price you try. With Amazon's data, the categories they rank in and what is moving. Never a recommended price.",
     },
   ],
 };

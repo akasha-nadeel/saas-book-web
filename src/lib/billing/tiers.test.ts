@@ -1,9 +1,12 @@
+import { readFileSync, readdirSync } from "node:fs";
 import { expect, it } from "vitest";
 import {
   PAID_TIERS,
   TIER_LIMITS,
   TIER_NAMES,
   TIER_ORDER,
+  AMAZON_DATA_TIER,
+  amazonDataAllowed,
   asPaidTier,
   asTier,
   bookLimit,
@@ -25,7 +28,7 @@ it("refuses the plan names Pro replaced", () => {
   }
 });
 
-it("narrows only the two tiers", () => {
+it("narrows only the three tiers", () => {
   for (const tier of TIER_ORDER) expect(asTier(tier)).toBe(tier);
 
   for (const junk of ["", "Free", "PRO", "premium", null, undefined, 1, {}]) {
@@ -75,7 +78,46 @@ it("gives every tier a limit set and a name", () => {
  * no infinity. The trigger in `20260915000000_free_three_books.sql` holds the
  * same number.
  */
-it("counts books on the free plan and nowhere else", () => {
-  expect(bookLimit("free")).toBe(3);
-  for (const tier of PAID_TIERS) expect(bookLimit(tier)).toBeNull();
+it("counts books on no plan, Free included", () => {
+  for (const tier of TIER_ORDER) expect(bookLimit(tier)).toBeNull();
+});
+
+/**
+ * **Amazon's data is Pro Plus, and Pro is the step below it.**
+ *
+ * Every request for it is paid for, so it is the one paid thing Pro does not
+ * get (2026-10-12). Moving `AMAZON_DATA_TIER` to `"pro"` is how Pro gets it
+ * later; this test is the one to change with it.
+ */
+it("gives Amazon's data to Pro Plus and nobody below it", () => {
+  expect(AMAZON_DATA_TIER).toBe("plus");
+  expect(amazonDataAllowed("plus")).toBe(true);
+  expect(amazonDataAllowed("pro")).toBe(false);
+  expect(amazonDataAllowed("free")).toBe(false);
+  expect(TIER_ORDER.indexOf("plus")).toBeGreaterThan(TIER_ORDER.indexOf("pro"));
+});
+
+/**
+ * **Every plan that can be bought, the database can store.**
+ *
+ * `subscriptions.plan` and `payment_orders.plan` are CHECK constraints, and a
+ * plan the TypeScript sells but the SQL refuses fails at the webhook, for
+ * money already taken. This reads the newest migration that states each CHECK
+ * and holds it to `PAID_TIERS`. It cannot know what the live database is
+ * running — the migration still has to be applied before the code ships.
+ */
+it("lets the database store every plan that can be bought", () => {
+  const dir = "supabase/migrations";
+  const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+  for (const constraint of ["subscriptions_plan_check", "payment_orders_plan_check"]) {
+    const latest = files
+      .map((f) => readFileSync(`${dir}/${f}`, "utf8"))
+      .filter((sql) => sql.includes(`add constraint ${constraint}`))
+      .at(-1);
+    const list = latest
+      ?.split(`add constraint ${constraint}`)[1]
+      .match(/check \(plan in \(([^)]*)\)\)/)?.[1];
+    const allowed = (list ?? "").split(",").map((v) => v.trim().replace(/'/g, ""));
+    expect(allowed.sort()).toEqual([...PAID_TIERS].sort());
+  }
 });

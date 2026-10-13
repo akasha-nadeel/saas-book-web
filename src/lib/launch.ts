@@ -1,18 +1,22 @@
 /**
  * Launch-MVP product decisions that must stay consistent across marketing,
  * pricing, entitlement checks, and upgrade prompts.
+ *
+ * Its one import is `tiers.ts`, which imports nothing, so this stays readable
+ * by a Server Component, a client component and the proxy alike.
  */
 
+import { amazonDataAllowed, bookLimit, type PlanTier } from "@/lib/billing/tiers";
+
+/*
+ * **There is no free book limit since 2026-10-13.** `freeBooks` lived here —
+ * one book, then three from 2026-09-15 — mirrored by `TIER_LIMITS.free.books`
+ * and a Postgres trigger. The owner made every plan unlimited; the trigger was
+ * dropped by `20261013000000_free_unlimited_books.sql` and the browser gates
+ * went with it. `bookLimit()` in `tiers.ts` is where a limit would come back,
+ * with a migration beside it.
+ */
 export const LAUNCH_LIMITS = {
-  /**
-   * Mirrors `TIER_LIMITS.free.books` and the book-limit trigger.
-   *
-   * Three since 2026-09-15, up from one. One was stricter than every
-   * competitor checked (WriteO and Novlr give two, Reedsy Studio unlimited) and
-   * the design note named it as the first thing to revisit; three lets a writer
-   * try a series before paying.
-   */
-  freeBooks: 3,
   /**
    * **Every format, on both plans, and the two arrays being identical is the
    * point rather than an oversight.**
@@ -64,6 +68,38 @@ export function onFreePlan(plan: {
 }
 
 /**
+ * The book limit this reader is held to, or null for none.
+ *
+ * Free's limit is `bookLimit("free")` — null since 2026-10-13, so this is null
+ * for everybody today. Asked through the same three-part `onFreePlan`, so a
+ * limit brought back would never fire while the plan is unknown.
+ */
+export function bookLimitFor(plan: {
+  loading: boolean;
+  billing: boolean;
+  pro: boolean;
+}): number | null {
+  return onFreePlan(plan) ? bookLimit("free") : null;
+}
+
+/**
+ * Whether Amazon's data is *known* to be shut to the reader.
+ *
+ * The same three parts as `onFreePlan`, for the one paid thing Pro does not
+ * get: Amazon's data is Pro Plus (`AMAZON_DATA_TIER`), because every request
+ * for it is paid for. Unknown is not shut, and no gateway is not shut — with
+ * no plans nothing is held back. The server checks again in
+ * `requireAmazonData()`; this decides what the screen draws.
+ */
+export function amazonLocked(plan: {
+  loading: boolean;
+  billing: boolean;
+  tier: PlanTier | null;
+}): boolean {
+  return !plan.loading && plan.billing && !amazonDataAllowed(plan.tier ?? "free");
+}
+
+/**
  * Whether a book's inside is shut to this reader.
  *
  * **The trash is the free plan's one closed door, and it is a browser gate
@@ -87,8 +123,9 @@ export function trashedBookClosed(
 /**
  * Whether the paid plans can actually be bought.
  *
- * **False since 2026-09-07, and off on purpose rather than by accident.**
- * No stranger has ever completed a checkout against the live prices, and the
+ * **True since 2026-09-16 (`f70954a`).** It was false from 2026-09-07, off on
+ * purpose rather than by accident, and what follows is why it was: no
+ * stranger had ever completed a checkout against the live prices, and the
  * one card available to test with was declined by its bank. A pricing page
  * that takes money down a path nobody has walked is worse than one that says
  * it is not open yet, so every paid button opens the "Available Soon" dialog

@@ -32,6 +32,27 @@ export interface ListedBook {
   series?: { name: string; number: number; of: number } | null;
   paperbackPrice?: number | null;
   fileSizeMb?: number | null;
+  /** How many ratings the book's page shows, and its star average. */
+  ratings?: number | null;
+  stars?: number | null;
+  /** Rank in the whole Kindle Store, from the book's page. */
+  storeRank?: number | null;
+  /**
+   * Every category the book's page says it ranks in, in Amazon's own words,
+   * store qualifier and all ("Cozy Mysteries (Books)").
+   */
+  categoryRanks?: CategoryRank[];
+  /**
+   * Amazon's own note on a Movers & Shakers entry ("Sales rank: 1,204 (was
+   * 18,331)"), shown as Amazon writes it.
+   */
+  change?: string | null;
+}
+
+/** One line of a book's "Best Sellers Rank": #rank in name. */
+export interface CategoryRank {
+  rank: number;
+  name: string;
 }
 
 type Json = Record<string, unknown>;

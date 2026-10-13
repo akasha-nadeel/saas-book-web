@@ -13,12 +13,12 @@ import {
   type Idea,
 } from "@/lib/ideas";
 import {
-  booksAgainstPlan,
+  atBookLimit,
   createBook,
   saveIdeasRaw,
 } from "@/lib/library-store";
 import { noteActivity } from "@/lib/activity-log";
-import { LAUNCH_LIMITS, onFreePlan } from "@/lib/launch";
+import { bookLimitFor } from "@/lib/launch";
 import { relativeTime } from "@/lib/relative-time";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RailMark, type MarkName } from "@/components/editor/rail-mark";
@@ -98,8 +98,8 @@ export function IdeasPanel({ bookId }: { bookId?: string }) {
   const shelf = useShelf();
   const plan = usePlan();
   const [full, setFull] = useState(false);
-  const shelfFull =
-    onFreePlan(plan) && booksAgainstPlan(shelf).length >= LAUNCH_LIMITS.freeBooks;
+  // Never true since 2026-10-13, when every plan went unlimited on books.
+  const shelfFull = atBookLimit(shelf, bookLimitFor(plan));
 
   /*
    * **Free parks five at a time; Pro has no ceiling** (2026-09-16). Occupancy,

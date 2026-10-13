@@ -3,7 +3,7 @@ import { SectionHeader } from "@/components/ui/list";
 import { BESTSELLER_SHELVES, SHELF_FAMILIES } from "@/lib/pricing/shelves";
 
 /**
- * The first thing the price check asks, and the only thing.
+ * The first thing the Market check asks, and the only thing.
  *
  * **Tiles rather than a dropdown on the first visit**: the whole question is
  * "which of these is yours", and sixteen named buttons answer it in one look

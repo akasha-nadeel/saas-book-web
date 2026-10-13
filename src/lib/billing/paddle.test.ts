@@ -208,6 +208,48 @@ describe("paddlePlanFrom", () => {
     expect(paddlePlanFrom(["pri_pro_m", "pri_pro_a"])).toBeNull();
   });
 
+  /**
+   * **A plan with no prices is off sale, and nothing more.** Pro Plus arrived
+   * on 2026-10-12 with two new ids; a deployment that has not set them yet
+   * must keep selling Pro — the outage this guards against is the one where
+   * missing ids called billing unconfigured and gave everything away.
+   */
+  it("takes a plan with no prices off sale without touching the others", async () => {
+    const saved = {
+      m: process.env.PADDLE_PRICE_PLUS_MONTHLY,
+      a: process.env.PADDLE_PRICE_PLUS_ANNUAL,
+    };
+    delete process.env.PADDLE_PRICE_PLUS_MONTHLY;
+    delete process.env.PADDLE_PRICE_PLUS_ANNUAL;
+    const { paddleTierOnSale, paddlePriceId, paddlePlanFrom } = await withPrices();
+    if (saved.m !== undefined) process.env.PADDLE_PRICE_PLUS_MONTHLY = saved.m;
+    if (saved.a !== undefined) process.env.PADDLE_PRICE_PLUS_ANNUAL = saved.a;
+
+    expect(paddleTierOnSale("pro")).toBe(true);
+    expect(paddleTierOnSale("plus")).toBe(false);
+    expect(paddlePriceId("plus", "monthly")).toBe("");
+    expect(paddlePriceId("pro", "annual")).toBe("pri_pro_a");
+    expect(paddlePlanFrom(["pri_pro_m"])).toEqual({ tier: "pro", period: "monthly" });
+  });
+
+  it("names Pro Plus once its prices are set", async () => {
+    const saved = {
+      m: process.env.PADDLE_PRICE_PLUS_MONTHLY,
+      a: process.env.PADDLE_PRICE_PLUS_ANNUAL,
+    };
+    process.env.PADDLE_PRICE_PLUS_MONTHLY = "pri_plus_m";
+    process.env.PADDLE_PRICE_PLUS_ANNUAL = "pri_plus_a";
+    const { paddleTierOnSale, paddlePlanFrom } = await withPrices();
+    if (saved.m === undefined) delete process.env.PADDLE_PRICE_PLUS_MONTHLY;
+    else process.env.PADDLE_PRICE_PLUS_MONTHLY = saved.m;
+    if (saved.a === undefined) delete process.env.PADDLE_PRICE_PLUS_ANNUAL;
+    else process.env.PADDLE_PRICE_PLUS_ANNUAL = saved.a;
+
+    expect(paddleTierOnSale("plus")).toBe(true);
+    expect(paddlePlanFrom(["pri_plus_a"])).toEqual({ tier: "plus", period: "annual" });
+    expect(paddlePlanFrom(["pri_pro_m", "pri_plus_m"])).toBeNull();
+  });
+
   it("ignores unknown ids travelling beside a known one", async () => {
     const { paddlePlanFrom } = await withPrices();
 

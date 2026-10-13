@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
+import { TIER_NAMES, amazonDataAllowed } from "@/lib/billing/tiers";
 import Link from "next/link";
 import type { PaymentTone } from "@/lib/billing/history";
 import { FREE_LIMITS } from "@/lib/free-limits";
-import { LAUNCH_LIMITS } from "@/lib/launch";
 import { plural } from "@/lib/plural";
 import { usePlan } from "@/lib/use-plan";
 import { PaddleUpdatePaymentButton } from "./paddle-update-button";
@@ -198,8 +197,7 @@ export function BillingPage({
                 )}
                 {!plan.pro && (
                   <p className="mt-0.5 font-sans text-xs text-muted">
-                    {plural(TIER_LIMITS.free.books ?? 0, "book")}, every
-                    export format,{" "}
+                    Unlimited books, every export format,{" "}
                     {plural(FREE_LIMITS.titleCheck.free, "title check")} a day
                   </p>
                 )}
@@ -444,19 +442,19 @@ export function BillingPage({
                 You&rsquo;ll go back to the free plan
               </h3>
               <ul className="mt-3 space-y-2 rounded-xl border border-line bg-surface p-4 font-sans text-sm text-muted">
-                <li>
-                  Room for {plural(LAUNCH_LIMITS.freeBooks, "book")}: every book
-                  you already have stays and stays editable, but a new one waits
-                  until you are under that.
-                </li>
+                {/* No book line since 2026-10-13: every plan holds unlimited
+                    books, so cancelling takes none away. */}
                 <li>
                   {plural(FREE_LIMITS.titleCheck.free, "title check")} a day
                   instead of unlimited.
                 </li>
-                <li>
-                  Price checks on Apple Books&rsquo; lists only, without
-                  Amazon&rsquo;s prices and Kindle Unlimited.
-                </li>
+                {plan.tier && amazonDataAllowed(plan.tier) && (
+                  <li>
+                    The Market check on Apple Books&rsquo; lists only, without
+                    Amazon&rsquo;s prices, Kindle Unlimited, categories and
+                    trends.
+                  </li>
+                )}
                 <li>
                   Room for {plural(FREE_LIMITS.ideas.free, "parked idea")} at a
                   time: every idea you have stays, but a new one waits until you

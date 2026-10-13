@@ -10,7 +10,6 @@ import {
   selectAll,
   toggle,
 } from "@/lib/bulk-select";
-import { LAUNCH_LIMITS } from "@/lib/launch";
 import type { Book, Shelf } from "@/lib/library-store";
 
 /** Just enough of a book for rules that only read ids and three flags. */
@@ -140,15 +139,22 @@ describe("favouriteIntent", () => {
   });
 });
 
+/**
+ * A limit to count against. No plan has one since 2026-10-13 (Free went
+ * unlimited), so the arithmetic is tested against a stated one — the number a
+ * limit brought back would be.
+ */
+const LIMIT = 3;
+
 describe("restoreCapacity", () => {
   it("holds nothing back when the plan does not apply", () => {
-    expect(restoreCapacity(shelfOf([]), false)).toBe(Infinity);
+    expect(restoreCapacity(shelfOf([]), null)).toBe(Infinity);
   });
 
   it("counts the free allowance down as the shelf fills", () => {
-    expect(restoreCapacity(shelfOf([]), true)).toBe(LAUNCH_LIMITS.freeBooks);
-    expect(restoreCapacity(shelfOf([book("a")]), true)).toBe(
-      LAUNCH_LIMITS.freeBooks - 1,
+    expect(restoreCapacity(shelfOf([]), LIMIT)).toBe(LIMIT);
+    expect(restoreCapacity(shelfOf([book("a")]), LIMIT)).toBe(
+      LIMIT - 1,
     );
   });
 
@@ -159,31 +165,31 @@ describe("restoreCapacity", () => {
    * one back out.
    */
   it("counts the archive against the plan and the trash not at all", () => {
-    /* Two separate shelves rather than one mixed one: the free plan holds a
-       single book, so a shelf carrying both would read zero either way and
-       prove nothing about which of them was counted. */
+    /* Two separate shelves rather than one mixed one, so a shelf carrying
+       both cannot read the same either way and prove nothing about which of
+       them was counted. */
     const archived = shelfOf([book("b", { archivedAt: 1 })]);
-    expect(restoreCapacity(archived, true)).toBe(LAUNCH_LIMITS.freeBooks - 1);
+    expect(restoreCapacity(archived, LIMIT)).toBe(LIMIT - 1);
 
     const trashed = shelfOf([
       book("c", { trashedAt: 1 }),
       book("d", { trashedAt: 1 }),
     ]);
-    expect(restoreCapacity(trashed, true)).toBe(LAUNCH_LIMITS.freeBooks);
+    expect(restoreCapacity(trashed, LIMIT)).toBe(LIMIT);
   });
 
   it("never goes below zero on an over-full shelf", () => {
-    const many = Array.from({ length: LAUNCH_LIMITS.freeBooks + 3 }, (_, i) =>
+    const many = Array.from({ length: LIMIT + 3 }, (_, i) =>
       book(`b${i}`),
     );
-    expect(restoreCapacity(shelfOf(many), true)).toBe(0);
+    expect(restoreCapacity(shelfOf(many), LIMIT)).toBe(0);
   });
 });
 
 describe("planRestore", () => {
   it("only asks for room for the books coming out of the trash", () => {
     const picked = [book("a", { trashedAt: 1 }), book("b", { archivedAt: 1 })];
-    const plan = planRestore(picked, shelfOf([]), true);
+    const plan = planRestore(picked, shelfOf([]), LIMIT);
     expect(plan.needRoom.map((b) => b.id)).toEqual(["a"]);
   });
 
@@ -191,13 +197,13 @@ describe("planRestore", () => {
     const picked = Array.from({ length: 50 }, (_, i) =>
       book(`t${i}`, { trashedAt: 1 }),
     );
-    expect(planRestore(picked, shelfOf([]), false).fits).toBe(true);
+    expect(planRestore(picked, shelfOf([]), null).fits).toBe(true);
   });
 
   /* All or nothing: the writer chose three books, not "whichever one fits". */
   it("refuses the whole batch when it does not fit", () => {
     const shelf = shelfOf(
-      Array.from({ length: LAUNCH_LIMITS.freeBooks - 1 }, (_, i) =>
+      Array.from({ length: LIMIT - 1 }, (_, i) =>
         book(`b${i}`),
       ),
     );
@@ -206,18 +212,18 @@ describe("planRestore", () => {
       book("y", { trashedAt: 1 }),
       book("z", { trashedAt: 1 }),
     ];
-    const plan = planRestore(picked, shelf, true);
+    const plan = planRestore(picked, shelf, LIMIT);
     expect(plan.room).toBe(1);
     expect(plan.fits).toBe(false);
   });
 
   it("allows a batch that exactly fills the last slots", () => {
     const shelf = shelfOf(
-      Array.from({ length: LAUNCH_LIMITS.freeBooks - 1 }, (_, i) =>
+      Array.from({ length: LIMIT - 1 }, (_, i) =>
         book(`b${i}`),
       ),
     );
     const picked = [book("x", { trashedAt: 1 })];
-    expect(planRestore(picked, shelf, true).fits).toBe(true);
+    expect(planRestore(picked, shelf, LIMIT).fits).toBe(true);
   });
 });

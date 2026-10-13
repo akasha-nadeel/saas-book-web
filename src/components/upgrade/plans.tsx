@@ -21,11 +21,15 @@ import {
   PLAN_BUTTON_PLAIN,
   planButton,
 } from "@/components/upgrade/plan-button";
-import { TIER_LIMITS, TIER_NAMES, type PaidTier } from "@/lib/billing/tiers";
+import {
+  PAID_TIERS,
+  TIER_NAMES,
+  tierAtLeast,
+  type PaidTier,
+} from "@/lib/billing/tiers";
 import { PLANS_ON_SALE } from "@/lib/launch";
 import { notePlanInterest } from "@/lib/plan-interest";
 import { PlanCard, PricingDecor } from "@/components/upgrade/plan-card";
-import { plural } from "@/lib/plural";
 
 /**
  * The two plans, presented as a pricing section rather than a settings screen:
@@ -65,13 +69,23 @@ import type { Period } from "@/lib/billing/plans";
 
 
 /**
- * The one paid card.
+ * The paid plan the page recommends, which wears the featured card.
  *
- * **Pro, since 2026-09-14.** There were three paid plans that differed only by
+ * **Pro.** There were three paid plans until 2026-09-14 that differed only by
  * how many assistant credits a month they granted; with the AI gone they were
- * one product at three prices. The mark is the nib the featured plan wore.
+ * one product at three prices. Pro Plus arrived on 2026-10-12 — Pro and
+ * Amazon's data — and is drawn beside it from `PAID_TIERS`, plain.
  */
-const PRO: PaidTier = "pro";
+const FEATURED: PaidTier = "pro";
+
+/** Why a "not on sale" dialog is open. */
+type Soon =
+  /** `PLANS_ON_SALE` is false: nothing is sold. */
+  | { tier: PaidTier; why: "plans" }
+  /** This plan's prices are not set yet (`tierOnSale`). */
+  | { tier: PaidTier; why: "prices" }
+  /** No gateway at all: nothing to buy and nothing held back. */
+  | { tier: PaidTier; why: "gateway" };
 
 export function Plans({
   /** Decides where the starter card's button goes — the shelf, or the way in. */
@@ -98,6 +112,12 @@ export function Plans({
    * the first paint rather than corrected in the browser a frame later.
    */
   intent = null,
+  /**
+   * Which paid plans can be bought here today (`tierOnSale`, on the server).
+   * A plan whose Paddle prices are not set says "Available soon" rather than
+   * opening a checkout that would refuse it. Omitted means every plan.
+   */
+  onSale,
 }: {
   signedIn: boolean;
   provider: "paddle" | "payhere" | null;
@@ -110,6 +130,7 @@ export function Plans({
   } | null;
   cancelled?: boolean;
   intent?: { tier: PaidTier; period: Period } | null;
+  onSale?: Partial<Record<PaidTier, boolean>>;
 }) {
   /* **Monthly first, by the owner's choice (2026-09-24)**, the same default
      as the landing page's cards. It was annual, on the argument that the
@@ -139,8 +160,9 @@ export function Plans({
     null,
   );
 
-  /** Whether the "not on sale" dialog is open. */
-  const [soon, setSoon] = useState(false);
+  /** The "not on sale" dialog, and which plan and reason it is for. */
+  const [soon, setSoon] = useState<Soon | null>(null);
+  const sells = (tier: PaidTier) => onSale?.[tier] !== false;
 
   /**
    * Whether to open the checkout without waiting to be pressed.
@@ -159,8 +181,8 @@ export function Plans({
    *
    * The exception is kept narrow so it cannot spread:
    *
-   * - only when `intent` names the paid tier this card sells, so a stray
-   *   `?buy=` for anything else does nothing;
+   * - only for the card whose tier `intent` names, and only while that plan
+   *   is on sale, so a stray `?buy=` for anything else does nothing;
    * - only while signed in, since the whole point is the return trip;
    * - never over an existing paid subscription — `current` means the card says
    *   "Your plan", and charging that writer again is the thing
@@ -169,8 +191,8 @@ export function Plans({
    *   money-moving arm in this ladder;
    * - and the button strips `?buy=` as it fires, so a reload cannot repeat it.
    */
-  const autoStart =
-    PLANS_ON_SALE && signedIn && !current && intent?.tier === PRO;
+  const autoStart = (tier: PaidTier) =>
+    PLANS_ON_SALE && signedIn && !current && intent?.tier === tier && sells(tier);
 
   const [state, checkout, pending] = useActionState<CheckoutState, FormData>(
     startCheckout,
@@ -189,6 +211,162 @@ export function Plans({
           onBack={() => setCheckoutTransaction(null)}
         />
       </main>
+    );
+  }
+
+  /**
+   * What a paid card's button does, for the writer looking at it.
+   *
+   * One ladder for every paid plan, so Pro and Pro Plus cannot disagree about
+   * what "on sale", "your plan" or "signed out" means.
+   */
+  function actionFor(tier: PaidTier) {
+    const featured = tier === FEATURED;
+    return (
+                /* **Nothing is for sale, so nothing takes money.**
+
+                   One branch above the whole ladder rather than a condition
+                   inside each of its money-moving arms, so switching
+                   selling back on is deleting this and nothing else. The
+                   ladder below is untouched and still correct — it is simply
+                   not reached while `PLANS_ON_SALE` is false. */
+                !PLANS_ON_SALE ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      notePlanInterest(tier, period, "upgrade");
+                      setSoon({ tier, why: "plans" });
+                    }}
+                    className={`w-full cursor-pointer ${planButton(featured)}`}
+                  >
+                    Get {TIER_NAMES[tier]}
+                  </button>
+                ) : /* **The card answers for the writer looking at it.** On Pro
+                   already, it confirms and points at `/billing`, or offers the
+                   other cycle. With nothing held, the checkout. */
+                current && current.tier !== tier ? (
+                  /* **Another paid plan than theirs.** Paddle swaps the price
+                     on the live subscription — up to Pro Plus or down to Pro —
+                     after showing Paddle's own figure for what it charges
+                     today (`ChangePlanButton`). PayHere cannot swap one, so the
+                     card points at the page that holds their plan. */
+                  current.provider === "paddle" && sells(tier) ? (
+                    <ChangePlanButton
+                      tier={tier}
+                      period={period}
+                      label={`${tierAtLeast(tier, current.tier) ? "Upgrade" : "Switch"} to ${TIER_NAMES[tier]}`}
+                      className={planButton(featured)}
+                    />
+                  ) : (
+                    <Link href="/billing" className={planButton(featured)}>
+                      {sells(tier) ? `Your plan: ${TIER_NAMES[current.tier]}` : "Available soon"}
+                    </Link>
+                  )
+                ) : current ? (
+                  /* **The plan they are on says so, whichever cycle is showing.**
+
+                     This compared the cycle too, so a subscriber on monthly
+                     who flicked the toggle to annual saw "Switch to Pro" on
+                     their own plan — which reads as though they are not on it.
+                     The tier is the plan; the cycle is how it is paid for, and
+                     conflating the two put the wrong words on the one card a
+                     subscriber looks at first. */
+                  current.period === period ? (
+                    <Link href="/billing" className={planButton(featured)}>
+                      Your plan
+                    </Link>
+                  ) : current.provider === "paddle" ? (
+                    /* Same plan, other cycle. A real change, and named as the
+                       cycle change it is rather than as a plan change. */
+                    <ChangePlanButton
+                      tier={tier}
+                      period={period}
+                      label={`Switch to ${period === "annual" ? "annual" : "monthly"}`}
+                      className={planButton(featured)}
+                    />
+                  ) : (
+                    /* PayHere has no call that swaps a cycle, so the card points
+                       at the one place the writer can act. */
+                    <Link href="/billing" className={planButton(featured)}>
+                      Your plan
+                    </Link>
+                  )
+                ) : !sells(tier) ? (
+                  /* **This plan's prices are not set yet.** The card says so
+                     and the press is heard, rather than opening a checkout
+                     that would refuse it (`tierOnSale`). */
+                  <button
+                    type="button"
+                    onClick={() => {
+                      notePlanInterest(tier, period, "upgrade");
+                      setSoon({ tier, why: "prices" });
+                    }}
+                    className={`w-full cursor-pointer ${planButton(featured)}`}
+                  >
+                    Available soon
+                  </button>
+                ) : !signedIn ? (
+                  /* **A signed-out press goes to the door, not to a 401.**
+                     `/api/billing/paddle/checkout` answers "Sign in to
+                     subscribe", and that used to arrive as red text under the
+                     button — the writer said they wanted to pay and was told
+                     no, with no way on. The press is carried instead: the tier
+                     and cycle travel in `next`, and `?buy=` opens the checkout
+                     on the other side.
+
+                     Sign-in rather than sign-up, the opposite of the landing
+                     page's button: somebody already this far into the app
+                     usually has an account, and the form offers the other with
+                     `next` intact either way. */
+                  <Link
+                    href={`/signin?next=${encodeURIComponent(upgradeTo(tier, period))}`}
+                    className={planButton(featured)}
+                  >
+                    Get {TIER_NAMES[tier]}
+                  </Link>
+                ) : provider === "paddle" && paddle ? (
+                  <PaddleUpgradeButton
+                    tier={tier}
+                    period={period}
+                    onTransaction={setCheckoutTransaction}
+                    className={planButton(featured)}
+                    autoStart={autoStart(tier)}
+                  />
+                ) : provider === "payhere" ? (
+                  <form action={checkout}>
+                    {/* Both read from the controls at submit time rather than
+                        from a second piece of state on the server. */}
+                    <input type="hidden" name="tier" value={tier} />
+                    <input type="hidden" name="period" value={period} />
+                    <button
+                      type="submit"
+                      disabled={pending}
+                      className={`w-full cursor-pointer disabled:cursor-default
+                                  disabled:opacity-70 ${planButton(featured)}`}
+                    >
+                      {pending ? "Starting checkout…" : `Get ${TIER_NAMES[tier]}`}
+                    </button>
+                    {state.error && (
+                      // On the card's own ink, not text-red: the featured
+                      // ground is the indigo `price-brand`, and a red that
+                      // reads on paper disappears on it.
+                      <p
+                        role="alert"
+                        className="mt-3 font-sans text-xs leading-relaxed text-white/75"
+                      >
+                        {state.error}
+                      </p>
+                    )}
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setSoon({ tier, why: "gateway" })}
+                    className={`w-full cursor-pointer ${planButton(featured)}`}
+                  >
+                    Get {TIER_NAMES[tier]}
+                  </button>
+                )
     );
   }
 
@@ -243,10 +421,11 @@ export function Plans({
                      font-medium text-fg/80"
         >
           Every format is free, on every plan — take your book and go whenever
-          you like. {TIER_NAMES.pro} is for more than{" "}
-          {plural(TIER_LIMITS.free.books ?? 0, "book")}, every consistency check,
-          your whole writing record and paperback setup. No AI on either plan:
-          every word is yours.
+          you like, and books are unlimited on every plan, Free included.{" "}
+          {TIER_NAMES.pro} is for every consistency check, your whole writing
+          record and paperback setup; {TIER_NAMES.plus} adds
+          Amazon&rsquo;s own lists to the Market check. No AI on any plan: every
+          word is yours.
         </p>
 
         {cancelled && (
@@ -263,16 +442,16 @@ export function Plans({
         )}
 
         {/* **The section the reference draws**: its own pale ground, the
-            switch over the paid column, and the two cards. Its palette and
+            switch over the paid columns, and the three cards. Its palette and
             face are `price-*` and `font-pricing` — see `plan-card.tsx`. */}
-        <div className="relative mx-auto mt-8 max-w-[52rem] overflow-hidden rounded-3xl bg-price-ground px-4 pt-7 pb-10 text-left sm:px-10">
+        <div className="relative mx-auto mt-8 max-w-[72rem] overflow-hidden rounded-3xl bg-price-ground px-4 pt-7 pb-10 text-left sm:px-10">
           <PricingDecor />
 
-          <div className="relative mx-auto flex max-w-[45rem] justify-center sm:justify-end sm:pr-8">
+          <div className="relative mx-auto flex max-w-[66rem] justify-center sm:justify-end sm:pr-8">
             <PeriodToggle period={period} onChange={setPeriod} />
           </div>
 
-        <div className="relative mx-auto mt-5 grid max-w-[45rem] gap-5 sm:grid-cols-2 sm:items-stretch">
+        <div className="relative mx-auto mt-5 grid max-w-[66rem] gap-5 sm:grid-cols-2 sm:items-stretch lg:grid-cols-3">
           <PlanCard
             name={TIER_NAMES.free}
             subtitle={BEST_FOR.free}
@@ -293,141 +472,31 @@ export function Plans({
             }
           />
 
-          <PlanCard
-              tone="featured"
-              badge="Recommended"
-              name={TIER_NAMES[PRO]}
-              subtitle={BEST_FOR[PRO]}
+          {PAID_TIERS.map((tier) => (
+            <PlanCard
+              key={tier}
+              tone={tier === FEATURED ? "featured" : "plain"}
+              badge={tier === FEATURED ? "Recommended" : undefined}
+              name={TIER_NAMES[tier]}
+              subtitle={BEST_FOR[tier]}
               /* The real monthly price, struck only over the real per-month
                  annual figure. On the monthly cycle there is nothing to strike. */
               was={
                 period === "annual"
-                  ? displayPrice(priceOf(PRO, "monthly"))
+                  ? displayPrice(priceOf(tier, "monthly"))
                   : undefined
               }
-              price={displayPrice(perMonthOf(PRO, period))}
+              price={displayPrice(perMonthOf(tier, period))}
               per="/month"
               note={
                 period === "annual"
-                  ? `${displayPrice(priceOf(PRO, "annual"))} billed annually`
+                  ? `${displayPrice(priceOf(tier, "annual"))} billed annually`
                   : "Billed monthly"
               }
-              highlights={highlightsFor(PRO)}
-              action={
-                /* **Nothing is for sale, so nothing takes money.**
-
-                   One branch above the whole ladder rather than a condition
-                   inside each of its money-moving arms, so switching
-                   selling back on is deleting this and nothing else. The
-                   ladder below is untouched and still correct — it is simply
-                   not reached while `PLANS_ON_SALE` is false. */
-                !PLANS_ON_SALE ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      notePlanInterest(PRO, period, "upgrade");
-                      setSoon(true);
-                    }}
-                    className={`w-full cursor-pointer ${planButton(true)}`}
-                  >
-                    Get {TIER_NAMES[PRO]}
-                  </button>
-                ) : /* **The card answers for the writer looking at it.** On Pro
-                   already, it confirms and points at `/billing`, or offers the
-                   other cycle. With nothing held, the checkout. */
-                current ? (
-                  /* **The plan they are on says so, whichever cycle is showing.**
-
-                     This compared the cycle too, so a subscriber on monthly
-                     who flicked the toggle to annual saw "Switch to Pro" on
-                     their own plan — which reads as though they are not on it.
-                     The tier is the plan; the cycle is how it is paid for, and
-                     conflating the two put the wrong words on the one card a
-                     subscriber looks at first. */
-                  current.period === period ? (
-                    <Link href="/billing" className={planButton(true)}>
-                      Your plan
-                    </Link>
-                  ) : current.provider === "paddle" ? (
-                    /* Same plan, other cycle. A real change, and named as the
-                       cycle change it is rather than as a plan change. */
-                    <ChangePlanButton
-                      tier={PRO}
-                      period={period}
-                      label={`Switch to ${period === "annual" ? "annual" : "monthly"}`}
-                      className={planButton(true)}
-                    />
-                  ) : (
-                    /* PayHere has no call that swaps a cycle, so the card points
-                       at the one place the writer can act. */
-                    <Link href="/billing" className={planButton(true)}>
-                      Your plan
-                    </Link>
-                  )
-                ) : !signedIn ? (
-                  /* **A signed-out press goes to the door, not to a 401.**
-                     `/api/billing/paddle/checkout` answers "Sign in to
-                     subscribe", and that used to arrive as red text under the
-                     button — the writer said they wanted to pay and was told
-                     no, with no way on. The press is carried instead: the tier
-                     and cycle travel in `next`, and `?buy=` opens the checkout
-                     on the other side.
-
-                     Sign-in rather than sign-up, the opposite of the landing
-                     page's button: somebody already this far into the app
-                     usually has an account, and the form offers the other with
-                     `next` intact either way. */
-                  <Link
-                    href={`/signin?next=${encodeURIComponent(upgradeTo(PRO, period))}`}
-                    className={planButton(true)}
-                  >
-                    Get {TIER_NAMES[PRO]}
-                  </Link>
-                ) : provider === "paddle" && paddle ? (
-                  <PaddleUpgradeButton
-                    tier={PRO}
-                    period={period}
-                    onTransaction={setCheckoutTransaction}
-                    className={planButton(true)}
-                    autoStart={autoStart}
-                  />
-                ) : provider === "payhere" ? (
-                  <form action={checkout}>
-                    {/* Both read from the controls at submit time rather than
-                        from a second piece of state on the server. */}
-                    <input type="hidden" name="tier" value={PRO} />
-                    <input type="hidden" name="period" value={period} />
-                    <button
-                      type="submit"
-                      disabled={pending}
-                      className={`w-full cursor-pointer disabled:cursor-default
-                                  disabled:opacity-70 ${planButton(true)}`}
-                    >
-                      {pending ? "Starting checkout…" : `Get ${TIER_NAMES[PRO]}`}
-                    </button>
-                    {state.error && (
-                      // On the card's own ink, not text-red: the featured
-                      // ground is the indigo `price-brand`, and a red that
-                      // reads on paper disappears on it.
-                      <p
-                        role="alert"
-                        className="mt-3 font-sans text-xs leading-relaxed text-white/75"
-                      >
-                        {state.error}
-                      </p>
-                    )}
-                  </form>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setSoon(true)}
-                    className={`w-full cursor-pointer ${planButton(true)}`}
-                  >
-                    Get {TIER_NAMES[PRO]}
-                  </button>
-                )
-              }
+              highlights={highlightsFor(tier)}
+              action={actionFor(tier)}
             />
+          ))}
         </div>
         </div>
 
@@ -436,7 +505,7 @@ export function Plans({
             top, read down when you are deciding. `spotlight` tints the column
             the featured card names, so the two say the same thing about which
             plan is being recommended. */}
-        <PlanTable spotlight="pro" />
+        <PlanTable spotlight={FEATURED} />
 
         <p className="mx-auto mt-10 max-w-xl font-sans text-sm leading-relaxed text-muted">
           Your manuscripts are yours on every plan. They are written to this
@@ -447,16 +516,18 @@ export function Plans({
 
       {soon && (
         <ComingSoonDialog
-          title={PLANS_ON_SALE ? "Plans" : TIER_NAMES[PRO]}
-          onClose={() => setSoon(false)}
+          title={soon.why === "gateway" ? "Plans" : TIER_NAMES[soon.tier]}
+          onClose={() => setSoon(null)}
         >
-          {PLANS_ON_SALE ? (
+          {soon.why === "gateway" ? (
             <>
               There is no payment gateway configured on this copy of
               OpenChapter, so there is nothing to buy and nothing is held back.
-              Once billing is configured, {TIER_NAMES[PRO]} unlocks unlimited
-              books, title checks and parked ideas, and paperback setup. Every
-              export format is free either way.
+              Once billing is configured, {TIER_NAMES.pro} unlocks unlimited
+              books, title checks and parked ideas, and paperback setup, and{" "}
+              {TIER_NAMES.plus}{" "}
+              adds Amazon&rsquo;s lists to the Market check.
+              Every export format is free either way.
             </>
           ) : (
             /* **It says the press was noted, because it was.** A button that
@@ -466,11 +537,11 @@ export function Plans({
                back is also the honest version of "we heard you" — it shows
                exactly what we wrote down. */
             <>
-              {TIER_NAMES[PRO]} is not on sale yet. We have noted that you
+              {TIER_NAMES[soon.tier]} is not on sale yet. We have noted that you
               wanted it — that is how we decide what to switch on first, and it
               is all we record about this press. Everything free stays free
-              meanwhile: {plural(TIER_LIMITS.free.books ?? 0, "book")}, unlimited
-              chapters and words, and every export format.
+              meanwhile: unlimited books, chapters and words, and every
+              export format.
             </>
           )}
         </ComingSoonDialog>

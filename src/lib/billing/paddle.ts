@@ -91,7 +91,8 @@ export const PADDLE_SANDBOX = paddleSandboxFrom(
 );
 
 /**
- * The two prices — Pro, once per cycle — made once in the Paddle dashboard.
+ * The prices — Pro and Pro Plus, once per cycle — made once in the Paddle
+ * dashboard, each plan its own product so the revenue reports split by plan.
  *
  * Server-side on purpose. The transaction is created by our own route rather
  * than by the browser (see `/api/billing/paddle/checkout`), so the price the
@@ -109,10 +110,37 @@ const PRICE_IDS: Record<PaidTier, Record<Period, string>> = {
     monthly: process.env.PADDLE_PRICE_PRO_MONTHLY ?? "",
     annual: process.env.PADDLE_PRICE_PRO_ANNUAL ?? "",
   },
+  plus: {
+    monthly: process.env.PADDLE_PRICE_PLUS_MONTHLY ?? "",
+    annual: process.env.PADDLE_PRICE_PLUS_ANNUAL ?? "",
+  },
 };
 
+/**
+ * The plan whose prices decide whether Paddle is configured at all.
+ *
+ * **Only Pro's, and that is the lesson of the worst outage this billing has
+ * had.** From 2026-08-23 to 2026-09-07 four plans needed six price ids,
+ * `isPaddleConfigured()` asked for all six, four went unset, and "no gateway"
+ * — which means *no plans and nothing held back* — gave every paid feature to
+ * everybody while the site quietly stopped selling. A plan added later must
+ * not be able to do that again by arriving with its ids missing: a Pro Plus
+ * with no prices is a card that says "Available soon"
+ * (`paddleTierOnSale`), never a free product.
+ */
+const CORE_TIER: PaidTier = "pro";
+
+/** Whether this plan can be bought through Paddle: both its prices are set. */
+export function paddleTierOnSale(tier: PaidTier): boolean {
+  return PRICE_IDS[tier].monthly.length > 0 && PRICE_IDS[tier].annual.length > 0;
+}
+
+/**
+ * The price for a plan and cycle, or `""` for a plan that is not on sale —
+ * which every caller must refuse rather than send to Paddle.
+ */
 export function paddlePriceId(tier: PaidTier, period: Period): string {
-  return PRICE_IDS[tier][period];
+  return paddleTierOnSale(tier) ? PRICE_IDS[tier][period] : "";
 }
 
 /**
@@ -149,16 +177,16 @@ export function paddlePlanFrom(
  * **Both prices or neither**, rather than per-cycle availability — that would
  * mean the pricing page hiding a cycle, which is a product decision hidden
  * inside a configuration check.
+ *
+ * **Pro's prices only** (`CORE_TIER`): a later plan with its ids unset is off
+ * sale, not a reason to call billing unconfigured and open everything.
  */
 export function isPaddleConfigured(): boolean {
   return (
     PADDLE_API_KEY.length > 0 &&
     PADDLE_WEBHOOK_SECRET.length > 0 &&
     PADDLE_CLIENT_TOKEN.length > 0 &&
-    PAID_TIERS.every(
-      (tier) =>
-        PRICE_IDS[tier].monthly.length > 0 && PRICE_IDS[tier].annual.length > 0,
-    )
+    paddleTierOnSale(CORE_TIER)
   );
 }
 

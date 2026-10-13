@@ -1,4 +1,4 @@
-import { TIER_NAMES } from "@/lib/billing/tiers";
+import { TIER_NAMES, type PaidTier } from "@/lib/billing/tiers";
 
 /**
  * The marker on a row that belongs to Pro.
@@ -32,14 +32,21 @@ import { TIER_NAMES } from "@/lib/billing/tiers";
  * badge on a rail row, and one on a check nobody can run, is the opposite case:
  * there the fill is what makes it findable without reading.
  */
-export function ProBadge({ className = "" }: { className?: string }) {
+export function ProBadge({
+  tier = "pro",
+  className = "",
+}: {
+  /** Which plan it names — "Pro Plus" on the Market check's Amazon tabs. */
+  tier?: PaidTier;
+  className?: string;
+}) {
   return (
     <span
       className={`shrink-0 rounded-md bg-linear-to-r from-upgrade-from
                   to-upgrade-to px-1.5 py-0.5 font-sans text-[10px] font-bold
                   tracking-wide text-white uppercase ${className}`}
     >
-      {TIER_NAMES.pro}
+      {TIER_NAMES[tier]}
     </span>
   );
 }

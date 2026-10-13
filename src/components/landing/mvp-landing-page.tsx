@@ -32,9 +32,9 @@ import {
 
 import { IMPORT_FORMATS } from "@/lib/import";
 import { MAX_SNAPSHOTS } from "@/lib/history";
-import { LAUNCH_LIMITS } from "@/lib/launch";
 import { PRO_CHECKS } from "@/lib/consistency-ids";
-import { TIER_NAMES } from "@/lib/billing/tiers";
+import { AMAZON_DATA_TIER, PAID_TIERS, TIER_NAMES } from "@/lib/billing/tiers";
+import { billingConfigured, tierOnSale } from "@/lib/billing/provider";
 import { FREE_LIMITS, FREE_RECORD_DAYS } from "@/lib/free-limits";
 import { CONTACT_EMAIL, LEGAL_PAGES, REFUND_DAYS } from "@/lib/legal";
 import { plural } from "@/lib/plural";
@@ -495,16 +495,16 @@ const ROWS: Row[] = [
        the line "It never tells you what to charge" is the tool's own deck. */
     /* The other half of that pair — see the note on `id` above. */
     id: "price-check",
-    badge: "Price check",
+    badge: "Market check",
     title: "See what books like yours are selling for",
-    lead: `Pick your genre and see what its top 100 best-selling ebooks cost — self-published and traditional publishers kept apart, every book listed — and what Amazon would pay you at any price you try. It never tells you what to charge. ${TIER_NAMES.free} reads Apple Books' lists as often as you like; ${TIER_NAMES.pro} adds Amazon's own top 100, with how many are in Kindle Unlimited.`,
+    lead: `Pick your genre and see what its top 100 best-selling ebooks cost — self-published and traditional publishers kept apart, every book listed — and what Amazon would pay you at any price you try. It never tells you what to charge. Every plan reads Apple Books' lists as often as you like; ${TIER_NAMES[AMAZON_DATA_TIER]} adds Amazon's own top 100 with how many are in Kindle Unlimited, the categories those books rank in, and Amazon's new-release and rising lists.`,
     figure: (
       <Shot
         src="/shot-price-check.webp"
         width={1897}
         height={860}
         url="openchapter.app/?area=price-check"
-        alt="The price check on Contemporary romance, from Apple Books' US top 100 best-selling ebooks: self-published and small presses at a middle price of $4.99 across 41 books, half between $3.99 and $6.99, and traditional publishers at $6.99 across 59, half between $3.99 and $9.99 — with a note that Kindle Unlimited books are sold only on Amazon and a link to search the genre there, above a Try a price card with $4.99 entered."
+        alt="The Market check on Contemporary romance, from Apple Books' US top 100 best-selling ebooks: self-published and small presses at a middle price of $4.99 across 41 books, half between $3.99 and $6.99, and traditional publishers at $6.99 across 59, half between $3.99 and $9.99 — with a note that Kindle Unlimited books are sold only on Amazon and a link to search the genre there, above a Try a price card with $4.99 entered."
       />
     ),
   },
@@ -569,6 +569,15 @@ const FAQ: [question: string, answer: ReactNode][] = [
     </>,
   ],
   [
+    "How many books can I write for free?",
+    <>
+      As many as you like. Every plan holds unlimited books, chapters and
+      words, Free included — start the next one whenever it arrives. What the
+      paid plans add is the extra checks and tools around a book, never room
+      for one.
+    </>,
+  ],
+  [
     "Do I have to pay to get my book out?",
     <>
       No. Word, EPUB and PDF are all on the free plan, with no limit on how
@@ -602,14 +611,15 @@ const FAQ: [question: string, answer: ReactNode][] = [
     <>
       Nothing is taken away and nothing is locked. Your books stay where they
       are, you keep writing in all of them, and every export format goes on
-      working. What changes is that you cannot start a new book while you
-      hold more than the free plan&rsquo;s{" "}
-      {plural(LAUNCH_LIMITS.freeBooks, "book")}, title checks go back to a
-      daily allowance, you cannot park a new idea while you hold more than{" "}
-      {FREE_LIMITS.ideas.free}, and what only {TIER_NAMES.pro} shows (the{" "}
+      working, and you can still start as many new books as you like — books
+      are unlimited on every plan. What changes is that title checks go back
+      to a daily allowance, you cannot park a new idea while you hold more
+      than{" "}
+      {FREE_LIMITS.ideas.free}, and what only a paid plan shows (the{" "}
       {plural(PRO_CHECKS.length, "extra consistency check")}, the writing record
-      before the last {FREE_RECORD_DAYS} days, paperback setup) closes again.
-      Nothing you wrote is deleted.
+      before the last {FREE_RECORD_DAYS}{" "}
+      days, paperback setup, and Amazon&rsquo;s lists in the Market check)
+      closes again. Nothing you wrote is deleted.
     </>,
   ],
   [
@@ -624,7 +634,7 @@ const FAQ: [question: string, answer: ReactNode][] = [
   [
     "Do I need an account?",
     <>
-      To sync across devices and to buy Pro, yes. The writing itself runs in
+      To sync across devices and to buy a paid plan, yes. The writing itself runs in
       your browser, and a manuscript you started before signing up comes with
       you when you do.
     </>,
@@ -651,6 +661,10 @@ const FAQ: [question: string, answer: ReactNode][] = [
 
 
 export function MvpLandingPage() {
+  /* Which paid plans have no prices set yet, read here on the server where
+     the configuration is. With no gateway at all nothing is held back, so
+     nothing is marked as not yet on sale either. */
+  const soon = billingConfigured() ? PAID_TIERS.filter((tier) => !tierOnSale(tier)) : [];
   return (
     /* `<body>` is `overflow-hidden` for the editor shell, so this page owns its
        own scrolling — `min-h-dvh` would put the footer out of reach.
@@ -765,9 +779,10 @@ export function MvpLandingPage() {
               </h1>
             </div>
             <p className={`oc-lead mx-auto mt-6 max-w-xl ${SECTION_LEAD}`}>
-              Write it in the browser. Export as{" "}
-              <strong className={LEAD_EM}>Word, EPUB or PDF</strong> — the EPUB
-              clears EPUBCheck. No AI — every word is yours.
+              Write it in the browser, with{" "}
+              <strong className={LEAD_EM}>unlimited books, free</strong>. Export
+              as <strong className={LEAD_EM}>Word, EPUB or PDF</strong> — the
+              EPUB clears EPUBCheck. No AI — every word is yours.
             </p>
 
             {/* Two pills side by side, filled and white — the reference's pair.
@@ -970,10 +985,11 @@ export function MvpLandingPage() {
                 Start free. Pay when the book is going out.
               </h2>
               <p className={`oc-lead mx-auto mt-6 max-w-2xl ${SECTION_LEAD}`}>
-                {TIER_NAMES.free} and {TIER_NAMES.pro}, two cycles, and
-                nothing held hostage.{" "}
+                {TIER_NAMES.free}, {TIER_NAMES.pro} and {TIER_NAMES.plus}, two
+                cycles, and nothing held hostage.{" "}
                 <strong className={LEAD_EM}>
-                  Every export format is free, on every plan, for good.
+                  Unlimited books and every export format are free, on every
+                  plan, for good.
                 </strong>
               </p>
             </div>
@@ -995,7 +1011,7 @@ export function MvpLandingPage() {
                 half is work a toggle does better. `pricing-cards.tsx` holds the
                 cycle state; the heading, the lead and the refund line stay out
                 here on the server. */}
-            <PricingCards />
+            <PricingCards soon={soon} />
 
             <p className="mt-8 text-center text-[0.9375rem] text-lp-body">
               Cancel from your billing page at any time; a paid plan runs to the

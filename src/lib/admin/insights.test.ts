@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { ACTIVITY_DETAILS, ACTIVITY_KINDS } from "@/lib/activity-log";
 import { perMonthOf } from "@/lib/billing/plans";
-import { LAUNCH_LIMITS } from "@/lib/launch";
 import {
   KIND_LABELS,
   SEGMENTS,
@@ -173,9 +172,10 @@ describe("segmentOf", () => {
     expect(segmentOf(user({ emailConfirmed: false, books: 5 }), NOW)).toBe("unconfirmed");
   });
 
-  it("finds the writers a limit has refused, or who hold the free book count", () => {
+  it("finds the writers a limit has refused, and not the ones with many books", () => {
     expect(segmentOf(user({ lastLimitAt: daysAgo(3) }), NOW)).toBe("limit");
-    expect(segmentOf(user({ books: LAUNCH_LIMITS.freeBooks }), NOW)).toBe("limit");
+    // Every plan holds unlimited books since 2026-10-13, so a big shelf is not a limit.
+    expect(segmentOf(user({ books: 12, words: 900 }), NOW)).not.toBe("limit");
     expect(segmentOf(user({ lastLimitAt: daysAgo(40) }), NOW)).not.toBe("limit");
   });
 

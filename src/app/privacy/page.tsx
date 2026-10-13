@@ -70,7 +70,9 @@ export default function PrivacyPage() {
           items={[
             <>
               <Term>Your account</Term> — your email address and any profile
-              details provided by the sign-in provider.
+              details provided by the sign-in provider. We use the address to
+              email you about your account and about changes to what your plan
+              includes — occasionally, never a newsletter, and never shared.
             </>,
             <>
               <Term>Your library</Term> — books, chapters, prose and metadata,
@@ -125,21 +127,23 @@ export default function PrivacyPage() {
               of your manuscript goes with them.
             </>,
             <>
-              <Term>The price check</Term> — the genre you pick is sent to our
+              <Term>The Market check</Term> — the genre you pick is sent to our
               server, which reads Apple Books&rsquo; public list of best-selling
               ebooks for it. Nothing about you or your book is sent to Apple.
               The covers in the list load straight from Apple&rsquo;s servers,
               so Apple sees that your browser asked for them.
             </>,
             <>
-              <Term>The price check&rsquo;s Amazon view</Term> (Pro) — our server
-              asks OpenWeb Ninja, a data company, for Amazon&rsquo;s best-seller
-              list in the genre you pick and for the details of the books on it.
-              Only the genre and those books&rsquo; Amazon ids are sent; nothing
-              about you or your book. The answers are kept on our server for up
-              to a week (a book&rsquo;s details for up to a month) and shared by
-              every Pro member who opens the same genre. The covers load
-              straight from Amazon&rsquo;s servers.
+              <Term>The Market check&rsquo;s Amazon tabs</Term> (Pro Plus) — our
+              server asks OpenWeb Ninja, a data company, for Amazon&rsquo;s
+              best-seller, new-release, movers and most-wished-for lists in the
+              genre you pick, and for the details of the books on the
+              best-seller list. Only the genre and those books&rsquo; Amazon ids
+              are sent; nothing about you or your book. The answers are kept on
+              our server for up to a week (a book&rsquo;s details for up to a
+              month, the trend lists for a day) and shared by every Pro Plus
+              member who opens the same genre. The covers load straight from
+              Amazon&rsquo;s servers.
             </>,
             <>
               <Term>Dictation</Term> — the microphone buttons use your
@@ -182,7 +186,7 @@ export default function PrivacyPage() {
             </>,
             <>
               <Term>Choosing a plan on the public pricing page</Term> —
-              pressing Choose Pro there records the plan, the billing cycle you
+              pressing a paid plan&rsquo;s button there records the plan, the billing cycle you
               had selected, and which page you pressed it on. That is how we
               tell whether people want the monthly or the annual price before
               they have an account to ask. If you are signed in, your account

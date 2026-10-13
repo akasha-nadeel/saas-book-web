@@ -97,6 +97,7 @@ is the thing to read **before changing that area**, not after.
 | Dashboard, checkup findings, roadmap, the sixteen tool screens, save bars | `docs/architecture/dashboard-and-tools.md` |
 | Why there is no AI, and the Free/Pro decision | `docs/plans/2026-09-14-ai-free-pro-plan-design.md` |
 | The price check — best-seller lists, what Amazon pays, and the Amazon-data plan | `docs/plans/2026-10-05-price-check-amazon-design.md` (the Google-search version it replaced: `docs/plans/2026-09-26-price-check-guided-search-design.md`) |
+| Pro Plus, the Market check's Categories and Trends, unlimited books on Free | `docs/plans/2026-10-12-pro-plus-market-check-design.md` |
 | Tiptap editor, rails, panels, front/back matter pages, series bible | `docs/architecture/editor.md` |
 | Reading view, pagination, the export wizard's Preview | `docs/architecture/reader.md` |
 | Export (EPUB, PDF, Word, Markdown), typesetting, front matter, covers | `docs/architecture/export.md` |
@@ -231,6 +232,14 @@ Both shapes are in the tree — the older routes use the helpers, the sixteen to
 routes write `props: { params: Promise<{ bookId: string }> }` by hand. Either is
 fine; awaiting `params` is not optional.
 
+**JSX can lose a space, and it ships that way.** Text that follows a `{…}`
+value and wraps onto the next line *with an entity (`&rsquo;`) in its first
+line* is compiled with its leading space dropped — "The {n} new releases on
+Amazon&rsquo;s…" rendered "The 50new releases" (found 2026-10-12, in the
+compiled chunk itself). Nothing warns. Put `{" "}` after the value and start
+the text on the next line, or build the sentence as one template string.
+`editor/import-mode-dialog.tsx:121` still has one (`TODO.md`).
+
 **`next.config.ts` is load-bearing, not boilerplate**, and every one of its four
 entries was paid for — read `docs/architecture/build-config.md` before touching
 it. The rules in short:
@@ -358,7 +367,8 @@ here, an entry there, and a line off `HIDDEN_BOOK_TOOL_PATHS`.
 
 **The dashboard's side panel, in the owner's order** (2026-09-15, with the
 price check added under the title check on 2026-09-26): Overview,
-Write, Favourites, Archived, a rule, Title check, Price check, Ideas,
+Write, Favourites, Archived, a rule, Title check, Market check (the price
+check, renamed 2026-10-12), Ideas,
 Paperback, a rule, Trash. No group heading — the rules separate the book lists from the tools, and
 Trash stays last. `RAIL` holds `{ divider: true }` rows for them. Paperback
 uses the shared frame `BookToolArea` and book picker `WorkingOn` (out of
@@ -370,9 +380,13 @@ Ideas mounts the editor's `IdeasPanel`. **The price check takes neither frame**
 its paperback card offers the writer's books in a picker of its own, for the
 page count only. The writing record is reached from the
 Export screen's Format step and the export-done dialog rather than from the
-rail. **How it works, Support, Send feedback and Pricing sit at the foot of the
-side panel**, under a rule; they were tried in the top bar beside New book for
-part of 2026-09-15 and the owner moved them back.
+rail. **Help, Support, Feedback, Pricing and Search are one-word buttons left
+of New book since 2026-10-13** (`HeaderAction`, the owner's call), with Admin
+first for the operator; the side panel holds places only. The owner chose words
+over icons the same day, and the full names ("How it works", "Send feedback")
+had been tried there on 2026-09-15 and moved back, so the short form is the
+decision, not a detail. Below `md` the five stay as labelled rows in the
+phone's navigation sheet, and Search is in the header at every width.
 **Each tool is the same three pieces** — a pure, tested module in `src/lib/`;
 a thin
 `src/app/book/[bookId]/<tool>/page.tsx` that awaits `params`; a client component
@@ -447,24 +461,47 @@ measurement are in `docs/plans/2026-10-05-price-check-amazon-design.md`.
   $9.99 on 2026-07-07), $0.15/MB delivery, print at $2.30 flat to 108 pages or
   $1.00 + $0.012/page, paperback 50% to $9.98 and 60% from $9.99. Its test
   reproduces KDP's own worked example; re-read the pages yearly.
-- **Amazon's data is Pro, since 2026-10-06, and it costs money per request.**
-  - `/api/price-shelf/amazon` reads OpenWeb Ninja's Real-Time Amazon Data API
-    (`amazon-source.ts`, parsed by the pure `amazon-list.ts`).
-  - It is **checked on the server** by `requireProData()`
-    (`billing/require-pro-data.ts`), because a browser gate is only honest
-    for things that cost nothing.
-  - It answers `private, no-store`, so a gated answer never sits in a shared
+- **The price check is the Market check since 2026-10-12**, with three
+  sections per genre — **Prices, Categories, Trends** — and a genre opens on
+  the three alone (2026-10-13): nothing is fetched until one is pressed, and
+  the bar stays on top inside a section. Only the words changed: the path,
+  `?area=price-check`, the `price_check_run` kind and the file names stay.
+  Categories is `category-facts.ts` (the store-wide rank of the list's
+  #1/#10/#25/#50/#100, and every category the top 100 rank in, read off each
+  book's "Best Sellers Rank" line); Trends is `trend-facts.ts` and
+  `/api/price-shelf/amazon/trends` (New Releases, Movers & Shakers, Most
+  Wished For, rating counts, launch prices **in bands** because those lists
+  carry no publisher to split by).
+- **Amazon's data is Pro Plus, since 2026-10-12, and it costs money per
+  request.** It was Pro from 2026-10-06; with no paying writers to cover the
+  bill the owner sold it on its own. **`AMAZON_DATA_TIER` in `tiers.ts` is the
+  one switch** — set it to `"pro"` and the server gate, the locked tabs, the
+  badges and the plan rows all follow.
+  - `/api/price-shelf/amazon` and `/trends` read OpenWeb Ninja's Real-Time
+    Amazon Data API (`amazon-source.ts`, parsed by the pure `amazon-list.ts`).
+  - They are **checked on the server** by `requireAmazonData()`
+    (`billing/require-amazon-data.ts`), which asks for a *tier*, not "paid",
+    because a browser gate is only honest for things that cost nothing.
+  - They answer `private, no-store`, so a gated answer never sits in a shared
     cache.
   - The saving lives in Next's data cache instead: lists for 7 days, each
-    book's details for 30, one book per request.
+    book's details for 30, the five ladder books again for 7 (sent with an
+    `x-oc-read: ladder` header — **Next's fetch cache key includes the
+    headers**, which is what keeps that copy apart), the trend lists for 1.
+    Cost grows with genres, not writers: every genre opened every day is
+    about 5,500 requests a month.
   - **OpenWeb Ninja almost certainly bills each book in a batched request as
     a request** (the free plan's 100 ran out at about 105 books), so a genre
-    is about 102 requests. A weekly refresh of all 27 is about $6 a month.
-  - `OPENWEBNINJA_API_KEY` is the switch. Unset, the route answers 503.
-  - `OPENWEBNINJA_BASE_URL` points the route at a stand-in for tests, and is
+    is about 102 requests the first time.
+  - `OPENWEBNINJA_API_KEY` is the switch. Unset, the routes answer 503.
+  - `OPENWEBNINJA_BASE_URL` points the routes at a stand-in for tests, and is
     never set in production.
-  - The free tab is Apple, unlimited. Amazon is a locked tab that opens
-    `UpgradeDialog reason="amazon"`.
+  - Below Pro Plus the Prices tab is Apple, unlimited, and Amazon, Categories
+    and Trends are locked tabs that say what they show — **no figure, not a
+    blurred one** — and open `UpgradeDialog reason="amazon"`, which sells
+    `AMAZON_DATA_TIER`.
+  - **The first Pro Plus sale mails the owner** (`billing/sale-alert.ts`,
+    from both notify routes) to move OpenWeb Ninja off its free 100 requests.
   - **Apify was tested first and failed**: its Kindle Unlimited flag said "no"
     for every book. Do not re-propose it as untested.
   - The full reckoning is in the design note.
@@ -954,7 +991,12 @@ local-only, with the account menu saying why. Every entry point checks
   absent** — PostgREST refuses the whole select for one unknown column, so the
   entire library download would fail for everybody.
 - **Schema changes belong in `supabase/migrations/`**, not only in the
-  dashboard. There are **eighteen**. The first seven were confirmed applied live
+  dashboard. There are **twenty**. **The nineteenth and twentieth must be
+  applied before their code ships**: `20261012010000_pro_plus_plan.sql` lets
+  the three plan CHECKs admit `plus` (without it a Pro Plus webhook fails with
+  a 23514 and Paddle retries), and `20261013000000_free_unlimited_books.sql`
+  drops the book-limit trigger (without it a free writer's fourth book never
+  syncs). The first seven were confirmed applied live
   on 2026-08-20; the fifteenth and the sixteenth on 2026-09-23. The seventeenth,
   `20261005000000_admin_insights.sql`, is `/admin`'s and was applied live on
   2026-10-05, before its code shipped, and checked through PostgREST (the
@@ -1067,23 +1109,32 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
 - **Neither checkout lets the browser say what it is buying** — the transaction
   is created server-side, so the price comes from `plans.ts` and the buyer's id
   from their own session.
-- **There are two plans, Free and Pro, and `src/lib/billing/tiers.ts` is where
-  they are named** (2026-09-14). `PlanTier` is `free | pro` — `tierAtLeast`
-  compares positions in `TIER_ORDER`, so a tier inserted in the wrong place opens
-  or shuts every gate above it. `TIER_LIMITS` is the one TypeScript statement of
-  what each plan gives, and it now holds one field, `books`; `TIER_NAMES` is the
-  one place the words are written. The module is pure and imports nothing, so a
-  Server Component, a client component and `library-store.ts` can all read it.
-  There were four (Free, Draft, Writer, Studio) and the paid three differed only
-  by assistant credits, so removing the AI left three identical products; the
+- **There are three plans, Free, Pro and Pro Plus, and `src/lib/billing/tiers.ts`
+  is where they are named** (Pro Plus since 2026-10-12). `PlanTier` is
+  `free | pro | plus` — `tierAtLeast` compares positions in `TIER_ORDER`, so a
+  tier inserted in the wrong place opens or shuts every gate above it.
+  `TIER_LIMITS` is the one TypeScript statement of what each plan gives, and it
+  holds one field, `books` — **null on every plan since 2026-10-13**;
+  `TIER_NAMES` is the one place the words are written. The module is pure and
+  imports nothing, so a Server Component, a client component and
+  `library-store.ts` can all read it. **Every gate but one means "any paid
+  plan"** (`isPro`, `plan.pro`, `onFreePlan`), which is right because Pro Plus
+  is everything in Pro; the one that asks for a tier is Amazon's data
+  (`AMAZON_DATA_TIER`, `amazonLocked`, `requireAmazonData`). There were four
+  once (Free, Draft, Writer, Studio) and the paid three differed only by
+  assistant credits, so removing the AI left three identical products; the
   migration folds every retired row into `pro`, and `asTier` refuses the old
   names rather than mapping them.
-- **Pro buys eight things since 2026-09-26**, and `plan-rows.test.ts` pins the
-  list: unlimited books (Free holds **three**); unlimited title checks (Free
-  runs **three a day**, `FREE_LIMITS.titleCheck`); **Amazon's best-seller
-  prices and Kindle Unlimited in the price check** (since 2026-10-06 Free has
-  the price check unlimited on Apple Books' lists, and the daily limit it had
-  for a day is gone from `FREE_LIMITS`); unlimited parked ideas (Free
+- **Pro Plus is Pro and Amazon's data, nothing else**, and
+  `plan-rows.test.ts` pins it: the Market check (Amazon + Apple), the
+  category check and the trends are the only rows where Pro and Pro Plus
+  differ.
+- **Pro buys six things since 2026-10-13**, and `plan-rows.test.ts` pins the
+  list. **Books are not one of them**: every plan holds unlimited books since
+  2026-10-13 (Free held three from 2026-09-15). Unlimited title checks (Free
+  runs **three a day**, `FREE_LIMITS.titleCheck`); the Market check is
+  unlimited on Apple Books' lists on every plan, and Amazon's is Pro Plus;
+  unlimited parked ideas (Free
   parks **five at a time**, `FREE_LIMITS.ideas` — occupancy, so forgetting one
   makes room); all **11** consistency checks (Free runs **5**, `FREE_CHECKS` in
   `consistency-ids.ts`, and is told how many things the other six found); the
@@ -1091,9 +1142,9 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   **30 days**, `FREE_RECORD_DAYS`, and the file says so); and **paperback
   setup, which Free does not get at all** — `PaperbackPage` opens `GatedTool`
   and the dashboard's Paperback area draws `ProCard`, and it is the one row
-  allowed to say "Not included". **Only the book count and the Amazon data are
-  enforced by the server** — the Amazon data because it is paid for per
-  request (`requireProData`); the rest are
+  allowed to say "Not included" on Pro's side. **Only the Amazon data is
+  enforced by the server** — because it is paid for per request
+  (`requireAmazonData`); the book count was the other, until it went; the rest are
   browser gates through `onFreePlan` / `useLimitGate` / `useEntitled`, which the
   owner chose knowingly. Nothing a writer typed is hidden by any of them — the
   log keeps recording, parked ideas past five stay — so upgrading opens what
@@ -1129,9 +1180,15 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   Plottr $9.99/mo); the design note has the research. **USD only.**
   `uniformAnnualSaving()` still guards the one "Save" badge. **A price change is
   three edits**: this table, *new* prices in Paddle's catalog (never an edit of a
-  live one), and the resulting env ids — **two of them**,
-  `PADDLE_PRICE_PRO_MONTHLY` and `PADDLE_PRICE_PRO_ANNUAL`, both required by
-  `isPaddleConfigured()`.
+  live one), and the resulting env ids — `PADDLE_PRICE_PRO_MONTHLY` and
+  `PADDLE_PRICE_PRO_ANNUAL`, both required by `isPaddleConfigured()`.
+  **Pro Plus is $9.99 a month or $99.48 a year** (twelve at $8.29, the same
+  17%), its own Paddle product with `PADDLE_PRICE_PLUS_MONTHLY` /
+  `_ANNUAL` — and **those two are not required**: only Pro's ids decide whether
+  Paddle is configured (`CORE_TIER`), so a Pro Plus with no prices is "Available
+  soon" (`tierOnSale`, passed down to both pricing pages) rather than billing
+  switched off and every paid feature given away, which is what six missing ids
+  did from 2026-08-23 to 2026-09-07.
 - **Export is free on both plans, and *export must never move behind the plan*
   is the rule.** The launch MVP sold EPUB and PDF as the two things Pro
   bought; that was undone on 2026-08-27, because a writer has to be able to take
@@ -1160,8 +1217,9 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   which silenced the one plan never mailed about). `/privacy` names the record.
   The table's CHECK still admits the retired tiers and the Starter Pass so rows
   recorded before 2026-09-14 stay valid; the route writes only `pro`.
-- **A plan change says what it will charge before it charges.** With one paid
-  plan, a change is a switch of cycle.
+- **A plan change says what it will charge before it charges.** A change is a
+  switch of cycle, or between Pro and Pro Plus ("Upgrade to Pro Plus" / "Switch
+  to Pro" on the cards; "Your plan" compares tier *and* cycle).
   `/api/billing/paddle/change-plan/preview` returns Paddle's own
   `previewUpdate` figure — never a difference worked out from `plans.ts`,
   because an annual switch charges the whole prorated year — $68.61 under a
@@ -1176,20 +1234,30 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   and `change-plan-button.tsx` reads the **status**, not the wording, to decide
   whether to draw the link to `/billing`. Codes go into either set once they
   have been seen.
-- **The one limit enforced on the server is the book count.**
-  `requireLaunchExport()` (`billing/launch-entitlements.ts`, all that file holds
-  now) only checks for a session — free is not anonymous, since
-  `/api/export/pdf` launches a browser on markup a caller sent — and the free
-  book limit is a **Postgres trigger** (`enforce_launch_book_limit`) rather than
-  a browser count. `new-book-form.tsx` mirrors it in the UI; the trigger is what
-  enforces it. **The number is stated three times and they must move together**:
-  `LAUNCH_LIMITS.freeBooks`, `TIER_LIMITS.free.books`, and the trigger body,
-  whose current value (**three**) is set by the sixteenth migration.
-  `launch.test.ts` reads that migration and fails if the SQL and the TypeScript
-  disagree. `requirePro`, `requireTier`, the credit ledger (`ai_credits`,
+- **There is no book limit on any plan since 2026-10-13**, the owner's
+  decision. It was a **Postgres trigger** (`enforce_launch_book_limit`) mirrored
+  in the browser — one book, then three from 2026-09-15 — and
+  `20261013000000_free_unlimited_books.sql` drops it; **that migration goes in
+  before its code**, or a fourth book is refused with a 23514 and never syncs.
+  `LAUNCH_LIMITS.freeBooks` is gone; the browser gates (new book, restore, bulk
+  restore, idea → book) read `atBookLimit(shelf, bookLimitFor(plan))`, which
+  answers false for everybody because `TIER_LIMITS.free.books` is null — so a
+  limit brought back is that field plus a trigger, and `launch.test.ts` checks
+  the newest migration naming the trigger drops it. `requireLaunchExport()`
+  (`billing/launch-entitlements.ts`) only checks for a session — free is not
+  anonymous, since `/api/export/pdf` launches a browser on markup a caller
+  sent. `requirePro`, `requireTier`, the credit ledger (`ai_credits`,
   `claim_credits`, `refund_credits`), `ai_usage` and the assistant reply
   functions are all gone — the migration drops the SQL half.
-- **The book limit counts everything but the trash**, so the archive is not a
+- **Existing writers were told once** (2026-10-13): `whats-new.ts` and
+  `shelf/whats-new.tsx` show "Unlimited books, free." on the dashboard only,
+  to accounts made (or, with no account, books opened) before the change,
+  remembered in `prefs.noticesSeen` **and** the account's
+  `user_metadata.notices_seen` so a second device does not ask. No sign-in is
+  needed: the session they already have is read. The email went through
+  `scripts/announce-unlimited-books.cjs` (a dry run unless `--send`).
+- **The rules a book limit would count by, kept for if one returns** — they
+  were written while Free held three. The book limit counts everything but the trash, so the archive is not a
   way round it and **unarchiving is never gated**. It was the active shelf alone
   until 2026-08-26, on the Trello/Figma convention where archiving opens a slot
   and coming back out is gated instead — a fair rule for tools whose archive
@@ -1461,7 +1529,8 @@ went back on the same day, 2026-09-15, so the count is the thing that moves
 most often here.
 
 **API routes:** `/api/comps` · `/api/comps/subjects` · `/api/price-shelf` ·
-`/api/price-shelf/amazon` (Pro, server-checked) ·
+`/api/price-shelf/amazon` and `/api/price-shelf/amazon/trends` (Pro Plus,
+server-checked) ·
 `/api/export/pdf` ·
 `/api/plan-interest` ·
 `/api/billing/*` (`subscription`, `cancel`, `resume`, `history`, `notify`,

@@ -4,8 +4,8 @@ import type { InterestPeriod, InterestTier } from "@/lib/plan-interest";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { alertAddress } from "@/lib/billing/sale-alert";
 import { isEmailConfigured, sendEmail } from "@/lib/email/send";
-import { CONTACT_EMAIL } from "@/lib/legal";
 
 /**
  * Somebody pressed a paid plan while the plans are not on sale.
@@ -30,23 +30,8 @@ import { CONTACT_EMAIL } from "@/lib/legal";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Where the alert goes.
- *
- * **`CONTACT_EMAIL` is the address on the site, which is not the same thing as
- * an address somebody reads.** It is published for writers to reach support at,
- * and on a domain whose mail is set up to *send*; the first twelve alerts were
- * accepted by Resend and delivered to a mailbox nobody was watching. An
- * operational alert wants the inbox its owner actually opens, and that is not a
- * fact about the product, so it is configuration rather than a constant.
- *
- * Falls back to the published address, which keeps a self-hosted copy working
- * without a setting and is the right destination when the domain does have a
- * mailbox.
- */
-function alertAddress(): string {
-  return process.env.PLAN_INTEREST_ALERT_EMAIL?.trim() || CONTACT_EMAIL;
-}
+/* Where the alert goes is `alertAddress()` in `billing/sale-alert.ts`, shared
+   with the new-subscriber alert; the reasoning is written there. */
 
 /** Where the press happened. Curiosity on the landing page, intent on /upgrade. */
 type Source = "upgrade" | "landing";

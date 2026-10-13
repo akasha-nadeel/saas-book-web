@@ -1,7 +1,8 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { expect, it } from "vitest";
 import {
   LAUNCH_LIMITS,
+  amazonLocked,
   exportAllowed,
   onFreePlan,
   trashedBookClosed,
@@ -79,21 +80,41 @@ it("holds nothing back where no gateway is configured", () => {
 });
 
 /**
- * **The free book count is stated three times and they must agree**:
- * `LAUNCH_LIMITS.freeBooks`, `TIER_LIMITS.free.books`, and the trigger in
- * `20260915000000_free_three_books.sql`, which is the one that actually
- * refuses. SQL cannot import TypeScript, so the test reads the migration — the
- * browser offering a book Postgres then refuses is the drift this catches.
+ * **Amazon's data is shut to Free and to Pro, and to nobody while unknown.**
+ *
+ * The same three parts as `onFreePlan`, read off the tier rather than the
+ * paid flag, because Pro is paid and still does not get it (2026-10-12).
  */
-it("holds three books on the free plan, in TypeScript and in SQL", async () => {
-  const { TIER_LIMITS } = await import("@/lib/billing/tiers");
-  expect(LAUNCH_LIMITS.freeBooks).toBe(3);
-  expect(TIER_LIMITS.free.books).toBe(LAUNCH_LIMITS.freeBooks);
+it("shuts Amazon's data below Pro Plus, never while unknown or with no gateway", () => {
+  const known = { loading: false, billing: true };
+  expect(amazonLocked({ ...known, tier: "free" })).toBe(true);
+  expect(amazonLocked({ ...known, tier: "pro" })).toBe(true);
+  expect(amazonLocked({ ...known, tier: "plus" })).toBe(false);
+  expect(amazonLocked({ ...known, loading: true, tier: null })).toBe(false);
+  expect(amazonLocked({ loading: false, billing: false, tier: null })).toBe(false);
+});
 
-  const sql = readFileSync(
-    "supabase/migrations/20260915000000_free_three_books.sql",
-    "utf8",
-  );
-  const limit = sql.match(/if v_count >= (\d+) then/);
-  expect(limit?.[1]).toBe(String(LAUNCH_LIMITS.freeBooks));
+/**
+ * **Every plan holds unlimited books, in TypeScript and in SQL** (2026-10-13).
+ *
+ * The free limit was stated in the browser and enforced by a Postgres trigger,
+ * and the two had to agree or the browser offered books Postgres refused. With
+ * no limit the agreement is that neither has one: every tier's `books` is null,
+ * and the newest migration that names the trigger drops it. SQL cannot import
+ * TypeScript, so the test reads the migrations — and it cannot know what the
+ * live database runs, so the migration still goes in first.
+ */
+it("holds unlimited books on every plan, in TypeScript and in SQL", async () => {
+  const { TIER_LIMITS, TIER_ORDER } = await import("@/lib/billing/tiers");
+  for (const tier of TIER_ORDER) expect(TIER_LIMITS[tier].books).toBeNull();
+
+  const dir = "supabase/migrations";
+  const latest = readdirSync(dir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort()
+    .map((f) => readFileSync(`${dir}/${f}`, "utf8"))
+    .filter((sql) => sql.includes("books_launch_free_limit"))
+    .at(-1);
+  expect(latest).toMatch(/drop trigger if exists books_launch_free_limit/);
+  expect(latest).not.toMatch(/create trigger books_launch_free_limit/);
 });

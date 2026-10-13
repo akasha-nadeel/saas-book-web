@@ -6,6 +6,7 @@ import { displayPrice, priceOf } from "@/lib/billing/plans";
 import { plural } from "@/lib/plural";
 import { NOT_INCLUDED, ROWS } from "@/lib/billing/plan-rows";
 import {
+  AMAZON_DATA_TIER,
   TIER_LIMITS,
   TIER_NAMES,
   type PaidTier,
@@ -60,16 +61,15 @@ export type UpgradeReason = "books" | "restore" | "checks" | "themes" | "amazon"
 /**
  * Which plan each refusal is answered by.
  *
- * Pro, since 2026-09-14 — it is the only paid plan. The map stays so the answer
- * follows the plan table rather than being written into each headline, and so
- * a second plan would have one place to be chosen in.
+ * Pro for everything Pro sells; Amazon's data is `AMAZON_DATA_TIER` (Pro Plus
+ * since 2026-10-12), so moving that switch moves this answer with it.
  */
 const SELLS: Record<UpgradeReason, PaidTier> = {
   books: "pro",
   restore: "pro",
   checks: "pro",
   themes: "pro",
-  amazon: "pro",
+  amazon: AMAZON_DATA_TIER,
 };
 
 /* **Each headline names the plan it is selling**, and the count it quotes is
@@ -97,12 +97,13 @@ const HEADLINES: Record<UpgradeReason, { lead: string; title: string }> = {
     lead: "Every colour, and both dark papers.",
     title: `${TIER_NAMES.free} comes with ${plural(FREE_TINTS.length, "colour")} and ${FREE_PAPERS.length} papers. ${TIER_NAMES.pro} opens all ${SHOWN_TINTS.length} and all ${FREE_PAPERS.length + PRO_PAPERS.length}.`,
   },
-  /* Pressed on the price check's Amazon tab (2026-10-06). It hides nothing:
-     the Apple list stays the writer's, unlimited. What it sells is Amazon's
-     own top 100, which costs money per request and is checked on the server. */
+  /* Pressed on the Market check's Amazon tab or its Categories and Trends
+     tabs (2026-10-06, Pro Plus since 2026-10-12). It hides nothing: the Apple
+     list stays the writer's, unlimited. What it sells is Amazon's own lists,
+     which cost money per request and are checked on the server. */
   amazon: {
-    lead: "Amazon's own best sellers, with Kindle Unlimited.",
-    title: `${TIER_NAMES.free} reads Apple Books' lists. ${TIER_NAMES.pro} adds Amazon's top 100 for your genre: how many are in Kindle Unlimited, what series and paperbacks cost, refreshed weekly.`,
+    lead: "Amazon's own best sellers, categories and trends.",
+    title: `${TIER_NAMES[AMAZON_DATA_TIER]} adds Amazon's lists for your genre: the top 100 with Kindle Unlimited, the categories they rank in, and what is new and rising.`,
   },
 };
 
@@ -216,7 +217,9 @@ const ROW_ICON: Record<string, React.ReactNode> = {
   "Autosave and sync": icons.sync,
   Export: icons.word,
   "Title check": icons.books,
-  "Price check": icons.books,
+  "Market check": icons.books,
+  "Category check": icons.everything,
+  "Trends & reviews": icons.ideas,
   "Consistency check": icons.everything,
   Ideas: icons.ideas,
   "Paperback setup": icons.ruler,
@@ -234,9 +237,19 @@ const ROW_ICON: Record<string, React.ReactNode> = {
  * Rows the plan does not include are dropped rather than crossed: a column
  * headed "what it adds" is a list of what you get, and the cards are where the
  * full comparison lives.
+ *
+ * **`over` drops the rows a paid writer already has** (2026-10-12): a Pro
+ * writer offered Pro Plus is shown the three Amazon rows it adds rather than
+ * fifteen lines, twelve of them the column beside it word for word. From Free
+ * every row is listed, as it always was.
  */
-function rowsFor(tier: PlanTier): Row[] {
-  return ROWS.filter((row) => row.values[tier] !== NOT_INCLUDED).map((row) => ({
+function rowsFor(tier: PlanTier, over?: PlanTier): Row[] {
+  const has = over && over !== "free" ? over : null;
+  return ROWS.filter(
+    (row) =>
+      row.values[tier] !== NOT_INCLUDED &&
+      (!has || row.values[tier] !== row.values[has]),
+  ).map((row) => ({
     icon: ROW_ICON[row.label] ?? icons.everything,
     name: row.label,
     /* The value carries the detail — "Unlimited", "25 a day". Where it is
@@ -265,9 +278,9 @@ function Column({
    * turn grey, and **no sixth colour joins the closed list in `docs/styling.md`
    * to get it**.
    */
-  tone: "free" | "pro";
+  tone: "have" | "offer";
 }) {
-  const pro = tone === "pro";
+  const pro = tone === "offer";
   return (
     <div
       /* A tenth, so it reads as a tint over `panel` rather than as a second
@@ -380,12 +393,12 @@ export function UpgradeDialog({
           <Column
             label={`${TIER_NAMES[tier]} — what you have`}
             rows={rowsFor(tier)}
-            tone="free"
+            tone="have"
           />
           <Column
             label={`${TIER_NAMES[selling]} — what it adds`}
-            rows={rowsFor(selling)}
-            tone="pro"
+            rows={rowsFor(selling, tier)}
+            tone="offer"
           />
         </div>
 

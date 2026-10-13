@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * A card that opens to show more: the price check's answers that only some
+ * A card that opens to show more: the Market check's answers that only some
  * writers want.
  *
  * **A native `<details>`**, so keyboard, screen reader and find-in-page all

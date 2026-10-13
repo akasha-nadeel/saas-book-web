@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { mergeAmazon, parseAmazonBestSellers, parseAmazonDetails } from "./amazon-list";
+import {
+  mergeAmazon,
+  parseAmazonBestSellers,
+  parseAmazonDetails,
+  parseBestSellersRank,
+} from "./amazon-list";
 
 /* Shapes copied from OpenWeb Ninja's real answers on 2026-10-06, cut down to
    the fields the parser reads. */
@@ -13,6 +18,9 @@ const list = {
         asin: "B0HLQ6HDZ6",
         product_title: "Swamp Shoot (Miss Fortune Mysteries Book 31)",
         product_price: "$7.99",
+        product_star_rating: "4.9",
+        product_num_ratings: 298,
+        rank_change_label: null,
         product_url: "https://www.amazon.com/dp/B0HLQ6HDZ6",
         product_photo: "https://images-na.ssl-images-amazon.com/images/I/91icfudWCDL._AC_UL900_SR900,600_.jpg",
       },
@@ -21,6 +29,9 @@ const list = {
         asin: "B0HKYHDZMG",
         product_title: "Sweet Ruin (Makov Bratva Book 1)",
         product_price: "$2.99",
+        product_star_rating: 4.3,
+        product_num_ratings: "1,204",
+        rank_change_label: "Sales rank: 1,204 (was 18,331)",
         product_url: "https://www.amazon.com/dp/B0HKYHDZMG",
         product_photo: null,
       },
@@ -46,6 +57,8 @@ const details = {
         "File size": "1.6 MB",
         "Print length": "664 pages",
         "Book 1 of 2": "Makov Bratva",
+        "Best Sellers Rank":
+          "#67 in Kindle Store (See Top 100 in Kindle Store)    #1 in Cozy Mystery   #1 in Cozy Mysteries (Books)   #1 in Private Investigator Mysteries (Kindle Store)",
       },
     },
     {
@@ -76,6 +89,16 @@ describe("parseAmazonBestSellers", () => {
     expect(books[1].cover).toBe(null);
   });
 
+  it("reads ratings, stars and a mover's own note, as Amazon writes them", () => {
+    const [swamp, sweet] = parseAmazonBestSellers(list);
+    expect(swamp).toMatchObject({ ratings: 298, stars: 4.9, change: null });
+    expect(sweet).toMatchObject({
+      ratings: 1204,
+      stars: 4.3,
+      change: "Sales rank: 1,204 (was 18,331)",
+    });
+  });
+
   it("returns nothing, rather than throwing, for a payload it does not recognise", () => {
     expect(parseAmazonBestSellers(null)).toEqual([]);
     expect(parseAmazonBestSellers({ data: {} })).toEqual([]);
@@ -95,7 +118,19 @@ describe("parseAmazonDetails", () => {
       fileSizeMb: 1.6,
       series: { name: "Makov Bratva", number: 1, of: 2 },
       paperbackPrice: 23.74,
+      storeRank: 67,
+      categoryRanks: [
+        { rank: 1, name: "Cozy Mystery" },
+        { rank: 1, name: "Cozy Mysteries (Books)" },
+        { rank: 1, name: "Private Investigator Mysteries (Kindle Store)" },
+      ],
     });
+  });
+
+  it("reads a book with no rank line as having none, rather than as #0", () => {
+    const book = found.get("B0HLQ6HDZ6")!;
+    expect(book.storeRank).toBe(null);
+    expect(book.categoryRanks).toEqual([]);
   });
 
   it("reads a book with no Kindle Unlimited flag as not in it, and kilobytes as megabytes", () => {
@@ -112,6 +147,29 @@ describe("parseAmazonDetails", () => {
   });
 });
 
+describe("parseBestSellersRank", () => {
+  it("keeps Amazon's own category names, separators and store qualifiers", () => {
+    expect(
+      parseBestSellersRank(
+        "#5,309 in Kindle Store (See Top 100 in Kindle Store)    #12 in Cozy Culinary Mystery   #2,040 in Women Sleuths (Books)",
+      ),
+    ).toEqual({
+      storeRank: 5309,
+      categoryRanks: [
+        { rank: 12, name: "Cozy Culinary Mystery" },
+        { rank: 2040, name: "Women Sleuths (Books)" },
+      ],
+    });
+  });
+
+  it("answers nothing for a missing or unreadable line", () => {
+    const none = { storeRank: null, categoryRanks: [] };
+    expect(parseBestSellersRank(undefined)).toEqual(none);
+    expect(parseBestSellersRank("Not ranked")).toEqual(none);
+    expect(parseBestSellersRank("#0 in Kindle Store")).toEqual(none);
+  });
+});
+
 describe("mergeAmazon", () => {
   it("joins the list and the details into the shape the screen draws", () => {
     const [swamp, sweet] = mergeAmazon(parseAmazonBestSellers(list), parseAmazonDetails(details));
@@ -124,7 +182,10 @@ describe("mergeAmazon", () => {
       publisher: null,
       kindleUnlimited: true,
       pages: 664,
+      ratings: 1204,
+      storeRank: 67,
     });
+    expect(sweet.categoryRanks).toHaveLength(3);
     expect(swamp.publisher).toBe("J&R Publishing");
   });
 

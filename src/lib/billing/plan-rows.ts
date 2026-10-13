@@ -1,5 +1,5 @@
 /**
- * Every line the two plans are compared on, and what each one gives.
+ * Every line the three plans are compared on, and what each one gives.
  *
  * **Its own module, with no `"use client"` on it, and that is load-bearing.**
  * The pricing cards are drawn on `/upgrade`, which is a client component, and
@@ -13,10 +13,14 @@
  * page cannot promise something the app then refuses.
  *
  * **The order of this array is the order in the table.** Books leads; the rest
- * run in the order a book is made in. Six rows differ between the plans since
- * 2026-09-16 (books, ideas, title checks, the consistency check, the writing
- * record and paperback setup); a row of identical values is the argument rather
- * than filler. Paperback setup is the one row Free does not have at all.
+ * run in the order a book is made in. A row of identical values is the
+ * argument rather than filler.
+ *
+ * **Pro Plus is Pro on every row but the three Amazon ones** (2026-10-12):
+ * the Market check's source, the category check and the trends. Those three
+ * are written from `amazonDataAllowed`, so moving `AMAZON_DATA_TIER` to Pro
+ * moves the words with it. Paperback setup is the one row Free does not have
+ * at all; the category check and the trends are the two Pro does not.
  */
 
 import { ALL_CHECKS, FREE_CHECKS } from "@/lib/consistency-ids";
@@ -28,7 +32,7 @@ import {
   PRO_PAPERS,
   SHOWN_TINTS,
 } from "@/lib/theme-access";
-import { TIER_LIMITS, TIER_ORDER, type PlanTier } from "./tiers";
+import { TIER_LIMITS, TIER_ORDER, amazonDataAllowed, type PlanTier } from "./tiers";
 
 /**
  * The one value that means "no". Named, because the mark in front of a row is
@@ -44,6 +48,21 @@ const INCLUDED = "Included";
 function everywhere(value: string): Record<PlanTier, string> {
   return Object.fromEntries(
     TIER_ORDER.map((tier) => [tier, value]),
+  ) as Record<PlanTier, string>;
+}
+
+/** Free says one thing, both paid plans another. */
+function paid(free: string, value: string): Record<PlanTier, string> {
+  return { free, pro: value, plus: value };
+}
+
+/**
+ * The plans that read Amazon's data say `amazon`; the rest say `otherwise`.
+ * Read from the same switch the server gate reads (`AMAZON_DATA_TIER`).
+ */
+function byAmazon(amazon: string, otherwise: string): Record<PlanTier, string> {
+  return Object.fromEntries(
+    TIER_ORDER.map((tier) => [tier, amazonDataAllowed(tier) ? amazon : otherwise]),
   ) as Record<PlanTier, string>;
 }
 
@@ -64,15 +83,19 @@ export const ROWS: {
   label: string;
   values: Record<PlanTier, string>;
 }[] = [
-  /* **Line one, because it is the first thing Pro buys** — said first rather
-     than found. */
+  /* **Line one, and unlimited on every plan since 2026-10-13.** It was the
+     first thing Pro bought while Free held three; now the identical values are
+     the argument, the way the Export row's are — no plan rations books. Read
+     from `TIER_LIMITS`, so a limit brought back would show here at once. */
   {
     group: "Writing",
     label: "Books",
-    values: {
-      free: plural(TIER_LIMITS.free.books ?? 0, "book"),
-      pro: UNLIMITED,
-    },
+    values: Object.fromEntries(
+      TIER_ORDER.map((tier) => {
+        const limit = TIER_LIMITS[tier].books;
+        return [tier, limit === null ? UNLIMITED : plural(limit, "book")];
+      }),
+    ) as Record<PlanTier, string>,
   },
   /* Qualifies the row above it: one book, but nothing inside it counted. */
   {
@@ -95,10 +118,7 @@ export const ROWS: {
   {
     group: "Writing",
     label: "Ideas",
-    values: {
-      free: `${FREE_LIMITS.ideas.free} at a time`,
-      pro: UNLIMITED,
-    },
+    values: paid(`${FREE_LIMITS.ideas.free} at a time`, UNLIMITED),
   },
   /* **Both halves of one answer**, which is why this is a row and not two: the
      paper and the app's colour are the same question asked twice, and the
@@ -110,10 +130,10 @@ export const ROWS: {
   {
     group: "Writing",
     label: "Colour themes",
-    values: {
-      free: `${plural(FREE_TINTS.length, "colour")}, ${FREE_PAPERS.length} papers`,
-      pro: `All ${SHOWN_TINTS.length}, all ${FREE_PAPERS.length + PRO_PAPERS.length} papers`,
-    },
+    values: paid(
+      `${plural(FREE_TINTS.length, "colour")}, ${FREE_PAPERS.length} papers`,
+      `All ${SHOWN_TINTS.length}, all ${FREE_PAPERS.length + PRO_PAPERS.length} papers`,
+    ),
   },
   /* **The second thing Pro buys.** The number comes from `FREE_LIMITS`, which
      is what `useLimitGate` spends, so this cannot promise a count the screen
@@ -122,24 +142,31 @@ export const ROWS: {
   {
     group: "Publishing",
     label: "Title check",
-    values: {
-      free: `${FREE_LIMITS.titleCheck.free} a day`,
-      pro: UNLIMITED,
-    },
+    values: paid(`${FREE_LIMITS.titleCheck.free} a day`, UNLIMITED),
   },
   /* **Not metered since 2026-10-06; the plans differ by source instead.**
-     Apple Books' lists are free to read, so Free has the price check as often
-     as it likes. What Pro adds is Amazon's own top 100 with Kindle Unlimited,
-     which is paid for per request and checked on the server
-     (`require-pro-data.ts`). Worded to keep clear of the unanchored `/ai/`
-     check in the test — no "available", no "paid". */
+     Apple Books' lists are free to read, so every plan has the Market check
+     (the price check, renamed 2026-10-12) as often as it likes. Amazon's own
+     top 100 with Kindle Unlimited is paid for per request and checked on the
+     server (`require-amazon-data.ts`), so it is Pro Plus. Worded to keep clear
+     of the unanchored `/ai/` check in the test — no "available", no "paid". */
   {
     group: "Publishing",
-    label: "Price check",
-    values: {
-      free: "Apple lists",
-      pro: "Amazon + Apple",
-    },
+    label: "Market check",
+    values: byAmazon("Amazon + Apple", "Apple prices"),
+  },
+  /* The categories a genre's top 100 also rank in, and the whole-store rank of
+     the list's #1 to #100 — read off the same Amazon data. */
+  {
+    group: "Publishing",
+    label: "Category check",
+    values: byAmazon("Amazon categories", NOT_INCLUDED),
+  },
+  /* New releases, movers and most wished for, rating counts and the covers. */
+  {
+    group: "Publishing",
+    label: "Trends & reviews",
+    values: byAmazon("Amazon lists", NOT_INCLUDED),
   },
   /* **The wedge.** Export is the one thing a writer cannot do without, and
      charging for the door is what this trade's writers check for first. Two
@@ -154,26 +181,20 @@ export const ROWS: {
   {
     group: "Publishing",
     label: "Consistency check",
-    values: {
-      free: `${FREE_CHECKS.length} checks`,
-      pro: `All ${ALL_CHECKS.length}`,
-    },
+    values: paid(`${FREE_CHECKS.length} checks`, `All ${ALL_CHECKS.length}`),
   },
   /* The free window is `FREE_RECORD_DAYS`; Pro reads what the log keeps,
      which is `KEEP_DAYS` — the test beside this pins the "12 months". */
   {
     group: "Publishing",
     label: "Writing record",
-    values: {
-      free: `Last ${FREE_RECORD_DAYS} days`,
-      pro: "Last 12 months",
-    },
+    values: paid(`Last ${FREE_RECORD_DAYS} days`, "Last 12 months"),
   },
   /* **Pro only since 2026-09-16**, the owner's decision — `ProGate` holds the
      screen. The table draws Free's cell as a dash. */
   {
     group: "Publishing",
     label: "Paperback setup",
-    values: { free: NOT_INCLUDED, pro: INCLUDED },
+    values: paid(NOT_INCLUDED, INCLUDED),
   },
 ];

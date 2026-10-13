@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogClose } from "@/components/ui/dialog";
-import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
+import { AMAZON_DATA_TIER, TIER_NAMES } from "@/lib/billing/tiers";
 import { ALL_CHECKS, FREE_CHECKS, PRO_CHECKS } from "@/lib/consistency-ids";
 import { CHECK_LOOK } from "@/lib/consistency-checks";
 import { FREE_LIMITS, FREE_RECORD_DAYS } from "@/lib/free-limits";
@@ -39,7 +39,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Finding things",
-        desc: "Search reads every book and every chapter at once, by title and by what is written inside them.",
+        desc: "Search reads every book and every chapter at once, by title and by what is written inside them. Press Search beside New book, or press /.",
       },
     ],
   },
@@ -121,8 +121,8 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "Searches millions of published books for the title you are considering, and shows what a reader would find instead of yours. Titles cannot be copyrighted, so this reports rather than advises.",
       },
       {
-        name: "The price check",
-        desc: `What the top 100 best-selling ebooks in your genre cost: a middle price for self-published books and one for traditional publishers, and every book listed. Try a price to see where it sits and what Amazon would pay you for a Kindle sale or a paperback. ${TIER_NAMES.free} reads Apple Books' US lists as often as you like; Kindle Unlimited books are sold only on Amazon, so they are not on them. ${TIER_NAMES.pro} adds Amazon's own top 100, refreshed weekly: how many are in Kindle Unlimited, series and book 1 prices, lengths and paperback prices. There is no recommended price and there will not be one.`,
+        name: "The Market check",
+        desc: `Pick a genre and ask it three things. Prices: what its top 100 best-selling ebooks cost, a middle price for self-published books and one for traditional publishers, every book listed, and what Amazon would pay you at any price you try. Categories: how far down the whole Kindle Store its best sellers sit, and every category they also rank in. Trends: Amazon's new releases, movers and most wished for, rating counts and the covers on the top 100. ${TIER_NAMES.free} and ${TIER_NAMES.pro} read Apple Books' US lists as often as you like; Kindle Unlimited books are sold only on Amazon, so they are not on them. ${TIER_NAMES[AMAZON_DATA_TIER]} adds Amazon's own lists: the top 100 with Kindle Unlimited, series, lengths and paperback prices, refreshed weekly, and the Categories and Trends tabs. There is no recommended price and no sales estimate, and there will not be.`,
       },
       {
         name: "The writing record",
@@ -139,15 +139,19 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     items: [
       {
         name: TIER_NAMES.free,
-        desc: `Free, no card. ${plural(TIER_LIMITS.free.books ?? 0, "book")}, unlimited chapters and words, importing, syncing, every export format, ${plural(FREE_LIMITS.titleCheck.free, "title check")} a day, unlimited price checks on Apple Books' lists,${plural(FREE_LIMITS.ideas.free, "parked idea")} at a time, ${FREE_CHECKS.length} consistency checks and the last ${FREE_RECORD_DAYS} days of the writing record.`,
+        desc: `Free, no card. Unlimited books, chapters and words, importing, syncing, every export format, ${plural(FREE_LIMITS.titleCheck.free, "title check")} a day, unlimited market checks on Apple Books' lists, ${plural(FREE_LIMITS.ideas.free, "parked idea")} at a time, ${FREE_CHECKS.length} consistency checks and the last ${FREE_RECORD_DAYS} days of the writing record.`,
       },
       {
         name: TIER_NAMES.pro,
-        desc: `Everything on Free, with unlimited books, title checks and parked ideas, Amazon's best-seller prices and Kindle Unlimited in the price check, all ${ALL_CHECKS.length} consistency checks, twelve months of the writing record with its fingerprint, and paperback setup.`,
+        desc: `Everything on Free, with unlimited title checks and parked ideas, all ${ALL_CHECKS.length} consistency checks, twelve months of the writing record with its fingerprint, and paperback setup.`,
+      },
+      {
+        name: TIER_NAMES.plus,
+        desc: `Everything in ${TIER_NAMES.pro}, and Amazon's own lists in the Market check: the top 100 for your genre with Kindle Unlimited, the categories those books rank in, and Amazon's new releases, movers and most wished for. Amazon's data is paid for by the request, which is why it is a plan of its own.`,
       },
       {
         name: "Not on sale yet",
-        desc: `${TIER_NAMES.pro} cannot be bought at the moment. Pressing it tells us you wanted it, so we know to open it — and everything free stays free meanwhile.`,
+        desc: "A plan whose button says Available soon cannot be bought at the moment. Pressing it tells us you wanted it, so we know to open it — and everything free stays free meanwhile.",
       },
       {
         name: "Cancelling",

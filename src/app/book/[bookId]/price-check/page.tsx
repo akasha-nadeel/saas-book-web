@@ -1,6 +1,6 @@
 import { PriceCheckPage } from "@/components/price-check/price-check-page";
 
-export const metadata = { title: "Price check · OpenChapter" };
+export const metadata = { title: "Market check · OpenChapter" };
 
 export default async function BookPriceCheckPage(props: {
   params: Promise<{ bookId: string }>;

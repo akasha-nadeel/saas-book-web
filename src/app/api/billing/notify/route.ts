@@ -1,11 +1,14 @@
 import { verifyNotification, notificationSignature } from "@/lib/billing/signature";
 import { MERCHANT_ID, MERCHANT_SECRET, isBillingConfigured } from "@/lib/billing/payhere";
 import { asPeriod, periodEnd, type Period } from "@/lib/billing/plans";
+import { alertIfAmazonSubscriber } from "@/lib/billing/sale-alert";
 import { paymentStatusFromCode } from "@/lib/billing/subscription";
+import { asPaidTier, type PaidTier } from "@/lib/billing/tiers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * PayHere's payment notification. The only thing in the app that grants Pro.
+ * PayHere's payment notification. The only thing in the app that grants a
+ * paid plan.
  *
  * Not a redirect and not a callback the browser makes — PayHere's servers POST
  * here, form-encoded, once per charge, including every automatic renewal months
@@ -108,7 +111,7 @@ export async function POST(request: Request) {
   // It also says what was *meant* to be charged, which the amount check uses.
   const { data: order } = await supabase
     .from("payment_orders")
-    .select("owner, period, amount")
+    .select("owner, plan, period, amount")
     .eq("order_id", orderId)
     .maybeSingle();
 
@@ -161,6 +164,10 @@ export async function POST(request: Request) {
   // From the order for the same reason: custom_2 is unsigned, and an annual
   // cycle claimed on a monthly payment is eleven free months.
   const period = asPeriod(order.period) ?? "monthly";
+  /* Which plan, from the order too. It said "pro" for everybody while Pro was
+     the only paid plan; since Pro Plus it is read, and an order whose plan
+     does not narrow grants nothing rather than a plan nobody chose. */
+  const tier = asPaidTier(order.plan);
 
   if (outcome === "paid") {
     // What was charged has to cover what was quoted. The amount is inside the
@@ -179,7 +186,11 @@ export async function POST(request: Request) {
       return new Response("OK", { status: 200 });
     }
 
-    await grant(supabase, owner, period, orderId, subscriptionId);
+    if (!tier) {
+      console.error("[billing] an order with no plan we sell; not granting", { orderId });
+      return new Response("OK", { status: 200 });
+    }
+    await grant(supabase, owner, tier, period, orderId, subscriptionId);
   } else if (outcome === "failed" && subscriptionId) {
     // A renewal that did not go through. PayHere retries on its own schedule,
     // so the plan is marked rather than ended — and isPro()'s grace window is
@@ -205,7 +216,7 @@ export async function POST(request: Request) {
 }
 
 /**
- * Put a writer on Pro, or keep them there.
+ * Put a writer on the plan they paid for, or keep them there.
  *
  * The new period runs from wherever the paid-up one ended, not from now — a
  * renewal that lands a day early would otherwise quietly cost the writer a day
@@ -214,6 +225,7 @@ export async function POST(request: Request) {
 async function grant(
   supabase: NonNullable<ReturnType<typeof createAdminClient>>,
   owner: string,
+  tier: PaidTier,
   period: Period,
   orderId: string,
   subscriptionId: string | null,
@@ -222,7 +234,7 @@ async function grant(
 
   const { data: existing } = await supabase
     .from("subscriptions")
-    .select("current_period_end")
+    .select("plan, current_period_end")
     .eq("owner", owner)
     .maybeSingle();
 
@@ -236,7 +248,7 @@ async function grant(
   const { error } = await supabase.from("subscriptions").upsert(
     {
       owner,
-      plan: "pro",
+      plan: tier,
       period,
       status: "active",
       payhere_subscription_id: subscriptionId,
@@ -250,7 +262,11 @@ async function grant(
     { onConflict: "owner" },
   );
 
-  if (error) console.error("[billing] could not grant the subscription", error);
+  if (error) {
+    console.error("[billing] could not grant the subscription", error);
+    return;
+  }
+  await alertIfAmazonSubscriber(supabase, existing?.plan, tier);
 }
 
 /**

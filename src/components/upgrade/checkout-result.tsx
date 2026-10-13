@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TIER_NAMES } from "@/lib/billing/tiers";
+import { TIER_NAMES, amazonDataAllowed } from "@/lib/billing/tiers";
 import Link from "next/link";
 import { usePlan } from "@/lib/use-plan";
 
@@ -63,7 +63,11 @@ export function CheckoutResult({ orderId }: { orderId: string | null }) {
           <Result
             tone="good"
             title={`You're on ${planName}`}
-            body="Unlimited books and unlimited title checks are switched on. PayHere has emailed your receipt."
+            body={`${
+              plan.tier && amazonDataAllowed(plan.tier)
+                ? "Unlimited title checks, every consistency check and Amazon's lists in the Market check are switched on."
+                : "Unlimited title checks, every consistency check and paperback setup are switched on."
+            } PayHere has emailed your receipt.`}
             action={{ href: "/", label: "Back to writing" }}
           />
         ) : refused ? (

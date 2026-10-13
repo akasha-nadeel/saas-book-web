@@ -85,9 +85,8 @@ export function DashboardDemo() {
           <p className="text-[1.75cqw] font-bold tracking-tight text-lp-ink">
             Open<span className="text-lp-wordmark">Chapter</span>
           </p>
-          <span className="text-lp-body">
-            <Glyph name="search" />
-          </span>
+          {/* No search glyph here: since 2026-10-13 the app draws Search in the
+              page header beside New book, and so does this. */}
           <span className="ml-auto text-lp-faint">
             <Glyph name="collapse" />
           </span>
@@ -125,19 +124,8 @@ export function DashboardDemo() {
           })}
         </ul>
 
-        <div className="mx-[0.8cqw] my-[0.8cqw] border-t border-lp-line" />
-
-        <ul className="space-y-[0.2cqw]">
-          {(["How it works", "Support"] as const).map((name) => (
-            <li
-              key={name}
-              className="flex items-center gap-[0.9cqw] rounded-[0.7cqw] px-[0.8cqw] py-[0.6cqw] text-[1.25cqw] text-lp-ink"
-            >
-              <Glyph name={name === "Support" ? "support" : "help"} />
-              {name}
-            </li>
-          ))}
-        </ul>
+        {/* How it works and Support were rows here until 2026-10-13. They are
+            short names beside New book now, in the app and below. */}
 
         {/* The account chip, pinned to the foot the way the app pins it. */}
         <div className="mt-auto flex items-center gap-[0.8cqw] border-t border-lp-line px-[0.6cqw] pt-[1.1cqw]">
@@ -165,6 +153,18 @@ export function DashboardDemo() {
               Welcome back — {BOOKS.length} books, {chapters} chapters on the shelf.
             </p>
           </div>
+          {/* The header's short names, in the app's order: Help, Support,
+              Feedback, Pricing, a rule, Search. Drawn, not pressable — the
+              same as every other control in this picture. */}
+          <span aria-hidden="true" className="flex shrink-0 items-center text-[1.25cqw] font-medium text-lp-body">
+            {(["Help", "Support", "Feedback", "Pricing"] as const).map((name) => (
+              <span key={name} className="flex h-[3.2cqw] items-center px-[0.8cqw]">
+                {name}
+              </span>
+            ))}
+            <span className="mx-[0.4cqw] h-[1.8cqw] w-px bg-lp-line" />
+            <span className="flex h-[3.2cqw] items-center px-[0.8cqw]">Search</span>
+          </span>
           <span className="flex items-center gap-[0.6cqw] rounded-[0.7cqw] bg-lp-accent px-[1.3cqw] py-[0.75cqw] text-[1.3cqw] font-semibold text-lp-accent-ink">
             + New book
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-[1.2cqw] w-[1.2cqw]">
@@ -460,7 +460,9 @@ function Glyph({ name }: { name: string }) {
     favourites:
       "M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0112 7.3 4.3 4.3 0 0119.5 10c0 5.4-7.5 10-7.5 10z",
     archived: "M3.5 5h17v4h-17zM5 9h14v10H5zM10 13h4",
-    "title-check": "M10.5 17a6.5 6.5 0 100-13 6.5 6.5 0 000 13zM15.5 15.5L20 20",
+    // A big T with a small magnifier — `shelfIcons.titleCheck`, as one path.
+    "title-check":
+      "M3 4h14M10 4v16.5M16.5 10.5a3 3 0 100 6 3 3 0 000-6zM18.62 15.62l2.88 2.88",
     search: "M10.5 17a6.5 6.5 0 100-13 6.5 6.5 0 000 13zM15.5 15.5L20 20",
     ideas: "M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z",
     paperback: "M14.5 4.5l5 5L9 20H4v-5L14.5 4.5zM12 7l5 5M7.5 12.5l2 2",

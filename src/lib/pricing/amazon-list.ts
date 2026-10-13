@@ -1,4 +1,4 @@
-import type { ListedBook } from "./apple-list";
+import type { CategoryRank, ListedBook } from "./apple-list";
 
 /**
  * Amazon's Kindle best-seller list, read from OpenWeb Ninja's Real-Time Amazon
@@ -6,9 +6,10 @@ import type { ListedBook } from "./apple-list";
  *
  * **Two calls make a list** (both measured on 2026-10-06):
  * - `/best-sellers` answers 50 books a page, in Amazon's order, with price.
- * - `/product-details` answers up to 10 books per request, with what the list
- *   lacks: the Kindle Unlimited flag, publisher, pages, file size, series and
- *   the paperback's price.
+ * - `/product-details` answers one book per request as we call it, with what
+ *   the list lacks: the Kindle Unlimited flag, publisher, pages, file size,
+ *   series, the paperback's price, and the "Best Sellers Rank" line — the
+ *   book's rank in the whole store and in each category it ranks in.
  *
  * **Pure and defensive, like `parseAppleList`.** Nothing here throws, and a
  * shape it does not recognise yields nothing. That reaches the screen as "no
@@ -42,6 +43,23 @@ export interface AmazonListed {
   price: number;
   cover: string | null;
   url: string | null;
+  ratings: number | null;
+  stars: number | null;
+  /** Movers & Shakers only: Amazon's own words for the move. */
+  change: string | null;
+}
+
+/** A count of ratings: 298, "298" or "1,204"; anything else is unknown. */
+function count(value: unknown): number | null {
+  const n =
+    typeof value === "number" ? value : Number(text(value)?.replace(/,/g, "") ?? NaN);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+/** "4.9" or 4.9, between 0 and 5; anything else is unknown. */
+function starsOf(value: unknown): number | null {
+  const n = typeof value === "number" ? value : Number(text(value) ?? NaN);
+  return Number.isFinite(n) && n >= 0 && n <= 5 ? n : null;
 }
 
 export function parseAmazonBestSellers(payload: unknown): AmazonListed[] {
@@ -63,6 +81,9 @@ export function parseAmazonBestSellers(payload: unknown): AmazonListed[] {
       price,
       cover: text(e.product_photo),
       url: text(e.product_url),
+      ratings: count(e.product_num_ratings),
+      stars: starsOf(e.product_star_rating),
+      change: text(e.rank_change_label),
     });
   });
   return books;
@@ -79,6 +100,54 @@ export interface AmazonDetails {
   fileSizeMb: number | null;
   series: { name: string; number: number; of: number } | null;
   paperbackPrice: number | null;
+  /** Rank in the whole Kindle Store. */
+  storeRank: number | null;
+  /** The categories the page says it ranks in, Amazon's own words. */
+  categoryRanks: CategoryRank[];
+}
+
+/** The whole store's name in a "Best Sellers Rank" line. */
+const STORE = "Kindle Store";
+
+/**
+ * A book page's "Best Sellers Rank" line, split into the store-wide rank and
+ * each category rank.
+ *
+ * The text, as OpenWeb Ninja returns it (2026-10-06, all 100 cozy mysteries
+ * carried one):
+ * `#67 in Kindle Store (See Top 100 in Kindle Store)    #1 in Cozy Mystery
+ *  #1 in Cozy Mysteries (Books)   #1 in Private Investigator Mysteries
+ *  (Kindle Store)`.
+ *
+ * The "(See Top 100 …)" link text is dropped; the store qualifiers Amazon
+ * writes after a category — "(Books)", "(Kindle Store)" — are kept, because
+ * "Cozy Mysteries (Books)" is the print store's category and a different one
+ * from the Kindle category beside it. A category is named exactly as Amazon
+ * names it, so two spellings Amazon keeps apart stay apart here.
+ */
+export function parseBestSellersRank(value: unknown): {
+  storeRank: number | null;
+  categoryRanks: CategoryRank[];
+} {
+  const s = text(value);
+  const out = { storeRank: null as number | null, categoryRanks: [] as CategoryRank[] };
+  if (!s) return out;
+  for (const part of s.split(/(?=#[\d,]+\s+in\s)/)) {
+    const m = part.match(/^#([\d,]+)\s+in\s+([\s\S]+)$/);
+    if (!m) continue;
+    const rank = Number(m[1].replace(/,/g, ""));
+    const name = m[2]
+      .replace(/\(See Top 100 in [^)]*\)/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!Number.isInteger(rank) || rank < 1 || !name) continue;
+    if (name === STORE) {
+      if (out.storeRank === null) out.storeRank = rank;
+    } else {
+      out.categoryRanks.push({ rank, name });
+    }
+  }
+  return out;
 }
 
 /** "by Nicole Fox (Author) Format: Kindle Edition" → "Nicole Fox". */
@@ -123,6 +192,7 @@ export function parseAmazonDetails(payload: unknown): Map<string, AmazonDetails>
     const paperback = formats.map(obj).find((f) => f && f.format === "Paperback");
 
     const pages = Number(text(info["Print length"])?.match(/^(\d+)/)?.[1]);
+    const ranks = parseBestSellersRank(info["Best Sellers Rank"]);
 
     out.set(asin, {
       author: authorOf(e.product_byline),
@@ -137,6 +207,8 @@ export function parseAmazonDetails(payload: unknown): Map<string, AmazonDetails>
           ? { name: seriesName, number: Number(nums[1]), of: Number(nums[2]) }
           : null,
       paperbackPrice: paperback ? dollars(paperback.price) : null,
+      storeRank: ranks.storeRank,
+      categoryRanks: ranks.categoryRanks,
     });
   }
   return out;
@@ -171,6 +243,11 @@ export function mergeAmazon(
       series: d?.series ?? null,
       paperbackPrice: d?.paperbackPrice ?? null,
       fileSizeMb: d?.fileSizeMb ?? null,
+      ratings: b.ratings,
+      stars: b.stars,
+      storeRank: d?.storeRank ?? null,
+      categoryRanks: d?.categoryRanks ?? [],
+      change: b.change,
     };
   });
 }

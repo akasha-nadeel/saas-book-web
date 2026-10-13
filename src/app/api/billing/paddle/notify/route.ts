@@ -7,6 +7,7 @@ import {
   paddlePlanFrom,
   paddleStatus,
 } from "@/lib/billing/paddle";
+import { alertIfAmazonSubscriber } from "@/lib/billing/sale-alert";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -164,6 +165,15 @@ export async function POST(request: Request) {
           ? scheduled.effectiveAt
           : null;
 
+    /* The plan before this write, for the one thing that wants to know a plan
+       *changed*: the owner's mail when a writer starts paying for Amazon's
+       data (`alertIfAmazonSubscriber`). */
+    const { data: before } = await supabase
+      .from("subscriptions")
+      .select("plan")
+      .eq("owner", owner)
+      .maybeSingle();
+
     const { error } = await supabase.from("subscriptions").upsert(
       {
         owner,
@@ -182,6 +192,10 @@ export async function POST(request: Request) {
     if (error) {
       console.error("[billing] paddle subscription write failed", error);
       return Response.json({ error: "Could not store." }, { status: 500 });
+    }
+
+    if (status === "active") {
+      await alertIfAmazonSubscriber(supabase, before?.plan, bought.tier);
     }
 
     return Response.json({ ok: true, granted: status === "active" });

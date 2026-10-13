@@ -69,6 +69,23 @@ export const shelfIcons = {
       <path d="m20 20-3.5-3.5" />
     </Svg>
   ),
+  /* The title check: a big T, for *title*, with a small magnifier beside it,
+     for *checked*. The T takes the box's full height so it reads as a letter
+     rather than as a cross. Same stroke as the rest, so the T is large, not
+     bold.
+
+     **The lens sits high, with a long handle, on purpose.** Drawn first at
+     the T's foot with a short handle, the pair read as "Tq" — a round letter
+     on the baseline with a descender. Lifted to mid-height, with the handle
+     running past the lens at 45°, it reads as a magnifier. It stays clear of
+     the stem, so the two never merge at 18px. */
+  titleCheck: (
+    <Svg>
+      <path d="M3 4h14M10 4v16.5" />
+      <circle cx="16.5" cy="13.5" r="3" />
+      <path d="m18.62 15.62 2.88 2.88" />
+    </Svg>
+  ),
   /* A price tag, for the price check. Not a coin and not a currency sign: a
      coin reads as money in general and a "$" would be a claim about which
      store, while a tag is the thing on the book. */

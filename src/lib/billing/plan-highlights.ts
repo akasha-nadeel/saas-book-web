@@ -7,8 +7,9 @@
  * scrolling down to it. The table stays underneath, where the same lines sit
  * side by side. Each line names the `ROWS` label it stands for, and a test holds
  * the two sets equal, so a row added to the table cannot be missing from a card.
- * A row the plan does not include (paperback setup on Free, since 2026-09-16)
- * is left off that card: the card is a list of features, and a line saying "not
+ * A row the plan does not include (paperback setup on Free, since 2026-09-16;
+ * the category check and the trends on Free and Pro, since 2026-10-12) is
+ * left off that card: the card is a list of features, and a line saying "not
  * included" there would read as one. Nothing here may say something the table
  * then contradicts.
  *
@@ -57,7 +58,8 @@ export interface Highlight {
  */
 export const BEST_FOR: Record<PlanTier, string> = {
   free: "Best for finding out if this is your tool.",
-  pro: "Best for a writer with more than one book.",
+  pro: "Best for getting a book ready to publish.",
+  plus: "Best for choosing a genre, a price and categories.",
 };
 
 /**
@@ -94,13 +96,27 @@ const EXPORT: Highlight = { row: "Export", text: "Export — Word, EPUB, PDF" };
 /* Pro only since 2026-09-16, so only the paid card carries it. */
 const PAPERBACK: Highlight = { row: "Paperback setup", text: "Paperback setup" };
 
+/*
+ * The Market check on Apple's lists, which every plan below
+ * `AMAZON_DATA_TIER` gets and nobody is counted on.
+ */
+const MARKET_APPLE: Highlight = {
+  row: "Market check",
+  lead: "Unlimited",
+  text: "market checks on Apple Books",
+};
+
 /** The lines on the Free card. */
 const FREE_HIGHLIGHTS: Highlight[] = [
-  {
-    row: "Books",
-    lead: String(TIER_LIMITS.free.books ?? 0),
-    text: nounFor(TIER_LIMITS.free.books ?? 0, "book"),
-  },
+  /* Unlimited since 2026-10-13; the limit is still read, so one brought back
+     would print its number here. */
+  TIER_LIMITS.free.books === null
+    ? { row: "Books", lead: "Unlimited", text: "books" }
+    : {
+        row: "Books",
+        lead: String(TIER_LIMITS.free.books),
+        text: nounFor(TIER_LIMITS.free.books, "book"),
+      },
   CHAPTERS,
   SYNC,
   VOICE,
@@ -119,7 +135,7 @@ const FREE_HIGHLIGHTS: Highlight[] = [
     lead: String(FREE_LIMITS.titleCheck.free),
     text: `${nounFor(FREE_LIMITS.titleCheck.free, "title check")} a day`,
   },
-  { row: "Price check", lead: "Unlimited", text: "price checks on Apple Books" },
+  MARKET_APPLE,
   EXPORT,
   {
     row: "Consistency check",
@@ -135,14 +151,15 @@ const FREE_HIGHLIGHTS: Highlight[] = [
 ];
 
 /**
- * The paid card.
+ * The paid cards.
  *
- * Every line is spelled out rather than "Everything in Free", so the two cards
- * can be read across line for line: the lines that differ sit where the table
- * puts them.
+ * Every line is spelled out rather than "Everything in Free" or "Everything in
+ * Pro", so the cards can be read across line for line: the lines that differ
+ * sit where the table puts them. Pro Plus is Pro's card with the Market check
+ * line swapped for Amazon's and the two Amazon tools added after it.
  */
-const PAID_HIGHLIGHTS: Record<PaidTier, Highlight[]> = {
-  pro: [
+function paidCard(market: Highlight[]): Highlight[] {
+  return [
     { row: "Books", lead: "Unlimited", text: "books" },
     CHAPTERS,
     SYNC,
@@ -150,7 +167,7 @@ const PAID_HIGHLIGHTS: Record<PaidTier, Highlight[]> = {
     { row: "Ideas", lead: "Unlimited", text: "parked ideas" },
     { row: "Colour themes", lead: "Every", text: "colour and paper" },
     { row: "Title check", lead: "Unlimited", text: "title checks" },
-    { row: "Price check", lead: "Amazon", text: "best-seller prices and Kindle Unlimited" },
+    ...market,
     EXPORT,
     {
       row: "Consistency check",
@@ -160,7 +177,16 @@ const PAID_HIGHLIGHTS: Record<PaidTier, Highlight[]> = {
     { row: "Writing record", lead: "12 months", text: "of writing record" },
     PAPERBACK,
     NO_AI,
-  ],
+  ];
+}
+
+const PAID_HIGHLIGHTS: Record<PaidTier, Highlight[]> = {
+  pro: paidCard([MARKET_APPLE]),
+  plus: paidCard([
+    { row: "Market check", lead: "Amazon", text: "best-seller prices and Kindle Unlimited" },
+    { row: "Category check", lead: "Categories", text: "the top 100 rank in" },
+    { row: "Trends & reviews", lead: "Trends", text: "— new releases, movers, reviews" },
+  ]),
 };
 
 /** What this plan's card leads with. */

@@ -63,9 +63,9 @@ export const TOOL_GUIDES: ToolGuide[] = [
           "Try a price and see what a Kindle sale or a paperback would bring in under Amazon's own published rules: 70% from $2.99 to $12.99 and 35% outside it, with printing taken off a paperback first. The sum is shown working, so you can check it.",
       },
       {
-        term: "Where the list comes from",
+        term: "Where the lists come from",
         detail:
-          "Apple Books' top 100 for each genre, in the US store, with every book linked to its listing. Books in Amazon's own subscription library are sold only on Amazon, so none of them are on it, and the screen says so rather than letting the gap pass for a cheap shelf.",
+          "Apple Books' top 100 for each genre, in the US store, with every book linked to its listing. Books in Amazon's own subscription library are sold only on Amazon, so none of them are on it, and the screen says so rather than letting the gap pass for a cheap shelf. Amazon's own lists add that library, how far down the whole Kindle Store the best sellers sit, every category they rank in, and what is new and rising — ranks and counts as Amazon prints them, never turned into sales.",
       },
     ],
   },

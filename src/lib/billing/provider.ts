@@ -17,8 +17,9 @@
  * button keeps calling PayHere, and only new checkouts go the new way.
  */
 
-import { isPaddleConfigured } from "./paddle";
+import { isPaddleConfigured, paddleTierOnSale } from "./paddle";
 import { isBillingConfigured as isPayHereConfigured } from "./payhere";
+import type { PaidTier } from "./tiers";
 
 export type Provider = "paddle" | "payhere";
 
@@ -37,6 +38,21 @@ export function activeProvider(): Provider | null {
  */
 export function billingConfigured(): boolean {
   return activeProvider() !== null;
+}
+
+/**
+ * Whether this plan can be bought here today.
+ *
+ * Through Paddle a plan is on sale once both its price ids are set; Pro's
+ * decide whether Paddle is configured at all, and a later plan's being unset
+ * takes that plan off sale and nothing else (`paddle.ts`, `CORE_TIER`).
+ * PayHere is told the amount from `plans.ts`, so every plan is on sale there.
+ * No gateway is no plans.
+ */
+export function tierOnSale(tier: PaidTier): boolean {
+  const provider = activeProvider();
+  if (provider === "paddle") return paddleTierOnSale(tier);
+  return provider === "payhere";
 }
 
 /** Narrows whatever a database row says the provider was. */

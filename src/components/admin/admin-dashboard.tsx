@@ -23,6 +23,7 @@ import {
   type WatchedFeature,
 } from "@/lib/admin/insights";
 import { FEATURE_USERS_MIGRATION, type ReadProblem } from "@/lib/admin/insights-server";
+import { TIER_NAMES, asPaidTier } from "@/lib/billing/tiers";
 import {
   Bars,
   DailyColumns,
@@ -243,7 +244,8 @@ function planLabel(user: AdminUser, now: Date): string {
   if (!sub) return "Free";
   if (isPaying(user, now)) {
     const status = sub.status === "active" ? "" : ` · ${sub.status === "past_due" ? "past due" : "cancelled"}`;
-    return `Pro · ${sub.period ?? "?"}${status}`;
+    const tier = asPaidTier(sub.plan);
+    return `${tier ? TIER_NAMES[tier] : "Paid"} · ${sub.period ?? "?"}${status}`;
   }
   return "Free (lapsed)";
 }

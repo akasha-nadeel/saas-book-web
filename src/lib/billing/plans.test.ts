@@ -66,10 +66,13 @@ describe("displayPrice", () => {
   it("uses the prices the cards print", () => {
     expect(priceOf("pro", "monthly")).toBe(5.99);
     expect(priceOf("pro", "annual")).toBe(59.88);
+    expect(priceOf("plus", "monthly")).toBe(9.99);
+    expect(priceOf("plus", "annual")).toBe(99.48);
   });
 
   it("divides the annual total rather than printing a typed figure", () => {
     expect(displayPrice(perMonthOf("pro", "annual"))).toBe("$4.99");
+    expect(displayPrice(perMonthOf("plus", "annual"))).toBe("$8.29");
   });
 });
 
@@ -107,6 +110,7 @@ describe("what PayHere is told", () => {
       }
     }
     expect(itemNameOf("pro", "annual")).toBe("OpenChapter Pro (annual)");
+    expect(itemNameOf("plus", "monthly")).toBe("OpenChapter Pro Plus (monthly)");
   });
 
   it("reads the cycle as a phrase for the checkout summary", () => {

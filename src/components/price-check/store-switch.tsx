@@ -1,21 +1,23 @@
 "use client";
 
 import { ProBadge } from "@/components/upgrade/pro-badge";
+import { AMAZON_DATA_TIER } from "@/lib/billing/tiers";
 
 export type Store = "amazon" | "apple";
 
 /**
- * Whose best-seller list the price check is reading: Amazon's or Apple's.
+ * Whose best-seller list the Market check is reading: Amazon's or Apple's.
  *
- * **Amazon's side is Pro, and on the free plan it stays pressable.** The press
+ * **Amazon's side is Pro Plus (`AMAZON_DATA_TIER`), and below it the tab
+ * stays pressable.** The press
  * opens the offer rather than doing nothing — the rule the consistency check's
  * locked cards and the theme swatches follow — so the badge is a promise the
  * button keeps rather than a dead control. Nothing is fetched for a free
  * writer: Amazon's data is paid for per request, and the server refuses it to
- * a free account anyway (`require-pro-data.ts`).
+ * an account without it anyway (`require-amazon-data.ts`).
  *
- * Amazon first, because for a Pro writer it is the list they are paying for
- * and the one they land on.
+ * Amazon first, because for a Pro Plus writer it is the list they are paying
+ * for and the one they land on.
  */
 export function StoreSwitch({
   value,
@@ -24,7 +26,7 @@ export function StoreSwitch({
   onLocked,
 }: {
   value: Store;
-  /** True on the free plan: the Amazon side opens the offer. */
+  /** True below `AMAZON_DATA_TIER`: the Amazon side opens the offer. */
   locked: boolean;
   onChange: (store: Store) => void;
   onLocked: () => void;
@@ -51,7 +53,7 @@ export function StoreSwitch({
         className={tab("amazon", value === "amazon")}
       >
         Amazon
-        {locked && <ProBadge />}
+        {locked && <ProBadge tier={AMAZON_DATA_TIER} />}
       </button>
       <button
         type="button"

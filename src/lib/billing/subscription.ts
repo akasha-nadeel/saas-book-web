@@ -79,7 +79,7 @@ export interface Subscription {
    */
   provider: Provider;
   /**
-   * Which of the three paid plans this row bought.
+   * Which of the two paid plans this row bought — Pro or Pro Plus.
    *
    * Narrowed on the way in, so nothing downstream has to wonder what a `plan`
    * column might hold. A row whose plan does not narrow is refused entirely by

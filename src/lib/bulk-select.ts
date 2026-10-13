@@ -1,4 +1,3 @@
-import { LAUNCH_LIMITS } from "./launch";
 import { booksAgainstPlan, type Book, type Shelf } from "./library-store";
 
 /**
@@ -123,8 +122,9 @@ export function favouriteIntent(books: readonly Book[]): "add" | "remove" {
 /**
  * How many books may still come **out of the trash**.
  *
- * `Infinity` on Pro, and whenever no gateway is configured — a self-hosted copy
- * holds nothing back.
+ * `Infinity` when `limit` is null — which is every plan since 2026-10-13, when
+ * Free went unlimited (`bookLimitFor` in `launch.ts`), and whenever no gateway
+ * is configured.
  *
  * **Only a trashed book is counted against the plan.** An archived book already
  * spends its slot (`booksAgainstPlan` counts both active and archived), so
@@ -132,9 +132,9 @@ export function favouriteIntent(books: readonly Book[]): "add" | "remove" {
  * be refused — that is the rule `handleRestore` makes one book at a time, and
  * this is the same test so the two cannot drift.
  */
-export function restoreCapacity(shelf: Shelf, gated: boolean): number {
-  if (!gated) return Infinity;
-  return Math.max(0, LAUNCH_LIMITS.freeBooks - booksAgainstPlan(shelf).length);
+export function restoreCapacity(shelf: Shelf, limit: number | null): number {
+  if (limit === null) return Infinity;
+  return Math.max(0, limit - booksAgainstPlan(shelf).length);
 }
 
 export interface RestorePlan {
@@ -156,9 +156,9 @@ export interface RestorePlan {
 export function planRestore(
   books: readonly Book[],
   shelf: Shelf,
-  gated: boolean,
+  limit: number | null,
 ): RestorePlan {
   const needRoom = books.filter((b) => b.trashedAt);
-  const room = restoreCapacity(shelf, gated);
+  const room = restoreCapacity(shelf, limit);
   return { needRoom, room, fits: needRoom.length <= room };
 }

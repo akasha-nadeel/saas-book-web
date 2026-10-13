@@ -1,10 +1,10 @@
 import { Plans } from "@/components/upgrade/plans";
 import { paddleClientConfig } from "@/lib/billing/paddle";
 import { asPeriod } from "@/lib/billing/plans";
-import { activeProvider } from "@/lib/billing/provider";
+import { activeProvider, tierOnSale } from "@/lib/billing/provider";
 import { currentSubscription } from "@/lib/billing/server";
 import { planTierOf } from "@/lib/billing/subscription";
-import { asPaidTier } from "@/lib/billing/tiers";
+import { PAID_TIERS, asPaidTier } from "@/lib/billing/tiers";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 /**
@@ -32,6 +32,11 @@ export default async function UpgradePage(props: PageProps<"/upgrade">) {
   const { cancelled, buy, period } = await props.searchParams;
   const provider = activeProvider();
   const paddle = provider === "paddle" ? paddleClientConfig() : undefined;
+  /* Which plans can be bought here today. Only asked with a gateway: with none
+     there are no plans, and the cards say that instead (see `Plans`). */
+  const onSale = provider
+    ? Object.fromEntries(PAID_TIERS.map((tier) => [tier, tierOnSale(tier)]))
+    : undefined;
 
   /* **What the writer pressed before they were asked to sign in.**
      `upgradeTo()` builds this on the landing page, `next` carries it through
@@ -59,6 +64,7 @@ export default async function UpgradePage(props: PageProps<"/upgrade">) {
         paddle={paddle}
         current={null}
         intent={intent}
+        onSale={onSale}
       />
     );
   }
@@ -94,6 +100,7 @@ export default async function UpgradePage(props: PageProps<"/upgrade">) {
       }
       cancelled={cancelled === "1"}
       intent={intent}
+      onSale={onSale}
     />
   );
 }

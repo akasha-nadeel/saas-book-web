@@ -1,25 +1,26 @@
 import { NextResponse } from "next/server";
-import { requireProData } from "@/lib/billing/require-pro-data";
+import { requireAmazonData } from "@/lib/billing/require-amazon-data";
 import { amazonDataConfigured, fetchAmazonShelf } from "@/lib/pricing/amazon-source";
 import { shelfById } from "@/lib/pricing/shelves";
 
 /**
- * One genre's Amazon Kindle best sellers, for Pro.
+ * One genre's Amazon Kindle best sellers, with each book's details — what the
+ * Market check's Prices and Categories tabs read. Pro Plus.
  *
  * **Checked on the server, before anything is fetched**, because every
- * request this route causes is paid for (`requireProData`). Then:
+ * request this route causes is paid for (`requireAmazonData`). Then:
  * - 503 when no key is set, the switch that turns the Amazon view off;
  * - 404 for a genre with no Amazon list;
  * - 502 when Amazon's list could not be had. An empty list is a failure, never
  *   a genre where nothing costs anything — the Apple route's rule.
  *
  * **`private, no-store`, unlike the Apple route's public caching.** A gated
- * answer must never sit in a shared cache where the next person to ask, Pro or
- * not, would be handed it. The saving that caching buys lives on the server
- * instead (`amazon-source.ts`), where only this route can reach it.
+ * answer must never sit in a shared cache where the next person to ask, Pro
+ * Plus or not, would be handed it. The saving that caching buys lives on the
+ * server instead (`amazon-source.ts`), where only this route can reach it.
  */
 export async function GET(request: Request) {
-  const refused = await requireProData("Amazon's best-seller prices");
+  const refused = await requireAmazonData("Amazon's best-seller lists");
   if (refused) return refused;
 
   if (!amazonDataConfigured()) {
@@ -52,7 +53,14 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json(
-    { shelf: shelf.id, source: "amazon", store: "us", updated: answer.updated, books: answer.books },
+    {
+      shelf: shelf.id,
+      source: "amazon",
+      store: "us",
+      updated: answer.updated,
+      ranksRead: answer.ranksRead,
+      books: answer.books,
+    },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }

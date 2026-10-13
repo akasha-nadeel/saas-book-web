@@ -62,35 +62,33 @@ it("gives every row an answer for every plan", () => {
 });
 
 /**
- * The first row is the first thing Pro buys, so it is said first rather than
- * found.
+ * **The table opens on Books, unlimited on every plan** (2026-10-13). It was
+ * the row that separated Free from Pro while Free held three; now, like the
+ * Export row, the identical values are the point — no plan rations books.
  */
-it("opens on the row that separates Free from Pro", () => {
+it("opens on Books, unlimited on every plan", () => {
   expect(ROWS[0].label).toBe("Books");
-  expect(ROWS[0].values.free).not.toBe(ROWS[0].values.pro);
+  const values = TIER_ORDER.map((tier) => ROWS[0].values[tier]);
+  expect(new Set(values)).toEqual(new Set(["Unlimited"]));
 });
 
 /**
- * **Pro is the whole of what is sold, and these are the rows that say what it
- * buys** (eight since 2026-09-26, when the price check joined the seven —
- * colour themes had joined the original six on 2026-09-16).
- * Everything else must read the same on both plans. **Paperback setup is the one
- * feature Free does not have at all** — the owner's decision on 2026-09-16 — so
- * it is the only row allowed to say "Not included", and Pro may never say it.
- * Colour themes is deliberately *not* a second one: Free keeps a colour and four
+ * **What Pro buys over Free** (six rows since 2026-10-13: the price check left
+ * this list on 2026-10-12 when Amazon's data moved to Pro Plus, and Books the
+ * next day when every plan went unlimited). **Paperback setup is the one feature Free does not have
+ * at all** among the things Pro sells — the owner's decision on 2026-09-16.
+ * Colour themes is deliberately *not* a door: Free keeps a colour and four
  * papers, so the row is a difference rather than a door.
  */
-it("differs between the plans only on the rows Pro sells", () => {
+it("differs between Free and Pro only on the rows Pro sells", () => {
   const differing = ROWS.filter((row) => row.values.free !== row.values.pro).map(
     (row) => row.label,
   );
   expect(differing.sort()).toEqual([
-    "Books",
     "Colour themes",
     "Consistency check",
     "Ideas",
     "Paperback setup",
-    "Price check",
     "Title check",
     "Writing record",
   ]);
@@ -98,8 +96,22 @@ it("differs between the plans only on the rows Pro sells", () => {
   const closedToFree = ROWS.filter((row) => row.values.free === NOT_INCLUDED).map(
     (row) => row.label,
   );
-  expect(closedToFree).toEqual(["Paperback setup"]);
-  for (const row of ROWS) expect(row.values.pro).not.toBe(NOT_INCLUDED);
+  expect(closedToFree).toEqual(["Category check", "Trends & reviews", "Paperback setup"]);
+});
+
+/**
+ * **Pro Plus is Pro and Amazon's data, and nothing else** (2026-10-12). Every
+ * row reads the same on the two paid plans but the three Amazon ones, and Pro
+ * Plus never says "Not included" — it is the top of the ladder. The Amazon
+ * rows are written from `AMAZON_DATA_TIER`, so giving Pro the data later moves
+ * them and empties this list; change it then, on purpose.
+ */
+it("differs between Pro and Pro Plus only on Amazon's data", () => {
+  const differing = ROWS.filter((row) => row.values.pro !== row.values.plus).map(
+    (row) => row.label,
+  );
+  expect(differing.sort()).toEqual(["Category check", "Market check", "Trends & reviews"]);
+  for (const row of ROWS) expect(row.values.plus).not.toBe(NOT_INCLUDED);
 });
 
 /**
@@ -118,7 +130,7 @@ it("promises no more of the writing record than the log keeps", () => {
  * break that.**
  *
  * The rows carried an explanation inline in brackets until the cards went to
- * four columns (there are two now), where every one of them wrapped — and a wrapped label took the
+ * four columns (there are three now), where every one of them wrapped — and a wrapped label took the
  * tick off its own line and pushed the badge over the card's edge. The
  * explanations are gone and the labels are short, and this is what keeps them
  * short: there is no width to test against here, so the proxy is the character

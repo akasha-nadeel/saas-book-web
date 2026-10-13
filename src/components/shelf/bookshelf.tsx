@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, createContext, type ReactNode, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
+import { TIER_NAMES } from "@/lib/billing/tiers";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -20,13 +20,14 @@ import { FeedbackDialog } from "@/components/shelf/feedback-dialog";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { SheetGrip, useSheetDrag } from "@/components/ui/sheet-grip";
+import { Tooltip } from "@/components/ui/tooltip";
 import { LoadingScreen } from "@/components/loading-screen";
 import { displayName, firstNameOf, type Account } from "@/lib/account";
 import {
   archiveBook,
   bookChapterCount,
   bookWordCount,
-  booksAgainstPlan,
+  atBookLimit,
   isSharedBook,
   booksIn,
   deleteBook,
@@ -71,7 +72,6 @@ import {
   needsConfirming,
   planRestore,
   rangeBetween,
-  restoreCapacity,
   selectAll,
   toggle,
   type BulkAction,
@@ -84,10 +84,12 @@ import {
 } from "@/lib/shelf-layout";
 import {
   LAUNCH_LIMITS,
+  bookLimitFor,
   onFreePlan,
   trashedBookClosed,
 } from "@/lib/launch";
 import { TrashedBookDialog } from "@/components/upgrade/trashed-book";
+import { WhatsNew } from "@/components/shelf/whats-new";
 import { UpgradeDialog } from "@/components/upgrade/upgrade-dialog";
 import { usePlan, type PlanState } from "@/lib/use-plan";
 import {
@@ -234,26 +236,31 @@ const AREAS: {
    *
    * The glyph moved with the name. A compass reads as *looking outward across
    * a field*, which is what two searches were; a magnifier is what one lookup
-   * is. Both come from `shelf-icons.tsx`, so it stays the same alphabet as the
-   * rest of the column.
+   * is. **Since 2026-10-13 it is a T with a small magnifier** (the owner's
+   * call): the magnifier alone was the same drawing as Search in the page
+   * header, so two different things wore one mark. The T says *title*, the
+   * magnifier says it is a search for one. Both come from `shelf-icons.tsx`,
+   * so it stays the same alphabet as the rest of the column.
    */
   {
     id: "title-check",
     label: "Title check",
     live: true,
-    icon: shelfIcons.search,
+    icon: shelfIcons.titleCheck,
     stage: true,
   },
   /*
    * **The price check, added 2026-09-26**, directly under the title check
    * because it is the same errand at the same moment: both ask the two free
    * catalogues what is already published beside this book, and both are
-   * decisions a writer makes before the file exists. Metered rather than
-   * gated, so no `pro` flag — the rail draws no badge on it.
+   * decisions a writer makes before the file exists. Open on every plan (its
+   * Amazon tabs are Pro Plus, and say so inside), so no `pro` flag — the rail
+   * draws no badge on it. **Called the Market check since 2026-10-12**; the
+   * id stays, so `?area=price-check` links keep working.
    */
   {
     id: "price-check",
-    label: "Price check",
+    label: "Market check",
     live: true,
     icon: shelfIcons.tag,
     stage: true,
@@ -718,9 +725,10 @@ export function Bookshelf({
        is the real enforcement — `enforce_launch_book_limit` exempts Pro — so
        the cost of waving through a restore we would have refused is that
        Postgres refuses it instead, which is the right way round. */
-    const gated =
-      onFreePlan(plan) &&
-      booksAgainstPlan(shelf).length >= LAUNCH_LIMITS.freeBooks;
+    /* No plan has a book limit since 2026-10-13, so `bookLimitFor` answers
+       null and this never refuses; it stays as the one place a limit brought
+       back would be asked. */
+    const gated = atBookLimit(shelf, bookLimitFor(plan));
     if (gated) {
       setNoRoomFor(book);
       return;
@@ -762,8 +770,7 @@ export function Bookshelf({
        module — filling the last two slots and leaving three behind is a
        half-done action the writer never chose the shape of. */
     if (action === "restore") {
-      const gated = onFreePlan(plan);
-      const { needRoom, room, fits } = planRestore(books, shelf, gated);
+      const { needRoom, room, fits } = planRestore(books, shelf, bookLimitFor(plan));
       if (!fits) {
         setNoRoomForBatch({ wanted: needRoom.length, room });
         return;
@@ -790,9 +797,10 @@ export function Bookshelf({
     <EditCoverContext.Provider value={setCovering}>
       <div className="flex h-[var(--oc-layout-height)] bg-surface">
         {/* ---- The six areas ------------------------------------------- */}
-        {/* The rail is compact: primary workflow first, secondary account/help
-          actions directly underneath, and only the signed-in account pinned to
-          the foot. A mostly empty sidebar reads like unfinished space. */}
+        {/* The rail is places only: the areas and the book lists, and the
+          signed-in account pinned to the foot. Search and the help, feedback
+          and pricing actions are not places, so since 2026-10-13 they are
+          short names beside New book — see the note on the control group. */}
         {/* pb-3, not the pb-14 this used to carry. That padding existed to keep
           the last item clear of Next's dev-tools badge, which sits in this
           exact corner — and it left a hand's width of empty rail at the bottom
@@ -853,25 +861,20 @@ export function Bookshelf({
               ) : (
                 <div className="mb-6 flex items-center justify-between pl-2 pr-0">
                   {/* `pr-0` against the wordmark's `pl-2`: `justify-between`
-                      had already pushed the pair as far right as the padding
-                      allowed, so the only room left to give them was the
-                      rail's own right margin. */}
+                      had already pushed the collapse control as far right as
+                      the padding allowed, so the only room left to give it was
+                      the rail's own right margin. */}
                   <Link
                     href="/"
                     className="min-w-0 text-xl font-bold tracking-tight text-fg transition-opacity hover:opacity-85"
                   >
                     Open<span className="text-wordmark">Chapter</span>
                   </Link>
+                  {/* Search sat here, beside the collapse control, until
+                      2026-10-13. It is in the page header now, beside New
+                      book, where it is the same button at every width and
+                      with the rail open or shut. */}
                   <div className="flex shrink-0 items-center gap-0.5">
-                    {/* Search sits beside the collapse control rather than in
-                        the list below it. It is not an area of the dashboard —
-                        it opens a panel over whatever you are on — and a row
-                        among Overview and Write claimed it was one. */}
-                    <HeaderMark
-                      mark="search"
-                      label="Search books and chapters"
-                      onClick={() => setSearchOpen(true)}
-                    />
                     <button
                       type="button"
                       onClick={() => setSidebarCollapsed(true)}
@@ -886,20 +889,6 @@ export function Bookshelf({
               )}
 
               <nav className="flex flex-col gap-0.5">
-                {/* Only while the rail is collapsed. Expanded, search lives in
-                    the header beside the collapse control; at 64px there is no
-                    header row to put it in, and `/` is no help to somebody
-                    reaching for a mouse. */}
-                {sidebarCollapsed && (
-                  <SideItem
-                    icon={shelfIcons.search}
-                    mark="search"
-                    collapsed
-                    onClick={() => setSearchOpen(true)}
-                  >
-                    Search
-                  </SideItem>
-                )}
                 {/* Straight down `RAIL`. The two kinds of row are drawn
                     alike on purpose — a writer reading this column is picking
                     a place, and which of them happens to be an area and which
@@ -983,58 +972,13 @@ export function Bookshelf({
                 </>
               )}
 
-              {/* Getting help, then giving it back. (They sat in the top bar
-                  beside New book for part of 2026-09-15 and came back here.) */}
-              <div className="mt-3 border-t border-line pt-3 flex flex-col gap-0.5">
-                {/* The operator's way back to `/admin`. Drawn for nobody else;
-                    the page itself is the lock, and answers 404 to anybody
-                    who types the address. */}
-                {admin ? (
-                  <SideItem
-                    icon={shelfIcons.track}
-                    collapsed={sidebarCollapsed}
-                    href="/admin"
-                  >
-                    Admin
-                  </SideItem>
-                ) : null}
-                {/* **`HelpDialog` was reachable from nothing**, which is how it
-                    went a fortnight out of date without anybody noticing: it
-                    was still rendered on `dialog === "help"` and no control
-                    set it. `shelfIcons.help` had survived too, so the row this
-                    restores is the one that was there. It goes first because
-                    it answers the question the other two are asked when it
-                    cannot — Support is for when the app is wrong, and this is
-                    for when it is merely unexplained. */}
-                <SideItem
-                  icon={shelfIcons.help}
-                  collapsed={sidebarCollapsed}
-                  onClick={() => setDialog("help")}
-                >
-                  How it works
-                </SideItem>
-                <SideItem
-                  icon={shelfIcons.support}
-                  collapsed={sidebarCollapsed}
-                  onClick={() => setDialog("support")}
-                >
-                  Support
-                </SideItem>
-                <SideItem
-                  icon={shelfIcons.feedback}
-                  collapsed={sidebarCollapsed}
-                  onClick={() => setDialog("feedback")}
-                >
-                  Send feedback
-                </SideItem>
-                <SideItem
-                  icon={shelfIcons.pricing}
-                  collapsed={sidebarCollapsed}
-                  href="/upgrade"
-                >
-                  Pricing
-                </SideItem>
-              </div>
+              {/* **How it works, Support, Send feedback, Pricing and Admin
+                  are not here any more** (2026-10-13, the owner's call). They
+                  are one-word buttons left of New book, with Search — see the
+                  note on the control group in the page header. They sat in the
+                  top bar once before, with their full names, for part of
+                  2026-09-15, and came back here the same day. The phone keeps
+                  them as labelled rows in `MobileDashboardNavigation`. */}
             </div>
           </div>
 
@@ -1106,10 +1050,11 @@ export function Bookshelf({
           {/* **The top bar is gone.**
 
             It held a search field and the New book button across the full
-            width, and both have better homes: search is a rail item opening a
+            width, and both have better homes: search is a button opening a
             panel that can reach a *chapter* — which a box filtering one list of
             books never could — and New book sits beside the heading it acts on.
-            What is left is the page's own header, below.
+            What is left is the page's own header, below, which since 2026-10-13
+            carries Search again, as a button beside New book.
 
             Three things did live only here and had to be carried out rather
             than deleted: the account menu on a phone, which is the one way to
@@ -1130,9 +1075,20 @@ export function Bookshelf({
                 thing.
 
                 It stacks below `sm`, where the two halves will not sit side by
-                side without the title truncating to nothing. */}
-            <div className="mt-6 mb-6 flex flex-col gap-4 border-b border-line pb-5 sm:mt-8 sm:flex-row sm:items-center sm:gap-3">
-              <div className="flex min-w-0 flex-col gap-1">
+                side without the title truncating to nothing.
+
+                **From `sm` it wraps rather than squeezing**, and the title's
+                `basis-80` is what decides when. Since the short names came
+                beside New book the controls are up to ~35rem wide, and on a
+                tablet or a small laptop with the rail open that left the
+                greeting truncated to "Hello…". A wrap needs no breakpoint of
+                its own: with less than
+                20rem for the title the controls drop to a second line, right
+                aligned by their `ml-auto` — the phone's own arrangement — and
+                it answers for the rail open or shut and for the operator's
+                extra button without being told about either. */}
+            <div className="mt-6 mb-6 flex flex-col gap-4 border-b border-line pb-5 sm:mt-8 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+              <div className="flex min-w-0 flex-col gap-1 sm:grow sm:basis-80">
                 <div className="flex min-w-0 items-center gap-3">
                   {/* No glyph beside the title. The rail already names the area
                       and lights the row the writer is on, so a second copy of
@@ -1219,10 +1175,65 @@ export function Bookshelf({
                   stretch and leave the button at the left. `items-center`
                   puts the 40px chip and the 40px button on one centreline,
                   and `shrink-0` makes the heading truncate first at the
-                  narrow end of the band rather than the controls squeezing. */}
+                  narrow end of the band rather than the controls squeezing.
+
+                  **The short names left of New book** (2026-10-13, the
+                  owner's call): Admin for the operator, Help, Support,
+                  Feedback and Pricing, a rule, then Search. They were rows at
+                  the foot of the rail. Icons alone were tried first, the same
+                  day, and the owner asked for words: six glyphs in a row are
+                  six things to decode, and a word is read at once. The names
+                  are cut to one word each so the row stays light — "Help"
+                  for How it works, which is also how that dialog titles
+                  itself. Search sits next to New book because it is the one
+                  of them used most and the one that acts on the books; Admin
+                  goes at the far end, so the operator's extra button moves
+                  nothing a writer sees.
+
+                  **The five are `md` and up, like the rail they came from.**
+                  Below it the phone's navigation sheet still lists them with
+                  their names, and a phone header has no room for seven
+                  targets. Search shows at every width — it was never in that
+                  sheet, so without it a phone had no way to search at all. */}
               <div className="ml-auto flex shrink-0 items-center gap-3">
                 <div className="hidden sm:flex md:hidden">
                   <AccountMenu account={account} />
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <div className="hidden items-center gap-1 md:flex">
+                    {/* The operator's way back to `/admin`. Drawn for nobody
+                        else; the page itself is the lock, and answers 404 to
+                        anybody who types the address. */}
+                    {admin ? <HeaderAction label="Admin" href="/admin" /> : null}
+                    {/* **`HelpDialog` was reachable from nothing once**, which
+                        is how it went a fortnight out of date without anybody
+                        noticing. It leads the three because it answers the
+                        question the other two are asked when it cannot —
+                        Support is for when the app is wrong, and this is for
+                        when it is merely unexplained. */}
+                    <HeaderAction label="Help" onClick={() => setDialog("help")} />
+                    <HeaderAction
+                      label="Support"
+                      onClick={() => setDialog("support")}
+                    />
+                    <HeaderAction
+                      label="Feedback"
+                      onClick={() => setDialog("feedback")}
+                    />
+                    <HeaderAction label="Pricing" href="/upgrade" />
+                    <span aria-hidden="true" className="mx-1 h-5 w-px bg-line" />
+                  </div>
+                  {/* The one with a tooltip, because it has something to add
+                      to its name: what it searches, and the `/` keycap — the
+                      first place that shortcut is written anywhere a writer
+                      would see it. */}
+                  <HeaderAction
+                    label="Search"
+                    tooltip="Search books and chapters"
+                    shortcut="/"
+                    onClick={() => setSearchOpen(true)}
+                  />
                 </div>
 
                 <Menu
@@ -1480,6 +1491,10 @@ export function Bookshelf({
           />
         )}
 
+        {/* Told once to the writers who were here before unlimited books
+            (2026-10-13). Its own rules decide whether it draws at all. */}
+        <WhatsNew />
+
         {noRoomForBatch && (
           /* **Nothing was restored**, and the numbers say why. Filling the
              last slots and leaving the rest behind would be a batch the
@@ -1650,6 +1665,10 @@ function MobileDashboardNavigation({
             ))}
           </nav>
 
+          {/* **These stay here, with their names**, though on a wider screen
+              they left the rail for short names beside New book (2026-10-13).
+              This sheet *is* the phone's rail, and the phone's header has room
+              for Search and New book and not for five more targets. */}
           <div className="mt-4 border-t border-line pt-3 pb-3">
             {admin ? (
               <SideItem icon={shelfIcons.track} href="/admin">
@@ -3142,8 +3161,8 @@ function ResumeSlot({
  * It is the same block `LimitBanner` uses, so the app has one shape for this
  * and not two.
  *
- * Every number is read from `LAUNCH_LIMITS` rather than written out, so the
- * card cannot drift from what the plan actually sells.
+ * Its words name what Pro adds over Free (`plan-rows.ts` is the list); books
+ * are not one of them since 2026-10-13, when every plan went unlimited.
  *
  * **The drawing has no background of its own.** It arrived as a flat grey
  * rectangle behind a figure, and a grey rectangle on a purple card is a
@@ -3171,38 +3190,20 @@ function ProCard({
   children,
 }: {
   plan: PlanState;
-  /** The heading. Left out, it is Overview's, and Overview's tells the truth
-   *  about whether there is actually room — see below. */
+  /** The heading. Left out, it is Overview's. */
   title?: string;
   /** The sentence under it. Defaults to Overview's. */
   children?: ReactNode;
 }) {
-  /* Before the guard, because hooks cannot sit after a conditional return. */
-  const shelf = useShelf();
-
   if (plan.loading || !plan.billing || plan.pro) return null;
 
   /*
-   * **"Room for the next book" is a claim, and it was being made to writers
-   * who had none.** The card draws for every metered writer, so a shelf at or
-   * past the limit was offered Pro under a heading promising capacity it did
-   * not have — a writer with four books on a three-book plan read "Room for
-   * the next book" directly above four covers. That is the no-claim rule
-   * pointed at a heading.
-   *
-   * A shelf can legitimately be over the limit: the free plan has been five
-   * books and one book as well as three, and the rule throughout is that a
-   * writer over it keeps everything they have and simply cannot start
-   * another. So this asks how much room is left rather than assuming the
-   * count is under the cap.
-   *
-   * `restoreCapacity` rather than a second count, because it is already the
-   * one that knows an archived book spends its slot and a shared one does
-   * not. `gated` is true: past the guard above, this writer is metered.
+   * **The heading was about room, and there is no room to run out of now.**
+   * It read "Room for the next book", or "No room for another book" once the
+   * shelf was full, while Free held three; since 2026-10-13 every plan holds
+   * unlimited books, so Overview's card sells what Pro still adds instead.
    */
-  const room = restoreCapacity(shelf, true);
-  const heading =
-    title ?? (room > 0 ? "Room for the next book" : "No room for another book");
+  const heading = title ?? "Getting a book ready to publish";
 
   return (
     /* A row rather than a picture positioned over the words. The figure is a
@@ -3238,10 +3239,10 @@ function ProCard({
         <p className="mt-1.5 text-sm leading-relaxed text-white/85">
           {children ?? (
             <>
-              {TIER_NAMES.pro} takes the shelf from{" "}
-              {plural(TIER_LIMITS.free.books ?? 0, "book")} to unlimited, and
-              takes the daily limit off title checks. Every export format is
-              free on every plan, this one included.
+              {TIER_NAMES.pro} adds every consistency check, your whole
+              writing record, paperback setup, and title checks and parked
+              ideas without a limit. Books are unlimited on every plan, and
+              every export format is free on every plan, this one included.
             </>
           )}
         </p>
@@ -5030,7 +5031,8 @@ function TitleCheckArea() {
 }
 
 /**
- * Price check — what are the books beside this one charging?
+ * Market check (the price check until 2026-10-12) — what are the books
+ * beside this one charging, where do they rank, and what is moving?
  *
  * **The same no-book shape as `TitleCheckArea` above**, and for the same
  * reason: the tool searches a description of a book rather than this writer's
@@ -5058,7 +5060,7 @@ function PriceCheckArea() {
            16:9 file in a 4:1 band keeps the empty sky and loses the subject. */
         crop="45% 86%"
         title="What the shelf beside yours charges"
-        subtitle="Real prices from real best-seller lists — and no recommended price, because that is yours to decide."
+        subtitle="Real prices, ranks and trends from real best-seller lists — and no recommended price, because that is yours to decide."
       />
 
       {/* The child override, as on the title check above: `toolShell` makes
@@ -5895,36 +5897,65 @@ function Stat({
  * answer "where am I" without competing with the page.
  */
 /**
- * A header control whose glyph is an animated mark.
+ * One of the short names left of New book, as a button or a link.
  *
- * `SideItem`'s pattern at the size the two buttons beside the wordmark use:
- * the button owns the pointer and focus events and drives the mark's handle,
- * because the glyph is 18px inside a 32px target and most of a hover never
- * touches it. See the note in `rail-mark.tsx`.
+ * **The word is the name**, so there is no `aria-label` to disagree with it —
+ * a screen reader hears exactly what a sighted writer reads. A tooltip is
+ * drawn only where it adds something the word does not say (Search's scope
+ * and its `/` keycap); one that repeated the label would be noise under the
+ * pointer.
+ *
+ * 40px tall below `md` and 36px from it, which is New book's own height on
+ * each side of that line, so the row is one height. Muted ink that comes up to
+ * `fg` on hover, over the rail's own `bg-raised` — quieter than New book, which
+ * is the one filled control on the row and the way forward.
  */
-function HeaderMark({
-  mark,
+function HeaderAction({
   label,
+  href,
   onClick,
+  tooltip,
+  shortcut,
 }: {
-  mark: MarkName;
+  /** The visible word, and so the accessible name. Keep it to one. */
   label: string;
-  onClick: () => void;
+  /** A place to go. Without it the control is a button and `onClick` acts. */
+  href?: string;
+  onClick?: () => void;
+  /** A longer description, shown under the button. Only when it adds to `label`. */
+  tooltip?: string;
+  /** The keystroke that does the same thing, drawn as a keycap in the tooltip. */
+  shortcut?: string;
 }) {
-  const handle = useMarkHandle();
+  const className =
+    "relative flex h-10 shrink-0 items-center rounded-lg px-2.5 text-sm font-medium " +
+    "whitespace-nowrap text-muted transition-colors hover:bg-raised hover:text-fg " +
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 " +
+    "cursor-pointer md:h-9";
+  const body = (
+    <>
+      {label}
+      {tooltip ? (
+        <Tooltip label={tooltip} side="bottom" nowrap shortcut={shortcut} />
+      ) : null}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {body}
+      </Link>
+    );
+  }
   return (
     <button
       type="button"
       onClick={onClick}
-      title={label}
-      aria-label={label}
-      onPointerEnter={handle.onEnter}
-      onPointerLeave={handle.onLeave}
-      onFocus={handle.onEnter}
-      onBlur={handle.onLeave}
-      className="group flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
+      aria-keyshortcuts={shortcut}
+      className={className}
     >
-      <RailMark mark={mark} markRef={handle.ref} size={18} />
+      {body}
     </button>
   );
 }

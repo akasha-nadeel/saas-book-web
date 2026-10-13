@@ -86,6 +86,22 @@ const PRICES: Record<PaidTier, Record<Period, { total: number; perMonth: number 
     monthly: { total: 5.99, perMonth: 5.99 },
     annual: { total: 59.88, perMonth: 4.99 },
   },
+  /**
+   * **Pro Plus is $9.99, the owner's figure (2026-10-12)**, and it is Pro and
+   * Amazon's data — the one thing here that costs money per request. It keeps
+   * $8.99 a monthly sale after Paddle's 5% + 50¢. Amazon's data costs at most
+   * a few dollars a month across the whole site however many writers read it,
+   * because every genre is fetched once and shared (`amazon-source.ts`), so
+   * three subscribers cover even OpenWeb Ninja's $25 fixed plan.
+   *
+   * **The year is $99.48, twelve months at $8.29**, the same 17% as Pro, so
+   * the toggle's one "Save" badge stays true for both (`uniformAnnualSaving`).
+   * Derived from the per-month figure for the same reason as Pro's.
+   */
+  plus: {
+    monthly: { total: 9.99, perMonth: 9.99 },
+    annual: { total: 99.48, perMonth: 8.29 },
+  },
 };
 
 /** How the figure is written. */
@@ -127,10 +143,10 @@ export function annualSavingPercent(tier: PaidTier): number {
  * percentage over different savings is the same stale claim
  * `annualSavingPercent` was written to prevent, one level up. So the badge asks
  * this first and renders nothing when the answer is null, rather than picking a
- * tier's figure and hoping. With Pro the only paid plan it is Pro's saving,
- * and it stays a function so a second plan cannot quietly make the badge lie.
+ * tier's figure and hoping. Pro and Pro Plus are both priced at 17%, so a
+ * third plan, or a price change on one of them, cannot quietly make it lie.
  *
- * Today it rounds to 30%.
+ * Today it rounds to 17%.
  */
 export function uniformAnnualSaving(): number | null {
   const [first, ...rest] = PAID_TIERS.map(annualSavingPercent);

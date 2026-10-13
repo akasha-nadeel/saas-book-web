@@ -66,9 +66,9 @@
  *
  * **The price check left this list on 2026-10-06**, by the owner's decision:
  * its Apple lists are free to read and cached for a day, so it is unlimited on
- * every plan, and what Pro buys there is Amazon's data — a server-checked gate
- * (`require-pro-data.ts`) rather than a count, because that data costs money
- * per request.
+ * every plan, and what a paid plan buys there is Amazon's data — Pro Plus since
+ * 2026-10-12, a server-checked gate (`require-amazon-data.ts`) rather than a
+ * count, because that data costs money per request.
  */
 export type DailyLimit = "comps" | "covers" | "titleCheck";
 

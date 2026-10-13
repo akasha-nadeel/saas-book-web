@@ -66,9 +66,11 @@ export default function RefundsPage() {
           it in full. You do not have to give a reason.
         </p>
         <p>
-          That applies to {TIER_NAMES.pro} on both cycles —{" "}
+          That applies to both paid plans on both cycles — {TIER_NAMES.pro} at{" "}
           {displayPrice(priceOf("pro", "monthly"))} monthly or{" "}
-          {displayPrice(priceOf("pro", "annual"))} annual.
+          {displayPrice(priceOf("pro", "annual"))} annual, and {TIER_NAMES.plus}{" "}
+          at {displayPrice(priceOf("plus", "monthly"))} monthly or{" "}
+          {displayPrice(priceOf("plus", "annual"))} annual.
         </p>
       </Section>
 

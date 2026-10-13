@@ -1,10 +1,14 @@
 /**
- * The two plans, what each one gives, and the order they climb in.
+ * The three plans, what each one gives, and the order they climb in.
  *
- * **Two since 2026-09-14.** There were four — Free, Draft, Writer and Studio —
- * and the three paid ones differed only by how many assistant credits they
- * granted. The assistant was removed with every other model call, which left
- * three identical products at three prices, so they became one: Pro.
+ * **Three since 2026-10-12: Free, Pro and Pro Plus.** There were four — Free,
+ * Draft, Writer and Studio — and the three paid ones differed only by how many
+ * assistant credits they granted. The assistant was removed with every other
+ * model call on 2026-09-14, which left three identical products at three
+ * prices, so they became one: Pro. Pro Plus is the first paid plan since then
+ * that differs by something real: **Amazon's data costs money per request**,
+ * so it is sold on its own until there are paying writers to cover it (see
+ * `AMAZON_DATA_TIER`). Pro Plus is everything in Pro and the Amazon data.
  *
  * **Its own file, importing nothing.** `plans.ts` is about money and `launch.ts`
  * is about what the MVP hides; the tier is a third thing that both of them and
@@ -26,20 +30,22 @@
  * positions in this array, so a tier inserted in the wrong place silently opens
  * or shuts every gate above it.
  */
-export const TIER_ORDER = ["free", "pro"] as const;
+export const TIER_ORDER = ["free", "pro", "plus"] as const;
 
 export type PlanTier = (typeof TIER_ORDER)[number];
 
 /** What can be bought. `free` is the absence of a subscription row. */
 export type PaidTier = Exclude<PlanTier, "free">;
 
-export const PAID_TIERS: readonly PaidTier[] = ["pro"];
+export const PAID_TIERS: readonly PaidTier[] = ["pro", "plus"];
 
 /**
  * What each plan gives.
  *
- * **Books are the one difference the server enforces.** Imports, sync, all
- * three export formats and unlimited words and chapters are on both plans, and
+ * **Books are the one difference here the server enforces** (the Amazon data
+ * is the other server-checked one, and it is decided by `AMAZON_DATA_TIER`
+ * rather than by a limit). Imports, sync, all three export formats and
+ * unlimited words and chapters are on every plan, and
  * *export must never move behind the plan.* The other differences (the daily
  * title check, the writing record's window and six of the consistency checks,
  * since 2026-09-15) are browser gates, and they live in `free-limits.ts` and
@@ -50,10 +56,15 @@ export const PAID_TIERS: readonly PaidTier[] = ["pro"];
  * and JSON has no infinity.
  */
 export const TIER_LIMITS = {
+  /* Unlimited since 2026-10-13, the owner's decision: Free held three books
+     from 2026-09-15 and one before that. */
   free: {
-    books: 3 as number | null,
+    books: null as number | null,
   },
   pro: {
+    books: null as number | null,
+  },
+  plus: {
     books: null as number | null,
   },
 } as const satisfies Record<PlanTier, TierLimits>;
@@ -74,6 +85,7 @@ export interface TierLimits {
 export const TIER_NAMES: Record<PlanTier, string> = {
   free: "Free",
   pro: "Pro",
+  plus: "Pro Plus",
 };
 
 /**
@@ -101,11 +113,31 @@ export function asPaidTier(value: unknown): PaidTier | null {
 /**
  * Whether `tier` reaches `minimum`.
  *
- * Every server gate asks this rather than naming tiers, so adding a plan is an
- * edit to `TIER_ORDER` and nothing else.
+ * A gate that names a plan asks this rather than comparing names, so a plan
+ * above it is let through without the gate knowing it exists.
  */
 export function tierAtLeast(tier: PlanTier, minimum: PlanTier): boolean {
   return TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf(minimum);
+}
+
+/**
+ * **The lowest plan that gets Amazon's data — the one switch for it.**
+ *
+ * Every Amazon request is paid for (OpenWeb Ninja, by the request), and on
+ * 2026-10-12 there were no paying writers to cover it, so the owner sold it in
+ * a plan of its own. When paid writers cover the bill, setting this to `"pro"`
+ * gives Pro the data — the server gate, the locked tabs and the badges all
+ * read it. The plan rows and the pricing cards say who gets what in words, and
+ * `plan-rows.test.ts` pins those words to this value, so it flags them.
+ *
+ * Every other paid gate (`isPro`, `plan.pro`, `onFreePlan`) means *any* paid
+ * plan, which is right: Pro Plus is everything in Pro and more.
+ */
+export const AMAZON_DATA_TIER: PaidTier = "plus";
+
+/** Whether a writer on `tier` may read Amazon's data. */
+export function amazonDataAllowed(tier: PlanTier): boolean {
+  return tierAtLeast(tier, AMAZON_DATA_TIER);
 }
 
 /** How many books this plan holds. `null` is unlimited. */

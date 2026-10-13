@@ -3389,6 +3389,48 @@ their characters and bible are **per-novel**; ours read across a series with
 transitive alias merging (`series.ts`), which is the one place we are already
 ahead on their flagship feature.
 
+## Built 2026-10-12/13 — Pro Plus, the Market check, and unlimited books on Free
+
+**Pro Plus ($9.99 a month, $99.48 a year)** is Pro and Amazon's data. Amazon's
+data left Pro the same day, because every request for it is paid for and there
+were no paying writers to cover it. `AMAZON_DATA_TIER` in `tiers.ts` is the one
+switch that gives it back to Pro later; the server gate, the locked tabs, the
+badges and the plan rows all read it.
+
+**The price check became the Market check**, with three sections per genre:
+- **Prices**: Apple's list free and unlimited, and Amazon's with Pro Plus.
+- **Categories**: the whole-store rank of the list's #1/#10/#25/#50/#100, and
+  every category the top 100 rank in.
+- **Trends**: New Releases, Movers & Shakers, Most Wished For, rating counts,
+  launch prices in bands, and the cover wall.
+
+A genre opens on the three sections alone; nothing is fetched until one is
+pressed. The ids stay `price-check`, so no link broke.
+
+**Free holds unlimited books since 2026-10-13.** The trigger is dropped by
+`20261013000000_free_unlimited_books.sql`. The browser gates read
+`bookLimitFor(plan)`, which answers null for everybody, so a limit brought
+back is `TIER_LIMITS` plus a migration. Existing writers see a one-time
+"Unlimited books, free" notice on the dashboard (`whats-new.ts`); it is
+remembered per account in `user_metadata`. Every confirmed account gets one
+email (`scripts/announce-unlimited-books.cjs`; a dry run by default).
+
+**Still to do:**
+- **My book tracker** (asked for 2026-10-12, held for later): a writer's own
+  published book on Amazon, its rank, categories, price and ratings read
+  weekly, with the history drawn. It needs a table, a weekly job and the
+  writer's ASIN; the cost is one request per tracked book per week.
+- **Re-shoot the landing page's price-check shot**: it shows the old name and
+  no section tabs.
+- **`editor/import-mode-dialog.tsx:121` loses a space.** "Delete the
+  {yourChapters} you have here and use the file&rsquo;s" — the compiler
+  drops the space before "you", because the text after a `{…}` whose first
+  line holds an entity is trimmed. Use `{" "}`.
+- **Check the three trend lists against the live API** once OpenWeb Ninja is
+  on a paid plan: three requests confirm Kindle nodes answer `NEW_RELEASES`,
+  `MOVERS_AND_SHAKERS` and `MOST_WISHED_FOR`. They were built against
+  recorded data.
+
 ## Built 2026-10-06 — Amazon's list for Pro, Apple's unlimited for everyone
 
 **Built and tested, not yet live.** The owner decided:

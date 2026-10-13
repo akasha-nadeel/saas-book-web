@@ -22,7 +22,7 @@ import { money } from "./money";
  * whole market.
  *
  * **When the self-published side is too thin on Apple's list, the next step is
- * Amazon**: a button that switches to the Amazon tab for a Pro writer, and a
+ * Amazon**: a button that switches to the Amazon tab for a Pro Plus writer, and a
  * link to Amazon's own list for everyone else.
  */
 export function ShelfAnswer({
@@ -36,7 +36,7 @@ export function ShelfAnswer({
   books: readonly ListedBook[];
   source: "apple" | "amazon";
   amazon: { url: string; label: string };
-  /** Pro only: switch to the Amazon tab instead of leaving for Amazon's site. */
+  /** Pro Plus only: switch to the Amazon tab instead of leaving for Amazon's site. */
   onAmazon?: () => void;
 }) {
   const order: PublisherGroup[] = [
