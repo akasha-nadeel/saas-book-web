@@ -39,7 +39,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Finding things",
-        desc: "Search reads every book and every chapter at once, by title and by what is written inside them.",
+        desc: "Search reads every book and every chapter at once, by title and by what is written inside them. Press Search beside New book, or press /.",
       },
     ],
   },

@@ -370,9 +370,13 @@ Ideas mounts the editor's `IdeasPanel`. **The price check takes neither frame**
 its paperback card offers the writer's books in a picker of its own, for the
 page count only. The writing record is reached from the
 Export screen's Format step and the export-done dialog rather than from the
-rail. **How it works, Support, Send feedback and Pricing sit at the foot of the
-side panel**, under a rule; they were tried in the top bar beside New book for
-part of 2026-09-15 and the owner moved them back.
+rail. **Help, Support, Feedback, Pricing and Search are one-word buttons left
+of New book since 2026-10-13** (`HeaderAction`, the owner's call), with Admin
+first for the operator; the side panel holds places only. The owner chose words
+over icons the same day, and the full names ("How it works", "Send feedback")
+had been tried there on 2026-09-15 and moved back, so the short form is the
+decision, not a detail. Below `md` the five stay as labelled rows in the
+phone's navigation sheet, and Search is in the header at every width.
 **Each tool is the same three pieces** — a pure, tested module in `src/lib/`;
 a thin
 `src/app/book/[bookId]/<tool>/page.tsx` that awaits `params`; a client component
