@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { TIER_NAMES, amazonDataAllowed } from "@/lib/billing/tiers";
+import { TIER_LIMITS, TIER_NAMES, amazonDataAllowed } from "@/lib/billing/tiers";
 import Link from "next/link";
 import type { PaymentTone } from "@/lib/billing/history";
 import { FREE_LIMITS } from "@/lib/free-limits";
@@ -197,7 +197,8 @@ export function BillingPage({
                 )}
                 {!plan.pro && (
                   <p className="mt-0.5 font-sans text-xs text-muted">
-                    Unlimited books, every export format,{" "}
+                    {plural(TIER_LIMITS.free.books ?? 0, "book")}, every
+                    export format,{" "}
                     {plural(FREE_LIMITS.titleCheck.free, "title check")} a day
                   </p>
                 )}
@@ -442,8 +443,11 @@ export function BillingPage({
                 You&rsquo;ll go back to the free plan
               </h3>
               <ul className="mt-3 space-y-2 rounded-xl border border-line bg-surface p-4 font-sans text-sm text-muted">
-                {/* No book line since 2026-10-13: every plan holds unlimited
-                    books, so cancelling takes none away. */}
+                <li>
+                  Room for {plural(TIER_LIMITS.free.books ?? 0, "book")}: every
+                  book you already have stays and stays editable, but a new one
+                  waits until you are under that.
+                </li>
                 <li>
                   {plural(FREE_LIMITS.titleCheck.free, "title check")} a day
                   instead of unlimited.

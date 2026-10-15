@@ -139,11 +139,7 @@ describe("favouriteIntent", () => {
   });
 });
 
-/**
- * A limit to count against. No plan has one since 2026-10-13 (Free went
- * unlimited), so the arithmetic is tested against a stated one — the number a
- * limit brought back would be.
- */
+/** The free plan's count, stated here so the arithmetic reads plainly. */
 const LIMIT = 3;
 
 describe("restoreCapacity", () => {

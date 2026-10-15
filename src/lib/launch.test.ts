@@ -95,18 +95,20 @@ it("shuts Amazon's data below Pro Plus, never while unknown or with no gateway",
 });
 
 /**
- * **Every plan holds unlimited books, in TypeScript and in SQL** (2026-10-13).
- *
- * The free limit was stated in the browser and enforced by a Postgres trigger,
- * and the two had to agree or the browser offered books Postgres refused. With
- * no limit the agreement is that neither has one: every tier's `books` is null,
- * and the newest migration that names the trigger drops it. SQL cannot import
- * TypeScript, so the test reads the migrations — and it cannot know what the
- * live database runs, so the migration still goes in first.
+ * **The free book count is stated twice and they must agree**:
+ * `TIER_LIMITS.free.books`, which every browser gate reads through
+ * `bookLimitFor`, and the trigger in the newest migration that writes it,
+ * which is the one that actually refuses. SQL cannot import TypeScript, so the
+ * test reads the migrations — the browser offering a book Postgres then
+ * refuses is the drift this catches. (Free went unlimited on 2026-10-13 in
+ * code that never shipped; `20261015000000_free_three_books_again.sql` put the
+ * trigger back.) It cannot know what the live database runs, so check that
+ * too before deploying.
  */
-it("holds unlimited books on every plan, in TypeScript and in SQL", async () => {
-  const { TIER_LIMITS, TIER_ORDER } = await import("@/lib/billing/tiers");
-  for (const tier of TIER_ORDER) expect(TIER_LIMITS[tier].books).toBeNull();
+it("holds three books on the free plan, in TypeScript and in SQL", async () => {
+  const { TIER_LIMITS, PAID_TIERS } = await import("@/lib/billing/tiers");
+  expect(TIER_LIMITS.free.books).toBe(3);
+  for (const tier of PAID_TIERS) expect(TIER_LIMITS[tier].books).toBeNull();
 
   const dir = "supabase/migrations";
   const latest = readdirSync(dir)
@@ -115,6 +117,7 @@ it("holds unlimited books on every plan, in TypeScript and in SQL", async () => 
     .map((f) => readFileSync(`${dir}/${f}`, "utf8"))
     .filter((sql) => sql.includes("books_launch_free_limit"))
     .at(-1);
-  expect(latest).toMatch(/drop trigger if exists books_launch_free_limit/);
-  expect(latest).not.toMatch(/create trigger books_launch_free_limit/);
+  expect(latest).toMatch(/create trigger books_launch_free_limit/);
+  const limit = latest?.match(/if v_count >= (\d+) then/);
+  expect(limit?.[1]).toBe(String(TIER_LIMITS.free.books));
 });

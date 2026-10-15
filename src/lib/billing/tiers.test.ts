@@ -76,10 +76,12 @@ it("gives every tier a limit set and a name", () => {
  * Free is the only tier that counts books, and it holds three. `null` rather
  * than `Infinity` because this value is serialised to the browser and JSON has
  * no infinity. The trigger in `20260915000000_free_three_books.sql` holds the
- * same number.
+ * same number — and `20261015000000_free_three_books_again.sql`, which put it
+ * back after a day without it.
  */
-it("counts books on no plan, Free included", () => {
-  for (const tier of TIER_ORDER) expect(bookLimit(tier)).toBeNull();
+it("counts books on the free plan and nowhere else", () => {
+  expect(bookLimit("free")).toBe(3);
+  for (const tier of PAID_TIERS) expect(bookLimit(tier)).toBeNull();
 });
 
 /**

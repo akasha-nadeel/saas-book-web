@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, createContext, type ReactNode, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { TIER_NAMES } from "@/lib/billing/tiers";
+import { TIER_LIMITS, TIER_NAMES, bookLimit } from "@/lib/billing/tiers";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -72,6 +72,7 @@ import {
   needsConfirming,
   planRestore,
   rangeBetween,
+  restoreCapacity,
   selectAll,
   toggle,
   type BulkAction,
@@ -89,7 +90,6 @@ import {
   trashedBookClosed,
 } from "@/lib/launch";
 import { TrashedBookDialog } from "@/components/upgrade/trashed-book";
-import { WhatsNew } from "@/components/shelf/whats-new";
 import { UpgradeDialog } from "@/components/upgrade/upgrade-dialog";
 import { usePlan, type PlanState } from "@/lib/use-plan";
 import {
@@ -725,9 +725,9 @@ export function Bookshelf({
        is the real enforcement — `enforce_launch_book_limit` exempts Pro — so
        the cost of waving through a restore we would have refused is that
        Postgres refuses it instead, which is the right way round. */
-    /* No plan has a book limit since 2026-10-13, so `bookLimitFor` answers
-       null and this never refuses; it stays as the one place a limit brought
-       back would be asked. */
+    /* `bookLimitFor` is that three-part test with the free plan's count
+       (`TIER_LIMITS.free.books`); `atBookLimit` counts the way the trigger
+       does. */
     const gated = atBookLimit(shelf, bookLimitFor(plan));
     if (gated) {
       setNoRoomFor(book);
@@ -1490,10 +1490,6 @@ export function Bookshelf({
             onClose={() => setBulkAsk(null)}
           />
         )}
-
-        {/* Told once to the writers who were here before unlimited books
-            (2026-10-13). Its own rules decide whether it draws at all. */}
-        <WhatsNew />
 
         {noRoomForBatch && (
           /* **Nothing was restored**, and the numbers say why. Filling the
@@ -3161,8 +3157,8 @@ function ResumeSlot({
  * It is the same block `LimitBanner` uses, so the app has one shape for this
  * and not two.
  *
- * Its words name what Pro adds over Free (`plan-rows.ts` is the list); books
- * are not one of them since 2026-10-13, when every plan went unlimited.
+ * Every number is read from `LAUNCH_LIMITS` rather than written out, so the
+ * card cannot drift from what the plan actually sells.
  *
  * **The drawing has no background of its own.** It arrived as a flat grey
  * rectangle behind a figure, and a grey rectangle on a purple card is a
@@ -3190,20 +3186,38 @@ function ProCard({
   children,
 }: {
   plan: PlanState;
-  /** The heading. Left out, it is Overview's. */
+  /** The heading. Left out, it is Overview's, and Overview's tells the truth
+   *  about whether there is actually room — see below. */
   title?: string;
   /** The sentence under it. Defaults to Overview's. */
   children?: ReactNode;
 }) {
+  /* Before the guard, because hooks cannot sit after a conditional return. */
+  const shelf = useShelf();
+
   if (plan.loading || !plan.billing || plan.pro) return null;
 
   /*
-   * **The heading was about room, and there is no room to run out of now.**
-   * It read "Room for the next book", or "No room for another book" once the
-   * shelf was full, while Free held three; since 2026-10-13 every plan holds
-   * unlimited books, so Overview's card sells what Pro still adds instead.
+   * **"Room for the next book" is a claim, and it was being made to writers
+   * who had none.** The card draws for every metered writer, so a shelf at or
+   * past the limit was offered Pro under a heading promising capacity it did
+   * not have — a writer with four books on a three-book plan read "Room for
+   * the next book" directly above four covers. That is the no-claim rule
+   * pointed at a heading.
+   *
+   * A shelf can legitimately be over the limit: the free plan has been five
+   * books and one book as well as three, and the rule throughout is that a
+   * writer over it keeps everything they have and simply cannot start
+   * another. So this asks how much room is left rather than assuming the
+   * count is under the cap.
+   *
+   * `restoreCapacity` rather than a second count, because it is already the
+   * one that knows an archived book spends its slot and a shared one does
+   * not. `gated` is true: past the guard above, this writer is metered.
    */
-  const heading = title ?? "Getting a book ready to publish";
+  const room = restoreCapacity(shelf, bookLimit("free"));
+  const heading =
+    title ?? (room > 0 ? "Room for the next book" : "No room for another book");
 
   return (
     /* A row rather than a picture positioned over the words. The figure is a
@@ -3239,10 +3253,10 @@ function ProCard({
         <p className="mt-1.5 text-sm leading-relaxed text-white/85">
           {children ?? (
             <>
-              {TIER_NAMES.pro} adds every consistency check, your whole
-              writing record, paperback setup, and title checks and parked
-              ideas without a limit. Books are unlimited on every plan, and
-              every export format is free on every plan, this one included.
+              {TIER_NAMES.pro} takes the shelf from{" "}
+              {plural(TIER_LIMITS.free.books ?? 0, "book")} to unlimited, and
+              takes the daily limit off title checks. Every export format is
+              free on every plan, this one included.
             </>
           )}
         </p>

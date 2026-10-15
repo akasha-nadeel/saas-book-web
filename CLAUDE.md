@@ -97,7 +97,7 @@ is the thing to read **before changing that area**, not after.
 | Dashboard, checkup findings, roadmap, the sixteen tool screens, save bars | `docs/architecture/dashboard-and-tools.md` |
 | Why there is no AI, and the Free/Pro decision | `docs/plans/2026-09-14-ai-free-pro-plan-design.md` |
 | The price check — best-seller lists, what Amazon pays, and the Amazon-data plan | `docs/plans/2026-10-05-price-check-amazon-design.md` (the Google-search version it replaced: `docs/plans/2026-09-26-price-check-guided-search-design.md`) |
-| Pro Plus, the Market check's Categories and Trends, unlimited books on Free | `docs/plans/2026-10-12-pro-plus-market-check-design.md` |
+| Pro Plus, and the Market check's Categories and Trends | `docs/plans/2026-10-12-pro-plus-market-check-design.md` |
 | Tiptap editor, rails, panels, front/back matter pages, series bible | `docs/architecture/editor.md` |
 | Reading view, pagination, the export wizard's Preview | `docs/architecture/reader.md` |
 | Export (EPUB, PDF, Word, Markdown), typesetting, front matter, covers | `docs/architecture/export.md` |
@@ -991,12 +991,16 @@ local-only, with the account menu saying why. Every entry point checks
   absent** — PostgREST refuses the whole select for one unknown column, so the
   entire library download would fail for everybody.
 - **Schema changes belong in `supabase/migrations/`**, not only in the
-  dashboard. There are **twenty**. **The nineteenth and twentieth must be
-  applied before their code ships**: `20261012010000_pro_plus_plan.sql` lets
-  the three plan CHECKs admit `plus` (without it a Pro Plus webhook fails with
-  a 23514 and Paddle retries), and `20261013000000_free_unlimited_books.sql`
-  drops the book-limit trigger (without it a free writer's fourth book never
-  syncs). The first seven were confirmed applied live
+  dashboard. There are **twenty-one**. The eighteenth to the twentieth were
+  applied live on 2026-10-13: `20261012000000_feature_users.sql`,
+  `20261012010000_pro_plus_plan.sql` (the three plan CHECKs admit `plus`) and
+  `20261013000000_free_unlimited_books.sql`, which **dropped the book-limit
+  trigger** for code that made Free unlimited — code the owner took back on
+  2026-10-15 before it shipped. **The twenty-first,
+  `20261015000000_free_three_books_again.sql`, puts the trigger back** (its
+  sentence says "upgrade for unlimited books", which is how to tell it is the
+  one running). Until it is applied the live database has no book backstop,
+  only the browser's. The first seven were confirmed applied live
   on 2026-08-20; the fifteenth and the sixteenth on 2026-09-23. The seventeenth,
   `20261005000000_admin_insights.sql`, is `/admin`'s and was applied live on
   2026-10-05, before its code shipped, and checked through PostgREST (the
@@ -1114,7 +1118,8 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   `free | pro | plus` — `tierAtLeast` compares positions in `TIER_ORDER`, so a
   tier inserted in the wrong place opens or shuts every gate above it.
   `TIER_LIMITS` is the one TypeScript statement of what each plan gives, and it
-  holds one field, `books` — **null on every plan since 2026-10-13**;
+  holds one field, `books` — **three on Free, null (unlimited) on both paid
+  plans**;
   `TIER_NAMES` is the one place the words are written. The module is pure and
   imports nothing, so a Server Component, a client component and
   `library-store.ts` can all read it. **Every gate but one means "any paid
@@ -1129,12 +1134,12 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   `plan-rows.test.ts` pins it: the Market check (Amazon + Apple), the
   category check and the trends are the only rows where Pro and Pro Plus
   differ.
-- **Pro buys six things since 2026-10-13**, and `plan-rows.test.ts` pins the
-  list. **Books are not one of them**: every plan holds unlimited books since
-  2026-10-13 (Free held three from 2026-09-15). Unlimited title checks (Free
-  runs **three a day**, `FREE_LIMITS.titleCheck`); the Market check is
-  unlimited on Apple Books' lists on every plan, and Amazon's is Pro Plus;
-  unlimited parked ideas (Free
+- **Pro buys seven things since 2026-10-12**, and `plan-rows.test.ts` pins the
+  list: unlimited books (Free holds **three** — unlimited on Free was built on
+  2026-10-13 and taken back by the owner on 2026-10-15 before it went live);
+  unlimited title checks (Free runs **three a day**,
+  `FREE_LIMITS.titleCheck`); the Market check is unlimited on Apple Books'
+  lists on every plan, and Amazon's is Pro Plus; unlimited parked ideas (Free
   parks **five at a time**, `FREE_LIMITS.ideas` — occupancy, so forgetting one
   makes room); all **11** consistency checks (Free runs **5**, `FREE_CHECKS` in
   `consistency-ids.ts`, and is told how many things the other six found); the
@@ -1142,9 +1147,9 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   **30 days**, `FREE_RECORD_DAYS`, and the file says so); and **paperback
   setup, which Free does not get at all** — `PaperbackPage` opens `GatedTool`
   and the dashboard's Paperback area draws `ProCard`, and it is the one row
-  allowed to say "Not included" on Pro's side. **Only the Amazon data is
-  enforced by the server** — because it is paid for per request
-  (`requireAmazonData`); the book count was the other, until it went; the rest are
+  allowed to say "Not included" on Pro's side. **Only the book count and the
+  Amazon data are enforced by the server** — the Amazon data because it is
+  paid for per request (`requireAmazonData`); the rest are
   browser gates through `onFreePlan` / `useLimitGate` / `useEntitled`, which the
   owner chose knowingly. Nothing a writer typed is hidden by any of them — the
   log keeps recording, parked ideas past five stay — so upgrading opens what
@@ -1234,30 +1239,26 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   and `change-plan-button.tsx` reads the **status**, not the wording, to decide
   whether to draw the link to `/billing`. Codes go into either set once they
   have been seen.
-- **There is no book limit on any plan since 2026-10-13**, the owner's
-  decision. It was a **Postgres trigger** (`enforce_launch_book_limit`) mirrored
-  in the browser — one book, then three from 2026-09-15 — and
-  `20261013000000_free_unlimited_books.sql` drops it; **that migration goes in
-  before its code**, or a fourth book is refused with a 23514 and never syncs.
-  `LAUNCH_LIMITS.freeBooks` is gone; the browser gates (new book, restore, bulk
-  restore, idea → book) read `atBookLimit(shelf, bookLimitFor(plan))`, which
-  answers false for everybody because `TIER_LIMITS.free.books` is null — so a
-  limit brought back is that field plus a trigger, and `launch.test.ts` checks
-  the newest migration naming the trigger drops it. `requireLaunchExport()`
+- **The one limit enforced on the server is the book count** (Amazon's data is
+  the other server gate, by tier rather than count). The free book limit is a
+  **Postgres trigger** (`enforce_launch_book_limit`) rather than a browser
+  count. **The number is stated twice and they must move together**:
+  `TIER_LIMITS.free.books` (three) and the trigger body in the newest
+  migration that writes it, now `20261015000000_free_three_books_again.sql`;
+  `launch.test.ts` reads it and fails if they disagree.
+  `LAUNCH_LIMITS.freeBooks` is gone (2026-10-13): the browser gates (new book,
+  restore, bulk restore, idea → book) read `atBookLimit(shelf,
+  bookLimitFor(plan))`, which is `TIER_LIMITS.free.books` behind `onFreePlan`'s
+  three parts, so changing the count is that field plus a trigger.
+  **Unlimited books on Free was built on 2026-10-13 and taken back on
+  2026-10-15 before it shipped**: its migration dropped the trigger in the live
+  database, and the twenty-first puts it back. `requireLaunchExport()`
   (`billing/launch-entitlements.ts`) only checks for a session — free is not
   anonymous, since `/api/export/pdf` launches a browser on markup a caller
   sent. `requirePro`, `requireTier`, the credit ledger (`ai_credits`,
   `claim_credits`, `refund_credits`), `ai_usage` and the assistant reply
   functions are all gone — the migration drops the SQL half.
-- **Existing writers were told once** (2026-10-13): `whats-new.ts` and
-  `shelf/whats-new.tsx` show "Unlimited books, free." on the dashboard only,
-  to accounts made (or, with no account, books opened) before the change,
-  remembered in `prefs.noticesSeen` **and** the account's
-  `user_metadata.notices_seen` so a second device does not ask. No sign-in is
-  needed: the session they already have is read. The email went through
-  `scripts/announce-unlimited-books.cjs` (a dry run unless `--send`).
-- **The rules a book limit would count by, kept for if one returns** — they
-  were written while Free held three. The book limit counts everything but the trash, so the archive is not a
+- **The book limit counts everything but the trash**, so the archive is not a
   way round it and **unarchiving is never gated**. It was the active shelf alone
   until 2026-08-26, on the Trello/Figma convention where archiving opens a slot
   and coming back out is gated instead — a fair rule for tools whose archive

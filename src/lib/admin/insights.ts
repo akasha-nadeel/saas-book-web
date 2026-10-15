@@ -9,7 +9,7 @@ import {
   isPro,
   type SubscriptionStatus,
 } from "@/lib/billing/subscription";
-import { asPaidTier } from "@/lib/billing/tiers";
+import { asPaidTier, bookLimit } from "@/lib/billing/tiers";
 import { FREE_LIMITS } from "@/lib/free-limits";
 
 /**
@@ -249,7 +249,7 @@ export const SEGMENTS: readonly Segment[] = [
   {
     id: "limit",
     label: "Hit a free limit",
-    rule: "On Free, and refused by a limit in the last 30 days. The ones to ask about Pro.",
+    rule: `On Free, and either refused by a limit in the last 30 days or holding ${bookLimit("free") ?? 0}+ books. The ones to ask about Pro.`,
     tone: "note",
   },
   {
@@ -297,8 +297,10 @@ export function segmentOf(user: AdminUser, now: Date): SegmentId {
     return within(seen, 14, now) ? "paying" : "paying_quiet";
   }
   if (!user.emailConfirmed) return "unconfirmed";
-  // Holding the free book count stopped counting on 2026-10-13: there is none.
-  if (within(user.lastLimitAt, 30, now)) return "limit";
+  const freeBooks = bookLimit("free");
+  if (within(user.lastLimitAt, 30, now) || (freeBooks !== null && user.books >= freeBooks)) {
+    return "limit";
+  }
   if (user.books === 0) return "no_book";
   if (user.words === 0) return "no_words";
   if (within(user.lastWritingAt, 7, now) || within(user.lastChangeAt, 7, now)) {

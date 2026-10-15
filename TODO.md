@@ -3389,7 +3389,7 @@ their characters and bible are **per-novel**; ours read across a series with
 transitive alias merging (`series.ts`), which is the one place we are already
 ahead on their flagship feature.
 
-## Built 2026-10-12/13 — Pro Plus, the Market check, and unlimited books on Free
+## Built 2026-10-12 — Pro Plus and the Market check
 
 **Pro Plus ($9.99 a month, $99.48 a year)** is Pro and Amazon's data. Amazon's
 data left Pro the same day, because every request for it is paid for and there
@@ -3407,13 +3407,12 @@ badges and the plan rows all read it.
 A genre opens on the three sections alone; nothing is fetched until one is
 pressed. The ids stay `price-check`, so no link broke.
 
-**Free holds unlimited books since 2026-10-13.** The trigger is dropped by
-`20261013000000_free_unlimited_books.sql`. The browser gates read
-`bookLimitFor(plan)`, which answers null for everybody, so a limit brought
-back is `TIER_LIMITS` plus a migration. Existing writers see a one-time
-"Unlimited books, free" notice on the dashboard (`whats-new.ts`); it is
-remembered per account in `user_metadata`. Every confirmed account gets one
-email (`scripts/announce-unlimited-books.cjs`; a dry run by default).
+**Free still holds three books.** Unlimited books on Free, with a one-time
+popup and an announcement email, was built on 2026-10-13. The owner took it
+back on 2026-10-15 before it went live. Its migration had already dropped the
+book-limit trigger in production; `20261015000000_free_three_books_again.sql`
+puts it back. The gates now read `bookLimitFor(plan)`, so the count lives in
+`TIER_LIMITS.free.books` and the trigger alone.
 
 **Still to do:**
 - **My book tracker** (asked for 2026-10-12, held for later): a writer's own

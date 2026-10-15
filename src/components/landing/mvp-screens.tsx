@@ -4,6 +4,8 @@ import {
 } from "@/components/landing/app-window";
 import { MAX_SNAPSHOTS } from "@/lib/history";
 import { IMPORT_FORMATS } from "@/lib/import";
+import { TIER_LIMITS } from "@/lib/billing/tiers";
+import { plural } from "@/lib/plural";
 import { RECORD_FORMAT } from "@/lib/provenance";
 
 /**
@@ -170,7 +172,7 @@ export function ShelfScreen({ chrome }: ScreenProps = {}) {
         <div className="mt-auto rounded-[1.17cqw] border border-lp-edge px-[1.43cqw] py-[1.3cqw]">
           <p className="text-[1.37cqw] font-semibold text-lp-ink">Free plan</p>
           <p className="mt-[0.33cqw] text-[1.3cqw] text-lp-faint">
-            Unlimited books
+            {plural(TIER_LIMITS.free.books ?? 0, "book")}
           </p>
         </div>
       </aside>

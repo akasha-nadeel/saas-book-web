@@ -56,10 +56,10 @@ export const PAID_TIERS: readonly PaidTier[] = ["pro", "plus"];
  * and JSON has no infinity.
  */
 export const TIER_LIMITS = {
-  /* Unlimited since 2026-10-13, the owner's decision: Free held three books
-     from 2026-09-15 and one before that. */
+  /* Three since 2026-09-15 (one before that). Unlimited was built on
+     2026-10-13 and taken back by the owner on 2026-10-15 before it went live. */
   free: {
-    books: null as number | null,
+    books: 3 as number | null,
   },
   pro: {
     books: null as number | null,

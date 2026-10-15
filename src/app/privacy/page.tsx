@@ -70,9 +70,7 @@ export default function PrivacyPage() {
           items={[
             <>
               <Term>Your account</Term> — your email address and any profile
-              details provided by the sign-in provider. We use the address to
-              email you about your account and about changes to what your plan
-              includes — occasionally, never a newsletter, and never shared.
+              details provided by the sign-in provider.
             </>,
             <>
               <Term>Your library</Term> — books, chapters, prose and metadata,

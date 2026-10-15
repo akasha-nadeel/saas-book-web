@@ -83,10 +83,9 @@ export const ROWS: {
   label: string;
   values: Record<PlanTier, string>;
 }[] = [
-  /* **Line one, and unlimited on every plan since 2026-10-13.** It was the
-     first thing Pro bought while Free held three; now the identical values are
-     the argument, the way the Export row's are — no plan rations books. Read
-     from `TIER_LIMITS`, so a limit brought back would show here at once. */
+  /* **Line one, because it is the first thing Pro buys** — said first rather
+     than found. Read from `TIER_LIMITS` for every plan, so the count on the
+     table is the count the gates enforce. */
   {
     group: "Writing",
     label: "Books",

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { TIER_NAMES } from "@/lib/billing/tiers";
+import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
 import Link from "next/link";
 import { LegalPage, List, Note, Section, Term } from "@/components/legal/legal-shell";
 import { displayPrice, priceOf } from "@/lib/billing/plans";
@@ -71,7 +71,8 @@ export default function TermsPage() {
 
       <Section title="5. The plans">
         <p>
-          The Free plan includes unlimited books, chapters and words, autosave and sync where accounts are
+          The Free plan includes {plural(TIER_LIMITS.free.books ?? 0, "book")},
+          unlimited chapters and words, autosave and sync where accounts are
           configured, Word, EPUB and PDF export,{" "}
           {plural(FREE_LIMITS.titleCheck.free, "title check")} a day,
           unlimited market checks on Apple Books&rsquo; best-seller lists,{" "}
@@ -80,7 +81,7 @@ export default function TermsPage() {
           and the last {FREE_RECORD_DAYS} days of the writing record.
         </p>
         <p>
-          {TIER_NAMES.pro} adds unlimited title checks and parked ideas,
+          {TIER_NAMES.pro} adds unlimited books, title checks and parked ideas,
           all {ALL_CHECKS.length} consistency checks, the writing record for the
           twelve months the app keeps, and paperback setup. {TIER_NAMES.plus}{" "}
           is everything in {TIER_NAMES.pro}{" "}

@@ -33,7 +33,7 @@ import {
 import { IMPORT_FORMATS } from "@/lib/import";
 import { MAX_SNAPSHOTS } from "@/lib/history";
 import { PRO_CHECKS } from "@/lib/consistency-ids";
-import { AMAZON_DATA_TIER, PAID_TIERS, TIER_NAMES } from "@/lib/billing/tiers";
+import { AMAZON_DATA_TIER, PAID_TIERS, TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
 import { billingConfigured, tierOnSale } from "@/lib/billing/provider";
 import { FREE_LIMITS, FREE_RECORD_DAYS } from "@/lib/free-limits";
 import { CONTACT_EMAIL, LEGAL_PAGES, REFUND_DAYS } from "@/lib/legal";
@@ -569,15 +569,6 @@ const FAQ: [question: string, answer: ReactNode][] = [
     </>,
   ],
   [
-    "How many books can I write for free?",
-    <>
-      As many as you like. Every plan holds unlimited books, chapters and
-      words, Free included — start the next one whenever it arrives. What the
-      paid plans add is the extra checks and tools around a book, never room
-      for one.
-    </>,
-  ],
-  [
     "Do I have to pay to get my book out?",
     <>
       No. Word, EPUB and PDF are all on the free plan, with no limit on how
@@ -611,10 +602,10 @@ const FAQ: [question: string, answer: ReactNode][] = [
     <>
       Nothing is taken away and nothing is locked. Your books stay where they
       are, you keep writing in all of them, and every export format goes on
-      working, and you can still start as many new books as you like — books
-      are unlimited on every plan. What changes is that title checks go back
-      to a daily allowance, you cannot park a new idea while you hold more
-      than{" "}
+      working. What changes is that you cannot start a new book while you
+      hold more than the free plan&rsquo;s{" "}
+      {plural(TIER_LIMITS.free.books ?? 0, "book")}, title checks go back to a
+      daily allowance, you cannot park a new idea while you hold more than{" "}
       {FREE_LIMITS.ideas.free}, and what only a paid plan shows (the{" "}
       {plural(PRO_CHECKS.length, "extra consistency check")}, the writing record
       before the last {FREE_RECORD_DAYS}{" "}
@@ -779,10 +770,9 @@ export function MvpLandingPage() {
               </h1>
             </div>
             <p className={`oc-lead mx-auto mt-6 max-w-xl ${SECTION_LEAD}`}>
-              Write it in the browser, with{" "}
-              <strong className={LEAD_EM}>unlimited books, free</strong>. Export
-              as <strong className={LEAD_EM}>Word, EPUB or PDF</strong> — the
-              EPUB clears EPUBCheck. No AI — every word is yours.
+              Write it in the browser. Export as{" "}
+              <strong className={LEAD_EM}>Word, EPUB or PDF</strong> — the EPUB
+              clears EPUBCheck. No AI — every word is yours.
             </p>
 
             {/* Two pills side by side, filled and white — the reference's pair.
@@ -988,8 +978,7 @@ export function MvpLandingPage() {
                 {TIER_NAMES.free}, {TIER_NAMES.pro} and {TIER_NAMES.plus}, two
                 cycles, and nothing held hostage.{" "}
                 <strong className={LEAD_EM}>
-                  Unlimited books and every export format are free, on every
-                  plan, for good.
+                  Every export format is free, on every plan, for good.
                 </strong>
               </p>
             </div>

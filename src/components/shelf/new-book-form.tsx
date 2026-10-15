@@ -244,10 +244,10 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
   const router = useRouter();
   const shelf = useShelf();
   const plan = usePlan();
-  /* **Never true since 2026-10-13**: every plan holds unlimited books, so
-     `bookLimitFor` answers null. Kept as the one place a limit brought back
-     would refuse a new book — read through `onFreePlan`'s three parts, so it
-     could never fire while the plan is still loading. */
+  /* `bookLimitFor` is the free plan's count behind `onFreePlan`'s three
+     parts, so it never fires while the plan is still loading — gating during
+     that window refused a Pro writer for the width of one request. The
+     Postgres trigger is what actually enforces this. */
   const freeBookLimitReached = atBookLimit(shelf, bookLimitFor(plan));
 
   /* Which door the writer came through, from `?source=`. Read with

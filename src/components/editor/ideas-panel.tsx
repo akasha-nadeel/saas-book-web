@@ -98,7 +98,6 @@ export function IdeasPanel({ bookId }: { bookId?: string }) {
   const shelf = useShelf();
   const plan = usePlan();
   const [full, setFull] = useState(false);
-  // Never true since 2026-10-13, when every plan went unlimited on books.
   const shelfFull = atBookLimit(shelf, bookLimitFor(plan));
 
   /*

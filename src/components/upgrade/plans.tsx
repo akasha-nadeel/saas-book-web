@@ -23,12 +23,14 @@ import {
 } from "@/components/upgrade/plan-button";
 import {
   PAID_TIERS,
+  TIER_LIMITS,
   TIER_NAMES,
   tierAtLeast,
   type PaidTier,
 } from "@/lib/billing/tiers";
 import { PLANS_ON_SALE } from "@/lib/launch";
 import { notePlanInterest } from "@/lib/plan-interest";
+import { plural } from "@/lib/plural";
 import { PlanCard, PricingDecor } from "@/components/upgrade/plan-card";
 
 /**
@@ -421,9 +423,9 @@ export function Plans({
                      font-medium text-fg/80"
         >
           Every format is free, on every plan — take your book and go whenever
-          you like, and books are unlimited on every plan, Free included.{" "}
-          {TIER_NAMES.pro} is for every consistency check, your whole writing
-          record and paperback setup; {TIER_NAMES.plus} adds
+          you like. {TIER_NAMES.pro} is for more than{" "}
+          {plural(TIER_LIMITS.free.books ?? 0, "book")}, every consistency check,
+          your whole writing record and paperback setup; {TIER_NAMES.plus} adds
           Amazon&rsquo;s own lists to the Market check. No AI on any plan: every
           word is yours.
         </p>
@@ -540,8 +542,8 @@ export function Plans({
               {TIER_NAMES[soon.tier]} is not on sale yet. We have noted that you
               wanted it — that is how we decide what to switch on first, and it
               is all we record about this press. Everything free stays free
-              meanwhile: unlimited books, chapters and words, and every
-              export format.
+              meanwhile: {plural(TIER_LIMITS.free.books ?? 0, "book")}, unlimited
+              chapters and words, and every export format.
             </>
           )}
         </ComingSoonDialog>

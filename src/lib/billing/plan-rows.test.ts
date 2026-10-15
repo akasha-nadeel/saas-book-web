@@ -62,20 +62,18 @@ it("gives every row an answer for every plan", () => {
 });
 
 /**
- * **The table opens on Books, unlimited on every plan** (2026-10-13). It was
- * the row that separated Free from Pro while Free held three; now, like the
- * Export row, the identical values are the point — no plan rations books.
+ * The first row is the first thing Pro buys, so it is said first rather than
+ * found.
  */
-it("opens on Books, unlimited on every plan", () => {
+it("opens on the row that separates Free from Pro", () => {
   expect(ROWS[0].label).toBe("Books");
-  const values = TIER_ORDER.map((tier) => ROWS[0].values[tier]);
-  expect(new Set(values)).toEqual(new Set(["Unlimited"]));
+  expect(ROWS[0].values.free).not.toBe(ROWS[0].values.pro);
 });
 
 /**
- * **What Pro buys over Free** (six rows since 2026-10-13: the price check left
- * this list on 2026-10-12 when Amazon's data moved to Pro Plus, and Books the
- * next day when every plan went unlimited). **Paperback setup is the one feature Free does not have
+ * **What Pro buys over Free** (seven rows since 2026-10-12: the price check
+ * left this list when Amazon's data moved to Pro Plus, and it reads "Apple
+ * prices" on both). **Paperback setup is the one feature Free does not have
  * at all** among the things Pro sells — the owner's decision on 2026-09-16.
  * Colour themes is deliberately *not* a door: Free keeps a colour and four
  * papers, so the row is a difference rather than a door.
@@ -85,6 +83,7 @@ it("differs between Free and Pro only on the rows Pro sells", () => {
     (row) => row.label,
   );
   expect(differing.sort()).toEqual([
+    "Books",
     "Colour themes",
     "Consistency check",
     "Ideas",

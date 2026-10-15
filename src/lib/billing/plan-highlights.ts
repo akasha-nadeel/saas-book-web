@@ -58,7 +58,7 @@ export interface Highlight {
  */
 export const BEST_FOR: Record<PlanTier, string> = {
   free: "Best for finding out if this is your tool.",
-  pro: "Best for getting a book ready to publish.",
+  pro: "Best for a writer with more than one book.",
   plus: "Best for choosing a genre, a price and categories.",
 };
 
@@ -108,8 +108,7 @@ const MARKET_APPLE: Highlight = {
 
 /** The lines on the Free card. */
 const FREE_HIGHLIGHTS: Highlight[] = [
-  /* Unlimited since 2026-10-13; the limit is still read, so one brought back
-     would print its number here. */
+  /* Read from `TIER_LIMITS`, so the card says the number the gates enforce. */
   TIER_LIMITS.free.books === null
     ? { row: "Books", lead: "Unlimited", text: "books" }
     : {

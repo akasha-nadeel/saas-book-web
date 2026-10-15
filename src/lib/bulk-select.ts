@@ -122,9 +122,9 @@ export function favouriteIntent(books: readonly Book[]): "add" | "remove" {
 /**
  * How many books may still come **out of the trash**.
  *
- * `Infinity` when `limit` is null — which is every plan since 2026-10-13, when
- * Free went unlimited (`bookLimitFor` in `launch.ts`), and whenever no gateway
- * is configured.
+ * `Infinity` when `limit` is null — a paid plan, an unknown plan, or no
+ * gateway configured (`bookLimitFor` in `launch.ts` decides); a self-hosted
+ * copy holds nothing back.
  *
  * **Only a trashed book is counted against the plan.** An archived book already
  * spends its slot (`booksAgainstPlan` counts both active and archived), so

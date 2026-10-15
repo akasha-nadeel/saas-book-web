@@ -9,12 +9,12 @@
 import { amazonDataAllowed, bookLimit, type PlanTier } from "@/lib/billing/tiers";
 
 /*
- * **There is no free book limit since 2026-10-13.** `freeBooks` lived here —
- * one book, then three from 2026-09-15 — mirrored by `TIER_LIMITS.free.books`
- * and a Postgres trigger. The owner made every plan unlimited; the trigger was
- * dropped by `20261013000000_free_unlimited_books.sql` and the browser gates
- * went with it. `bookLimit()` in `tiers.ts` is where a limit would come back,
- * with a migration beside it.
+ * **The free book limit is `TIER_LIMITS.free.books` in `tiers.ts`** — three
+ * since 2026-09-15 — and the Postgres trigger `enforce_launch_book_limit`,
+ * which is what actually refuses. `LAUNCH_LIMITS.freeBooks` used to mirror it
+ * here; since 2026-10-13 the gates read `bookLimitFor(plan)` instead, so the
+ * number is stated once in TypeScript and once in SQL, and `launch.test.ts`
+ * holds the two together.
  */
 export const LAUNCH_LIMITS = {
   /**
@@ -70,9 +70,9 @@ export function onFreePlan(plan: {
 /**
  * The book limit this reader is held to, or null for none.
  *
- * Free's limit is `bookLimit("free")` — null since 2026-10-13, so this is null
- * for everybody today. Asked through the same three-part `onFreePlan`, so a
- * limit brought back would never fire while the plan is unknown.
+ * Free's limit is `bookLimit("free")` (three); a paid plan, an unknown plan
+ * and no gateway at all are null. Asked through the same three-part
+ * `onFreePlan`, so it never fires while the plan is still loading.
  */
 export function bookLimitFor(plan: {
   loading: boolean;

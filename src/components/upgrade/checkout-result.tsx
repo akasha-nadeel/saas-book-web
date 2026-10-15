@@ -65,8 +65,8 @@ export function CheckoutResult({ orderId }: { orderId: string | null }) {
             title={`You're on ${planName}`}
             body={`${
               plan.tier && amazonDataAllowed(plan.tier)
-                ? "Unlimited title checks, every consistency check and Amazon's lists in the Market check are switched on."
-                : "Unlimited title checks, every consistency check and paperback setup are switched on."
+                ? "Unlimited books, unlimited title checks and Amazon's lists in the Market check are switched on."
+                : "Unlimited books and unlimited title checks are switched on."
             } PayHere has emailed your receipt.`}
             action={{ href: "/", label: "Back to writing" }}
           />

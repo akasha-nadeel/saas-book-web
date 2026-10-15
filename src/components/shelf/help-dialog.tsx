@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogClose } from "@/components/ui/dialog";
-import { AMAZON_DATA_TIER, TIER_NAMES } from "@/lib/billing/tiers";
+import { AMAZON_DATA_TIER, TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
 import { ALL_CHECKS, FREE_CHECKS, PRO_CHECKS } from "@/lib/consistency-ids";
 import { CHECK_LOOK } from "@/lib/consistency-checks";
 import { FREE_LIMITS, FREE_RECORD_DAYS } from "@/lib/free-limits";
@@ -139,11 +139,11 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     items: [
       {
         name: TIER_NAMES.free,
-        desc: `Free, no card. Unlimited books, chapters and words, importing, syncing, every export format, ${plural(FREE_LIMITS.titleCheck.free, "title check")} a day, unlimited market checks on Apple Books' lists, ${plural(FREE_LIMITS.ideas.free, "parked idea")} at a time, ${FREE_CHECKS.length} consistency checks and the last ${FREE_RECORD_DAYS} days of the writing record.`,
+        desc: `Free, no card. ${plural(TIER_LIMITS.free.books ?? 0, "book")}, unlimited chapters and words, importing, syncing, every export format, ${plural(FREE_LIMITS.titleCheck.free, "title check")} a day, unlimited market checks on Apple Books' lists, ${plural(FREE_LIMITS.ideas.free, "parked idea")} at a time, ${FREE_CHECKS.length} consistency checks and the last ${FREE_RECORD_DAYS} days of the writing record.`,
       },
       {
         name: TIER_NAMES.pro,
-        desc: `Everything on Free, with unlimited title checks and parked ideas, all ${ALL_CHECKS.length} consistency checks, twelve months of the writing record with its fingerprint, and paperback setup.`,
+        desc: `Everything on Free, with unlimited books, title checks and parked ideas, all ${ALL_CHECKS.length} consistency checks, twelve months of the writing record with its fingerprint, and paperback setup.`,
       },
       {
         name: TIER_NAMES.plus,

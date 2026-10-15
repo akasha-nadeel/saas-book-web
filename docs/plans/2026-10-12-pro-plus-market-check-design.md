@@ -1,6 +1,6 @@
-# Pro Plus, the Market check, and unlimited books on Free
+# Pro Plus and the Market check
 
-Decided 2026-10-12 and 2026-10-13 by the owner. Builds on
+Decided 2026-10-12 by the owner. Builds on
 `2026-10-05-price-check-amazon-design.md`, which has the Amazon data's
 measurements and the providers tested.
 
@@ -71,19 +71,19 @@ The price check was renamed because it now asks three questions.
 - Migration `20261012010000_pro_plus_plan.sql` widens the plan CHECKs. **Apply
   it first.**
 
-## Unlimited books on Free (2026-10-13)
+## Unlimited books on Free — built, then taken back (2026-10-13 → 10-15)
 
-The owner made every plan unlimited on books.
+On 2026-10-13 the owner asked for unlimited books on every plan, with a
+one-time popup for existing writers and an email to every account. All three
+were built, and its migration (`20261013000000_free_unlimited_books.sql`)
+dropped the book-limit trigger in the live database.
 
-- `20261013000000_free_unlimited_books.sql` drops the trigger. **Apply it
-  first**, or a fourth book never syncs.
-- The browser gates now read `bookLimitFor(plan)`, which is null for everyone,
-  so a limit could come back with one field and a trigger.
-- Pro now sells the checks and tools around a book, never room for one.
-- **Telling people.** Existing writers see "Unlimited books, free." once, on the
-  dashboard, with no new sign-in. It is remembered per account. Every
-  confirmed account gets one plain email (`scripts/announce-unlimited-books.cjs`;
-  no tracking; it sends only with `--send`). `/privacy` says we email about
-  changes to a plan.
-- Storage: the shelf holds about 800 books in `localStorage`, and Pro was
-  already unlimited, so no ceiling a writer reaches moved.
+On 2026-10-15, before any of it went live and before the email was sent, the
+owner decided **Free stays at three books**. The popup and the email script
+were deleted. `20261015000000_free_three_books_again.sql` puts the trigger
+back, with a new sentence so a console error names it.
+
+**What stayed from it:** the browser's book gates now read
+`bookLimitFor(plan)` and `atBookLimit` in place of `LAUNCH_LIMITS.freeBooks`.
+That makes `TIER_LIMITS.free.books` the one TypeScript statement of the count,
+held to the trigger by `launch.test.ts`.

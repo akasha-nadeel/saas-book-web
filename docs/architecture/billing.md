@@ -7,16 +7,18 @@ Read before touching `src/lib/billing/`, `src/lib/free-limits.ts`, `src/componen
 > Cross-references reading "above", "below" or "the note in the styling section" may now
 > point at a sibling file in `docs/` -- see the table in CLAUDE.md.
 
-> ## Since 2026-10-12/13: three plans, and unlimited books on every one
+> ## Since 2026-10-12: three plans
 >
 > **Pro Plus ($9.99 / $99.48)** is Pro and Amazon's data, which is paid for by
 > the request; `AMAZON_DATA_TIER` in `tiers.ts` is the switch that gives it to
-> Pro later. **Free holds unlimited books since 2026-10-13** — the trigger is
-> dropped by `20261013000000_free_unlimited_books.sql` and the browser gates
-> read `bookLimitFor(plan)`, null for everybody. Only Pro's Paddle ids decide
-> whether Paddle is configured; a Pro Plus with no prices is "Available soon".
-> The reasoning is in `docs/plans/2026-10-12-pro-plus-market-check-design.md`.
-> What follows was written for two plans and a book limit; read it with that.
+> Pro later. Free still holds three books: unlimited was built on 2026-10-13
+> and taken back on 2026-10-15 before it shipped, and
+> `20261015000000_free_three_books_again.sql` restores the trigger its
+> migration dropped. The browser gates read `bookLimitFor(plan)` now rather
+> than `LAUNCH_LIMITS.freeBooks`. Only Pro's Paddle ids decide whether Paddle
+> is configured; a Pro Plus with no prices is "Available soon". The reasoning
+> is in `docs/plans/2026-10-12-pro-plus-market-check-design.md`. What follows
+> was written for two plans; read it with that.
 >
 > ## Two plans, Free and Pro, and no AI (2026-09-14)
 >
@@ -155,8 +157,8 @@ consistency at $70 a year, and Reedsy Studio's paid add-ons are history and
 outlining on top of a free core. Writers with a backlist are the ones Pro is
 aimed at — Written Word Media's 2025 survey found high earners write lots of
 books in series — which is why more books and the full record are paid.
-**Only the book count was server-enforced** (until 2026-10-13, when it went;
-Amazon's data is the one server gate since); the rest are browser gates through
+**Only the book count is server-enforced** (and, since 2026-10-06, Amazon's
+data, by plan rather than count); the rest are browser gates through
 `onFreePlan`, and the owner chose them knowing that. None hides anything a
 writer typed. EPUB and PDF were Pro until 2026-08-27; see the note in
 `launch.ts` for why that was the wrong thing to charge for, and
